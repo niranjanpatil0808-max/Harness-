@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from kintsugi.loop import load_task, parse_files, solve
+from kintsugi.loop import headline, load_task, parse_files, solve
 from kintsugi.model import MockModel, ModelRequestError
 
 FIXTURE = Path(__file__).parent / "fixtures" / "add_bug"
@@ -82,6 +82,36 @@ class TestSolve(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertEqual(result.attempts[-1].error_type, "ModelError")
         self.assertEqual(result.num_attempts, 2)
+
+    def test_conversation_stays_bounded_over_many_retries(self):
+        model = MockModel([WRONG])
+        solve(self.task, model, max_retries=3)
+        sizes = [len(messages) for messages in model.prompts]
+        self.assertEqual(sizes, [2, 4, 4, 4])  # system + task, then the latest attempt and its error
+
+    def test_earlier_failures_are_summarised(self):
+        wrong_again = WRONG.replace("a * b", "a - 1")
+        model = MockModel([WRONG, wrong_again, RIGHT])
+        result = solve(self.task, model, max_retries=3)
+        self.assertTrue(result.passed)
+        third_prompt = model.prompts[2][-1]["content"]
+        self.assertIn("Earlier attempts also failed", third_prompt)
+        self.assertIn("attempt 1: AssertionError", third_prompt)
+
+    def test_repeated_attempt_is_called_out(self):
+        model = MockModel([WRONG, WRONG, RIGHT])
+        solve(self.task, model, max_retries=3)
+        self.assertIn("identical to your attempt 1", model.prompts[2][-1]["content"])
+
+    def test_unchanged_original_is_called_out(self):
+        original = "```python\n# file: calc.py\ndef add(a, b):\n    return a - b\n```"
+        model = MockModel([original, RIGHT])
+        solve(self.task, model, max_retries=2)
+        self.assertIn("original code unchanged", model.prompts[1][-1]["content"])
+
+    def test_headline_picks_the_exception_line(self):
+        output = "FAIL: test_add\nTraceback...\nAssertionError: -1 != 5\n\nRan 1 test"
+        self.assertEqual(headline(output), "AssertionError: -1 != 5")
 
 
 if __name__ == "__main__":

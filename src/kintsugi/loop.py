@@ -139,6 +139,26 @@ def build_prompt(task: Task, use_graph: bool, lessons_text: str) -> tuple[str, l
     return "\n\n".join(parts), editable
 
 
+def headline(output: str) -> str:
+    """One line describing a test failure: the last exception line, else the first line."""
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    for line in reversed(lines):
+        if re.match(r"^[\w.]*(Error|Exception|Failure)\b", line):
+            return line[:160]
+    return (lines[0] if lines else "no output")[:160]
+
+
+def repeat_warning(files: dict[str, str], task: Task, earlier: list[dict[str, str]]) -> str:
+    """Tell the model when it handed back code it has already tried (or the original, unchanged)."""
+    if files and all(files[path].strip() == task.sources.get(path, "").strip() for path in files):
+        return "You returned the original code unchanged, so nothing is fixed. Change the code.\n"
+    for number, previous in enumerate(earlier, 1):
+        if files and files == previous:
+            return (f"This is identical to your attempt {number}, which failed the same way. "
+                    "Do not repeat it: find a different cause.\n")
+    return ""
+
+
 def solve(
     task: Task,
     model: Model,
@@ -161,11 +181,13 @@ def solve(
     attempts: list[Attempt] = []
     learned: list[str] = []
     shown: list[str] = []  # lessons put in front of the model during retries
+    tried: list[dict[str, str]] = []  # the files of each attempt, to spot repeats
+    earlier: list[str] = []  # one line per failed attempt
     for number in range(1, max_retries + 2):
         try:
             reply = model.complete(messages)
         except ModelRequestError as err:
-            # e.g. the conversation outgrew the model's context window: the task fails, the run goes on.
+            # e.g. the request was too long for the model's context window: the task fails, the run goes on.
             attempts.append(Attempt(number, False, "ModelError", str(err)[:300], [], used_ids))
             break
         files = parse_files(reply, task, editable)
@@ -182,13 +204,22 @@ def solve(
         if lesson:
             learned.append(lesson.id)
         if number <= max_retries:
-            feedback = f"The tests failed:\n```\n{result.output}\n```\n"
+            feedback = ""
+            if earlier:
+                feedback += "Earlier attempts also failed:\n" + "\n".join(f"- {line}" for line in earlier) + "\n\n"
+            feedback += f"Your latest attempt failed the tests:\n```\n{result.output}\n```\n"
+            feedback += repeat_warning(files, task, tried)
             if lesson:
                 feedback += f"Lesson from this failure: {lesson.text}\n"
                 shown.append(lesson.id)
-            messages.append({"role": "assistant", "content": reply})
-            messages.append({"role": "user", "content":
-                             feedback + "Find the cause and return the complete fixed file(s)."})
+            earlier.append(f"attempt {number}: {headline(result.output)}")
+            tried.append(files)
+            # Keep the conversation short: the task, the latest attempt and its error. Older
+            # attempts are only summarised above, so long retry chains never outgrow the context.
+            messages = messages[:2] + [
+                {"role": "assistant", "content": reply},
+                {"role": "user", "content": feedback + "Find the cause and return the complete fixed file(s)."},
+            ]
 
     passed = attempts[-1].passed
     if memory and learn:
