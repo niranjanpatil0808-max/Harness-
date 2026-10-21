@@ -1,0 +1,295 @@
+{
+  "meta": {
+    "started": "2026-10-21T15:32:59+00:00",
+    "git_commit": "aab7b92",
+    "mock": false,
+    "modes": [
+      "baseline"
+    ],
+    "repeats": 1,
+    "temperature": 0.0,
+    "split": {
+      "note": "Lessons are learned on warmup tasks only. Pass rates are reported on held-out tasks.",
+      "warmup": [
+        "s01_median",
+        "s04_flatten",
+        "s07_roman",
+        "s10_dedupe",
+        "s13_caesar",
+        "m01_order_total",
+        "m04_units",
+        "m07_slugify"
+      ],
+      "heldout": [
+        "s02_palindrome",
+        "s03_binary_search",
+        "s05_word_count",
+        "s06_chunk",
+        "s08_merge_intervals",
+        "s09_rotate",
+        "s11_duration",
+        "s12_moving_average",
+        "s14_fibonacci",
+        "s15_brackets",
+        "s16_top_k",
+        "m02_display_name",
+        "m03_config_defaults",
+        "m05_bank_errors",
+        "m06_coupon",
+        "m08_scheduler"
+      ]
+    },
+    "model": "allam-2-7b",
+    "base_url": "https://api.groq.com/openai/v1",
+    "finished": "2026-10-21T15:35:19+00:00"
+  },
+  "runs": {
+    "baseline": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: text.py\ndef is_palindrome(text):\n    cleaned = text.lower().replace(\" \", \"\").replace(\",\", \"\").replace(\"!\", \"\").strip()\n    return cleaned == cleaned[::-1]\n\n# file: test_text.py\nimport unittest\n\nfrom text import is_palindrome\n\n\nclass TestPalindrome(unittest.TestCase):\n    def test_simple(self):\n        self.assertTrue(is_palindrome(\"Racecar\"))\n\n    def test_punctuation(self):\n        self.assertTrue(is_palindrome(\"A man, a plan, a canal: Panama!\"))\n\n    def test_not_palindrome(self):\n    "
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: search.py\ndef binary_search(items, target):\n    lo, hi = 0, len(items) - 1\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if items[mid] == target:\n            return mid\n        elif items[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1\n```"
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: words.py\ndef word_count(text):\n    counts = {}\n    for word in text.lower().split():\n        word = word.replace(\",\", \"\").replace(\".\", \"\").lower()\n        counts[word] = counts.get(word, 0) + 1\n    return counts\n\n# file: test_words.py\nimport unittest\n\nfrom words import word_count\n\n\nclass TestWordCount(unittest.TestCase):\n    def test_case(self):\n        self.assertEqual(word_count(\"The the THE\"), {\"the\": 3})\n\n    def test_punctuation(self):\n        self.assertEqual(word_count(\"Hello, wor"
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: chunks.py\ndef chunk(items, size):\n    return [items[i:i + size] for i in range(0, len(items) - size + 1, size)]\n\n# file: test_chunks.py\nimport unittest\n\nfrom chunks import chunk\n\n\nclass TestChunk(unittest.TestCase):\n    def test_even(self):\n        self.assertEqual(chunk([1, 2, 3, 4], 2), [[1, 2], [3, 4]])\n\n    def test_remainder(self):\n        self.assertEqual(chunk([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]])\n\n    def test_size_larger_than_list(self):\n        self.assertEqual(chunk([1, "
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: intervals.py\ndef merge_intervals(intervals):\n    merged = []\n    for start, end in intervals:\n        if merged and start < merged[-1][1]:\n            merged[-1][1] = max(merged[-1][1], end)\n        else:\n            merged.append([start, end])\n    return merged\n\n# file: test_intervals.py\nimport unittest\n\nfrom intervals import merge_intervals\n\n\nclass TestMerge(unittest.TestCase):\n    def test_overlap(self):\n        self.assertEqual(merge_intervals([[1, 3], [2, 6], [8, 10]]), [[1, 6], [8,"
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: matrix.py\ndef rotate_clockwise(matrix):\n    if not matrix:\n        return []\n    rows, cols = len(matrix), len(matrix[0])\n    return [[matrix[r][cols - c - 1] for r in range(rows) for c in range(cols)] for c in range(cols - 1, -1, -1)]\n\n# file: test_matrix.py\nimport unittest\n\nfrom matrix import rotate_clockwise\n\n\nclass TestRotate(unittest.TestCase):\n    def test_square(self):\n        self.assertEqual(rotate_clockwise([[1, 2], [3, 4]]), [[3, 1], [4, 2]])\n\n    def test_rectangular(self):\n "
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: duration.py\nimport re\n\nUNITS = {\"h\": 3600, \"m\": 3600, \"s\": 1}\n\n\ndef parse_duration(text):\n    total = 0\n    for amount, unit in re.findall(r\"(\\d+)([hms])\", text):\n        total += int(amount) * UNITS[unit]\n    return total\n\n\n# file: test_duration.py\nimport unittest\n\nfrom duration import parse_duration\n\n\nclass TestDuration(unittest.TestCase):\n    def test_full(self):\n        self.assertEqual(parse_duration(\"1h30m15s\"), 5415)\n\n    def test_minutes(self):\n        self.assertEqual(parse_dura"
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: series.py\n\ndef moving_average(values, window):\n    result = []\n    for i in range(len(values) - window):\n        chunk = values[i:i + window]\n        result.append(sum(chunk) / window)\n    return result\n\n# file: test_series.py\n\nimport unittest\n\nfrom series import moving_average\n\n\nclass TestMovingAverage(unittest.TestCase):\n    def test_basic(self):\n        self.assertEqual(moving_average([1, 2, 3, 4, 5], 2), [1.5, 2.5, 3.5, 4.5])\n\n    def test_window_equals_length(self):\n        self.ass"
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: fib.py\ndef fib(n):\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a  # Corrected the variable names and removed unnecessary assignment\n\n# file: test_fib.py\nimport unittest\n\nfrom fib import fib\n\n\nclass TestFib(unittest.TestCase):\n    def test_base(self):\n        self.assertEqual(fib(0), 0)\n        self.assertEqual(fib(1), 1)\n\n    def test_sequence(self):\n        expected = [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]\n        actual = [fib(i) for i in range(10)]\n        sel"
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: brackets.py\n\nPAIRS = {\")\": \"(\", \"]\": \"[\", \"}\": \"{\"}\n\n\ndef is_balanced(text):\n    stack = []\n    for ch in text:\n        if ch in \"([{\":\n            stack.append(ch)\n        elif ch in PAIRS:\n            if not stack:\n                return False\n            opening_pair = PAIRS[ch]\n            if stack.pop() != opening_pair:\n                return False\n    return stack == []\n```\n\n# file: test_brackets.py\n\nimport unittest\n\nfrom brackets import is_balanced\n\n\nclass TestBalanced(unittest.Te"
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: freq.py\nfrom collections import Counter\n\n\ndef top_k(words, k):\n    counts = Counter(words)\n    ranked = sorted(counts.items(), key=lambda pair: (pair[1], pair[0]), reverse=True)\n    return [word for word, _ in ranked[:k]]\n\n\n# file: test_freq.py\nimport unittest\n\nfrom freq import top_k\n\n\nclass TestTopK(unittest.TestCase):\n    def test_counts(self):\n        self.assertEqual(top_k([\"a\", \"b\", \"a\", \"c\", \"a\", \"b\"], 2), [\"a\", \"b\"])\n\n    def test_ties_alphabetical(self):\n        self.assertEqual("
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: users.py\nfrom text_utils import title_case\n\n\ndef display_name(user):\n    return title_case(title_case(title_case(title_case(title_case(title_case(title_case(user.get(\"first\"), user.get(\"middle\"), user.get(\"last\"))\n```python\n# file: test_users.py\nimport unittest\n\nfrom users import display_name\n\n\nclass TestDisplayName(unittest.TestCase):\n    def test_simple(self):\n        self.assertEqual(display_name({\"first\": \"ada\", \"last\": \"LOVELACE\"}), \"Ada Lovelace\"\n\n    def test_small_words(self):\n  "
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: settings.py\nfrom defaults import DEFAULTS\n\n\ndef get_setting(config, key):\n    if key in config:\n        return config[key]\n    return DEFAULTS.get(key)\n```\n\n# file: test_settings.py\nimport unittest\n\nfrom settings import get_setting, load\n\n\nclass TestSettings(unittest.TestCase):\n    def test_present(self):\n        self.assertEqual(get_setting(load(\"timeout = 30\"), \"30\")\n\n    def test_default(self):\n        self.assertEqual(get_setting(load(\"# empty\"), \"timeout\")\n        self.assertEqual(g"
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ImportError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "from_name\n    __import__(name)\n  File \"/tmp/kintsugi-q0sa79ql/task/test_account.py\", line 3, in <module>\n    from account import Account\n  File \"/tmp/kintsugi-q0sa79ql/task/account.py\", line 1, in <module>\n    from errors import InsufficientFunds, InvalidAmount\n  File \"/tmp/kintsugi-q0sa79ql/task/errors.py\", line 1, in <module>\n    from typing import TypeError\nImportError: cannot import name 'TypeError' from 'typing' (/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/typing.py)\n\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)",
+            "last_reply": "# file: account.py\nfrom errors import InsufficientFunds\n\n\nclass Account:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n\n    def deposit(self, amount):\n        self.balance += amount\n\n    def withdraw(self, amount):\n        if amount > self.balance:\n            raise InsufficientFunds(\"Insufficient funds\")\n        self.balance -= amount\n```\n\n# file: errors.py\nfrom typing import TypeError\n\nclass InsufficientFunds(TypeError):\n    pass\n```python\n"
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "# file: checkout.py\nfrom discounts import checkout_total\nfrom logging import Logger\nfrom logging_utils import Logger\n\nclass Checkout:\n    def __init__(self, logger: Logger):\n        self.logger = logger\n\n    def __str__(self):\n        return f\"Checkout: {self.logger.tail(10)}\"\n\n    def checkout_total(self, cart, code=None):\n        if code is None:\n            self.logger.warning(\"No coupon code provided\")\n            return sum(item[\"price\"] * item[\"qty\"] for item in cart)\n        elif code in "
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "TypeError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "ast):\n  File \"/tmp/kintsugi-nmsb62s_/task/test_jobs.py\", line 11, in test_hourly\n    self.assertEqual(next_run({\"frequency\": \"hourly\"}, NOW), datetime(2026, 10, 21, 10, 0))\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/kintsugi-nmsb62s_/task/jobs.py\", line 11, in next_run\n    return now + timedelta(seconds=interval_for(job))\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: unsupported type for timedelta seconds component: datetime.timedelta\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nFAILED (errors=2)",
+            "last_reply": "# file: jobs.py\nfrom datetime import datetime\n\n\nINTERVALS = {\n    \"hourly\": 60,\n    \"daily\": 24 * 60,\n    \"weekly\": 7 * 24 * 60,\n}\n\ndef next_run(job, now):\n    interval = INTERVALS[job[\"frequency\"]]\n    return now + datetime.timedelta(minutes=interval)\n```\n\n# file: schedule_config.py\nfrom datetime import timedelta\n\nINTERVALS = {\n    \"hourly\": timedelta(minutes=60),\n    \"daily\": timedelta(minutes=24 * 60),\n    \"weekly\": timedelta(minutes=7 * 24 * 60),\n}\n```"
+          }
+        ],
+        "usage": {
+          "calls": 16,
+          "prompt_tokens": 12548,
+          "completion_tokens": 5838
+        }
+      }
+    ]
+  },
+  "summary": {
+    "baseline": {
+      "repeats": 1,
+      "pass_rate_mean": 0.0,
+      "pass_rate_min": 0.0,
+      "pass_rate_max": 0.0,
+      "avg_attempts": 1,
+      "calls_per_run": 16,
+      "tokens_per_run": 18386
+    }
+  }
+}
