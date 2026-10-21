@@ -152,6 +152,7 @@ def run_mode(data: dict, mode: str, repeat: int, model: Model, out: Path, sleep:
             "lessons_used": result.attempts[0].lessons_used if result.attempts else [],
             "lessons_learned": result.lessons_learned,
             "last_output": "" if result.passed else result.attempts[-1].output[-600:],
+            "last_reply": "" if result.passed else result.attempts[-1].reply,
         }
         run["tasks"].append(record)
         save(out, data)

@@ -89,6 +89,7 @@ class Attempt:
     output: str
     files_changed: list[str]
     lessons_used: list[str] = field(default_factory=list)
+    reply: str = ""  # start of the model's raw reply, kept for failed attempts so failures can be inspected
 
 
 @dataclass
@@ -154,7 +155,7 @@ def solve(
             result = VerifyResult(False, "No usable code block found. Reply with the full fixed file "
                                          "in a ```python block starting with '# file: <path>'.", "FormatError")
         attempts.append(Attempt(number, result.passed, result.error_type, result.output,
-                                sorted(files), used_ids))
+                                sorted(files), used_ids, "" if result.passed else reply[:500]))
         if result.passed:
             break
         lesson = memory.reflect(model, task, files, result) if memory and learn else None

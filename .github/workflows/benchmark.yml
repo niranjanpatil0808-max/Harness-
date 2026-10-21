@@ -52,7 +52,8 @@ jobs:
             model="${entry%%:*}"; tokens="${entry##*:}"
             echo "=== $model (max_tokens $tokens) ==="
             KINTSUGI_MODEL="$model" KINTSUGI_MAX_TOKENS="$tokens" \
-              python benchmark/run_benchmark.py --model openai --repeats "${REPEATS:-1}" --sleep "${SLEEP:-0}" || status=1
+              python benchmark/run_benchmark.py --model openai --repeats "${REPEATS:-1}" --sleep "${SLEEP:-0}" \
+                --modes ${MODES:-baseline loop loop+memory full} || status=1
           done
           exit $status
 
