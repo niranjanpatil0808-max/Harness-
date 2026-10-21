@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "lessons": [
+    {
+      "id": "L001",
+      "text": "When implementing recursive or iterative algorithms with specific base cases, explicitly verify that your initial conditions match the problem definition exactly, as off-by-one errors in index mapping are a common source of failure.",
+      "error_type": "AssertionError",
+      "keywords": [
+        "algorithms",
+        "base",
+        "cases",
+        "common",
+        "conditions",
+        "definition",
+        "errors",
+        "exactly",
+        "explicitly",
+        "failure",
+        "fib",
+        "fibonacci",
+        "implementing",
+        "index",
+        "initial",
+        "iterative",
+        "mapping",
+        "match",
+        "number",
+        "off",
+        "problem",
+        "range",
+        "recursive",
+        "source",
+        "specific",
+        "verify",
+        "where"
+      ],
+      "status": "promoted",
+      "seen": 1,
+      "uses": 6,
+      "wins": 6,
+      "evidence": [
+        {
+          "task": "s14_fibonacci",
+          "event": "created",
+          "error": "AssertionError"
+        },
+        {
+          "task": "s14_fibonacci",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m02_display_name",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m03_config_defaults",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m05_bank_errors",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m06_coupon",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m08_scheduler",
+          "event": "used",
+          "passed": true
+        }
+      ]
+    }
+  ]
+}
