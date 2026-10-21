@@ -1,0 +1,1449 @@
+{
+  "meta": {
+    "started": "2026-10-21T13:37:09+00:00",
+    "git_commit": "924bd56",
+    "mock": false,
+    "modes": [
+      "baseline",
+      "loop",
+      "loop+memory",
+      "full"
+    ],
+    "repeats": 1,
+    "temperature": 0.0,
+    "split": {
+      "note": "Lessons are learned on warmup tasks only. Pass rates are reported on held-out tasks.",
+      "warmup": [
+        "s01_median",
+        "s04_flatten",
+        "s07_roman",
+        "s10_dedupe",
+        "s13_caesar",
+        "m01_order_total",
+        "m04_units",
+        "m07_slugify"
+      ],
+      "heldout": [
+        "s02_palindrome",
+        "s03_binary_search",
+        "s05_word_count",
+        "s06_chunk",
+        "s08_merge_intervals",
+        "s09_rotate",
+        "s11_duration",
+        "s12_moving_average",
+        "s14_fibonacci",
+        "s15_brackets",
+        "s16_top_k",
+        "m02_display_name",
+        "m03_config_defaults",
+        "m05_bank_errors",
+        "m06_coupon",
+        "m08_scheduler"
+      ]
+    },
+    "model": "allam-2-7b",
+    "base_url": "https://api.groq.com/openai/v1",
+    "finished": "2026-10-21T14:54:50+00:00"
+  },
+  "runs": {
+    "baseline": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ImportError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "from_name\n    __import__(name)\n  File \"/tmp/kintsugi-bb0kfrr_/task/test_account.py\", line 3, in <module>\n    from account import Account\n  File \"/tmp/kintsugi-bb0kfrr_/task/account.py\", line 1, in <module>\n    from errors import InsufficientFunds, InvalidAmount\n  File \"/tmp/kintsugi-bb0kfrr_/task/errors.py\", line 1, in <module>\n    from typing import TypeError\nImportError: cannot import name 'TypeError' from 'typing' (/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/typing.py)\n\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)"
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "TypeError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "ast):\n  File \"/tmp/kintsugi-6fpdimpl/task/test_jobs.py\", line 11, in test_hourly\n    self.assertEqual(next_run({\"frequency\": \"hourly\"}, NOW), datetime(2026, 10, 21, 10, 0))\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/kintsugi-6fpdimpl/task/jobs.py\", line 11, in next_run\n    return now + timedelta(seconds=interval_for(job))\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: unsupported type for timedelta seconds component: datetime.timedelta\n\n----------------------------------------------------------------------\nRan 2 tests in 0.001s\n\nFAILED (errors=2)"
+          }
+        ],
+        "usage": {
+          "calls": 16,
+          "prompt_tokens": 12548,
+          "completion_tokens": 5838
+        }
+      }
+    ],
+    "loop": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "ImportError",
+              "ImportError",
+              "FormatError",
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: b'{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'"
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "TypeError",
+              "TypeError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          }
+        ],
+        "usage": {
+          "calls": 63,
+          "prompt_tokens": 91681,
+          "completion_tokens": 26777
+        }
+      }
+    ],
+    "loop+memory": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s01_median",
+            "kind": "single",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s04_flatten",
+            "kind": "single",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s07_roman",
+            "kind": "single",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s10_dedupe",
+            "kind": "single",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s13_caesar",
+            "kind": "single",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m01_order_total",
+            "kind": "multi",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "TypeError",
+              "TypeError",
+              "SyntaxError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [
+              "L001",
+              "L002",
+              "L003"
+            ],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m04_units",
+            "kind": "multi",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "AssertionError",
+              "AssertionError",
+              "AssertionError",
+              "FormatError"
+            ],
+            "lessons_used": [
+              "L003",
+              "L002",
+              "L001"
+            ],
+            "lessons_learned": [
+              "L004",
+              "L004",
+              "L004"
+            ],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m07_slugify",
+            "kind": "multi",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [
+              "L004",
+              "L003",
+              "L002"
+            ],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [
+              "L004",
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 3,
+            "error_types": [
+              "ImportError",
+              "IndentationError",
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [
+              "L005",
+              "L006"
+            ],
+            "last_output": "Model API error 400: b'{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'"
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 3,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "ModelError"
+            ],
+            "lessons_used": [
+              "L005",
+              "L006"
+            ],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: b'{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'"
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "AssertionError",
+              "ImportError",
+              "ImportError",
+              "FormatError"
+            ],
+            "lessons_used": [
+              "L005",
+              "L006"
+            ],
+            "lessons_learned": [
+              "L007",
+              "L008",
+              "L009"
+            ],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          }
+        ],
+        "usage": {
+          "calls": 103,
+          "prompt_tokens": 136560,
+          "completion_tokens": 35277
+        }
+      }
+    ],
+    "full": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s01_median",
+            "kind": "single",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s04_flatten",
+            "kind": "single",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s07_roman",
+            "kind": "single",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s10_dedupe",
+            "kind": "single",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s13_caesar",
+            "kind": "single",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m01_order_total",
+            "kind": "multi",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "TypeError",
+              "SyntaxError",
+              "SyntaxError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [
+              "L001",
+              "L002",
+              "L002"
+            ],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m04_units",
+            "kind": "multi",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [
+              "L002",
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m07_slugify",
+            "kind": "multi",
+            "scored": false,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "AssertionError",
+              "AssertionError",
+              "AssertionError",
+              "SyntaxError"
+            ],
+            "lessons_used": [
+              "L002",
+              "L001"
+            ],
+            "lessons_learned": [
+              "L003",
+              "L004",
+              "L005",
+              "L006"
+            ],
+            "last_output": "on/3.12.15/x64/lib/python3.12/unittest/loader.py\", line 339, in _get_module_from_name\n    __import__(name)\n  File \"/tmp/kintsugi-ibsjegqq/task/test_pipeline.py\", line 3, in <module>\n    from pipeline import slugify\n  File \"/tmp/kintsugi-ibsjegqq/task/pipeline.py\", line 1, in <module>\n    from tokenizer import tokenize\n  File \"/tmp/kintsugi-ibsjegqq/task/tokenizer.py\", line 6\n    return [word for word in re.findall(pattern, text.lower())\n           ^\nSyntaxError: '[' was never closed\n\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)"
+          },
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [
+              "L003",
+              "L006",
+              "L004"
+            ],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [
+              "L005",
+              "L006",
+              "L004"
+            ],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [
+              "L003",
+              "L005",
+              "L006"
+            ],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "FormatError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "AssertionError",
+              "FormatError",
+              "FormatError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [
+              "L007"
+            ],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "TypeError",
+              "AssertionError",
+              "IndentationError",
+              "FormatError"
+            ],
+            "lessons_used": [
+              "L007"
+            ],
+            "lessons_learned": [
+              "L008",
+              "L009",
+              "L010"
+            ],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "SyntaxError",
+              "SyntaxError",
+              "FormatError",
+              "ModelError"
+            ],
+            "lessons_used": [
+              "L008",
+              "L010",
+              "L009"
+            ],
+            "lessons_learned": [
+              "L011",
+              "L012"
+            ],
+            "last_output": "Model API error 400: b'{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'"
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "AssertionError",
+              "NameError",
+              "ImportError",
+              "FormatError"
+            ],
+            "lessons_used": [
+              "L012",
+              "L011",
+              "L008"
+            ],
+            "lessons_learned": [
+              "L013",
+              "L014",
+              "L015"
+            ],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'."
+          }
+        ],
+        "usage": {
+          "calls": 111,
+          "prompt_tokens": 130827,
+          "completion_tokens": 32223
+        }
+      }
+    ]
+  },
+  "summary": {
+    "baseline": {
+      "repeats": 1,
+      "pass_rate_mean": 0.0,
+      "pass_rate_min": 0.0,
+      "pass_rate_max": 0.0,
+      "avg_attempts": 1,
+      "calls_per_run": 16,
+      "tokens_per_run": 18386
+    },
+    "loop": {
+      "repeats": 1,
+      "pass_rate_mean": 0.0,
+      "pass_rate_min": 0.0,
+      "pass_rate_max": 0.0,
+      "avg_attempts": 4,
+      "calls_per_run": 63,
+      "tokens_per_run": 118458
+    },
+    "loop+memory": {
+      "repeats": 1,
+      "pass_rate_mean": 0.0,
+      "pass_rate_min": 0.0,
+      "pass_rate_max": 0.0,
+      "avg_attempts": 3.875,
+      "calls_per_run": 103,
+      "tokens_per_run": 171837
+    },
+    "full": {
+      "repeats": 1,
+      "pass_rate_mean": 0.0,
+      "pass_rate_min": 0.0,
+      "pass_rate_max": 0.0,
+      "avg_attempts": 4,
+      "calls_per_run": 111,
+      "tokens_per_run": 163050
+    }
+  }
+}
