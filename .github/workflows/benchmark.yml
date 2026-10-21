@@ -29,6 +29,14 @@ jobs:
           python -m unittest discover -s tests
           python benchmark/check_tasks.py
 
+      - name: List the models this key can use
+        continue-on-error: true
+        env:
+          KINTSUGI_API_KEY: ${{ secrets.KINTSUGI_API_KEY }}
+        run: |
+          set -a; . benchmark/run.config; set +a
+          kintsugi models
+
       - name: Run the benchmark on the real model
         env:
           KINTSUGI_API_KEY: ${{ secrets.KINTSUGI_API_KEY }}

@@ -19,6 +19,7 @@ from typing import Callable
 DEFAULT_BASE_URL = "https://api.groq.com/openai/v1"
 DEFAULT_MODEL = "llama-3.1-8b-instant"
 THINK_RE = re.compile(r"<think>.*?</think>", re.S)
+USER_AGENT = "kintsugi/0.1 (+https://github.com/niranjanpatil0808-max/Harness-)"
 
 
 @dataclass
@@ -63,6 +64,13 @@ class OpenAIAdapter(Model):
         self.timeout = timeout
         self.max_retries = max_retries
 
+    def list_models(self) -> list[str]:
+        """Model ids this key can use (GET {base_url}/models)."""
+        request = urllib.request.Request(f"{self.base_url}/models", headers={
+            "Authorization": f"Bearer {self.api_key}", "User-Agent": USER_AGENT})
+        with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            return sorted(item["id"] for item in json.load(response)["data"])
+
     def complete(self, messages: list[dict]) -> str:
         body = json.dumps({
             "model": self.name,
@@ -77,7 +85,7 @@ class OpenAIAdapter(Model):
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.api_key}",
                 # Some providers' firewalls (Cloudflare error 1010) reject Python's default User-Agent.
-                "User-Agent": "kintsugi/0.1 (+https://github.com/niranjanpatil0808-max/Harness-)",
+                "User-Agent": USER_AGENT,
             },
         )
         delay = 2.0

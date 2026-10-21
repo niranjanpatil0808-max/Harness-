@@ -3,6 +3,7 @@
   kintsugi fix <task_dir> [--no-memory] [--no-graph] [--retries N] [--mock]
   kintsugi graph <task_dir>
   kintsugi lessons [--memory PATH]
+  kintsugi models
 """
 
 from __future__ import annotations
@@ -59,6 +60,14 @@ def cmd_lessons(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_models(args: argparse.Namespace) -> int:
+    model = OpenAIAdapter()
+    print(f"Models available at {model.base_url}:")
+    for name in model.list_models():
+        print(f"  {name}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kintsugi", description="Fix bugs with a small model that learns from its mistakes.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -80,6 +89,9 @@ def main(argv: list[str] | None = None) -> int:
     lessons = sub.add_parser("lessons", help="list stored lessons")
     lessons.add_argument("--memory", type=Path, default=DEFAULT_MEMORY)
     lessons.set_defaults(func=cmd_lessons)
+
+    models = sub.add_parser("models", help="list the model names your API key can use")
+    models.set_defaults(func=cmd_models)
 
     args = parser.parse_args(argv)
     return args.func(args)
