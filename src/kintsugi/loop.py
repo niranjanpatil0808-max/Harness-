@@ -136,6 +136,7 @@ def solve(
     ]
     attempts: list[Attempt] = []
     learned: list[str] = []
+    shown: list[str] = []  # lessons put in front of the model during retries
     for number in range(1, max_retries + 2):
         reply = model.complete(messages)
         files = parse_files(reply, task)
@@ -148,19 +149,21 @@ def solve(
                                 sorted(files), used_ids))
         if result.passed:
             break
-        if memory and learn:
-            lesson = memory.reflect(model, task, files, result)
-            if lesson:
-                learned.append(lesson.id)
+        lesson = memory.reflect(model, task, files, result) if memory and learn else None
+        if lesson:
+            learned.append(lesson.id)
         if number <= max_retries:
+            feedback = f"The tests failed:\n```\n{result.output}\n```\n"
+            if lesson:
+                feedback += f"Lesson from this failure: {lesson.text}\n"
+                shown.append(lesson.id)
             messages.append({"role": "assistant", "content": reply})
             messages.append({"role": "user", "content":
-                             f"The tests failed:\n```\n{result.output}\n```\n"
-                             "Find the cause and return the complete fixed file(s)."})
+                             feedback + "Find the cause and return the complete fixed file(s)."})
 
     passed = attempts[-1].passed
     if memory and learn:
-        # Credit lessons only when the outcome is known (Harness²-style: keep what wins).
-        memory.record_outcome(used_ids, passed, retried=len(attempts) > 1)
+        # Credit lessons only once the outcome is known (Harness²-style: keep what wins).
+        memory.record_outcome(used_ids + shown, passed, task.id)
         memory.save()
     return TaskResult(task.id, passed, attempts, learned)
