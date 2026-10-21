@@ -20,7 +20,7 @@ DEFAULT_BASE_URL = "https://api.groq.com/openai/v1"
 DEFAULT_MODEL = "llama-3.1-8b-instant"
 THINK_RE = re.compile(r"<think>.*?</think>", re.S)
 MAX_WAIT = 300.0  # longest rate-limit wait (seconds) we will sit through
-USER_AGENT = "kintsugi/0.1 (+https://github.com/niranjanpatil0808-max/Harness-)"
+USER_AGENT = "kintsugi/0.1 (+https://github.com/niranjanpatil0808-max/KINTSUGI)"
 
 
 class ModelRequestError(RuntimeError):
