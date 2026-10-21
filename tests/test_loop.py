@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 
 from kintsugi.loop import load_task, parse_files, solve
-from kintsugi.model import MockModel
+from kintsugi.model import MockModel, ModelRequestError
 
 FIXTURE = Path(__file__).parent / "fixtures" / "add_bug"
 WRONG = "```python\n# file: calc.py\ndef add(a, b):\n    return a * b\n```"
@@ -56,6 +56,17 @@ class TestSolve(unittest.TestCase):
         result = solve(self.task, model, max_retries=1)
         self.assertEqual(result.attempts[0].error_type, "FormatError")
         self.assertTrue(result.passed)
+
+    def test_rejected_request_fails_the_task_without_crashing(self):
+        def reply(messages):
+            if len(messages) > 2:
+                raise ModelRequestError("context length exceeded")
+            return WRONG
+
+        result = solve(self.task, MockModel(reply), max_retries=3)
+        self.assertFalse(result.passed)
+        self.assertEqual(result.attempts[-1].error_type, "ModelError")
+        self.assertEqual(result.num_attempts, 2)
 
 
 if __name__ == "__main__":

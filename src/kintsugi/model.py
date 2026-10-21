@@ -19,7 +19,12 @@ from typing import Callable
 DEFAULT_BASE_URL = "https://api.groq.com/openai/v1"
 DEFAULT_MODEL = "llama-3.1-8b-instant"
 THINK_RE = re.compile(r"<think>.*?</think>", re.S)
+MAX_WAIT = 300.0  # longest rate-limit wait (seconds) we will sit through
 USER_AGENT = "kintsugi/0.1 (+https://github.com/niranjanpatil0808-max/Harness-)"
+
+
+class ModelRequestError(RuntimeError):
+    """The API rejected this particular request (bad request, too long...). Other tasks can still run."""
 
 
 @dataclass
@@ -96,10 +101,16 @@ class OpenAIAdapter(Model):
                 break
             except urllib.error.HTTPError as err:
                 # Rate limits and server hiccups are retried; anything else is a real error.
+                detail = f"Model API error {err.code}: {err.read()[:500]!r}"
+                if err.code in (400, 413, 422):
+                    raise ModelRequestError(detail) from err
                 if err.code not in (429, 500, 502, 503, 504) or attempt == self.max_retries:
-                    raise RuntimeError(f"Model API error {err.code}: {err.read()[:500]!r}") from err
+                    raise RuntimeError(detail) from err
                 retry_after = err.headers.get("retry-after")
-                time.sleep(float(retry_after) if retry_after else delay)
+                wait = float(retry_after) if retry_after else delay
+                if wait > MAX_WAIT:  # a daily quota, not a short rate limit: stop instead of sleeping for hours
+                    raise RuntimeError(f"{detail} (asked to wait {wait:.0f}s)") from err
+                time.sleep(wait)
                 delay *= 2
             except (urllib.error.URLError, TimeoutError):
                 if attempt == self.max_retries:

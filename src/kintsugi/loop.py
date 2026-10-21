@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .graph import ContextGraph
-from .model import Model
+from .model import Model, ModelRequestError
 from .verifier import VerifyResult, verify
 
 if TYPE_CHECKING:
@@ -141,7 +141,12 @@ def solve(
     learned: list[str] = []
     shown: list[str] = []  # lessons put in front of the model during retries
     for number in range(1, max_retries + 2):
-        reply = model.complete(messages)
+        try:
+            reply = model.complete(messages)
+        except ModelRequestError as err:
+            # e.g. the conversation outgrew the model's context window: the task fails, the run goes on.
+            attempts.append(Attempt(number, False, "ModelError", str(err)[:300], [], used_ids))
+            break
         files = parse_files(reply, task, editable)
         if files:
             result = verify(task.dir, files, timeout=timeout)
