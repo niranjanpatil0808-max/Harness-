@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from kintsugi.loop import load_task, solve
-from kintsugi.memory import MemoryStore, tokens
+from kintsugi.memory import MemoryStore, mentions_task_names, tokens
 from kintsugi.model import MockModel
 
 FIXTURE = Path(__file__).parent / "fixtures" / "add_bug"
@@ -60,6 +60,17 @@ class TestStore(unittest.TestCase):
         self.assertEqual(good.status, "promoted")
         self.assertEqual(bad.status, "pruned")
         self.assertNotIn(bad, store.active)
+
+    def test_lessons_naming_the_tasks_own_functions_are_rejected(self):
+        task = load_task(Path(__file__).parent / "fixtures" / "shop")
+        store = MemoryStore()
+        specific = "When calling apply_tax, remember that TAX_RATE is a fraction."
+        model = MockModel([specific])
+        result = type("R", (), {"error_type": "AssertionError", "output": "boom"})()
+        self.assertTrue(mentions_task_names(specific, task))
+        self.assertIsNone(store.reflect(model, task, {}, result))
+        self.assertEqual(store.lessons, [])
+        self.assertFalse(mentions_task_names(LESSON, task))
 
 
 class TestRetrieval(unittest.TestCase):

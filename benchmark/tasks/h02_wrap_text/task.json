@@ -1,0 +1,6 @@
+{
+  "id": "h02_wrap_text",
+  "description": "wrap_text(text, width) greedily word-wraps text and returns a list of lines. Words are separated by any whitespace and are joined by single spaces. A line holds as many words as fit in width characters. A word longer than width is split: every full width-sized piece becomes its own line, and the remaining shorter piece starts a new line that following words may join. Paragraphs are separated by a blank line (two newlines, possibly with spaces between them): each paragraph is wrapped on its own and one empty string is placed between consecutive paragraphs. A single newline inside a paragraph counts as a space. Leading and trailing whitespace is ignored, and empty or whitespace-only text gives an empty list.",
+  "difficulty": "hard",
+  "kind": "single"
+}

@@ -67,54 +67,83 @@ def git_commit() -> str:
         return "unknown"
 
 
-def summarize(runs: list[dict]) -> dict:
-    """Aggregate scored (held-out) results over repeats."""
-    rates, attempts, calls, tokens = [], [], [], []
+def summarize(runs: list[dict], n_heldout: int) -> dict:
+    """Aggregate scored (held-out) results over repeats.
+
+    Only repeats that finished every held-out task are counted: a run that stopped
+    early (rate limit, daily quota) must not show up as a pass rate.
+    """
+    rates, hard_rates, attempts, calls, tokens = [], [], [], [], []
+    started = 0
+    most_done = 0
     for run in runs:
         scored = [r for r in run["tasks"] if r["scored"]]
         if not scored:
             continue
+        started += 1
+        most_done = max(most_done, len(scored))
+        if len(scored) < n_heldout:
+            continue
         rates.append(sum(r["passed"] for r in scored) / len(scored))
+        hard = [r for r in scored if r.get("difficulty") == "hard"]
+        if hard:
+            hard_rates.append(sum(r["passed"] for r in hard) / len(hard))
         attempts.append(statistics.mean(r["num_attempts"] for r in scored))
-        calls.append(run["usage"]["calls"])
-        tokens.append(run["usage"]["prompt_tokens"] + run["usage"]["completion_tokens"])
+        if all("usage" in r for r in scored):  # scored tasks only: warmup calls are not part of the comparison
+            calls.append(sum(r["usage"]["calls"] for r in scored))
+            tokens.append(sum(r["usage"]["tokens"] for r in scored))
     if not rates:
-        return {}
-    return {
+        return {"incomplete": True, "tasks_done": most_done, "tasks_total": n_heldout} if started else {}
+    summary = {
         "repeats": len(rates),
         "pass_rate_mean": statistics.mean(rates),
         "pass_rate_min": min(rates),
         "pass_rate_max": max(rates),
         "avg_attempts": statistics.mean(attempts),
-        "calls_per_run": statistics.mean(calls),
-        "tokens_per_run": statistics.mean(tokens),
     }
+    if hard_rates:
+        summary["hard_pass_rate_mean"] = statistics.mean(hard_rates)
+    if calls:
+        summary["calls_scored"] = statistics.mean(calls)
+        summary["tokens_scored"] = statistics.mean(tokens)
+    return summary
 
 
 def table(data: dict) -> str:
     meta = data["meta"]
-    n = len(meta["split"]["heldout"])
+    split = meta["split"]
+    n = len(split["heldout"])
+    n_hard = sum(1 for t in split["heldout"] if t in split.get("hard", []))
+    repeats = max((s.get("repeats", 0) for s in data["summary"].values()), default=0)
     lines = [
-        f"Model: `{meta['model']}` · held-out tasks: {n} · max retries: 3 · temperature: {meta['temperature']}"
+        f"Model: `{meta['model']}` · held-out tasks: {n} ({n_hard} hard) · repeats: {repeats or meta.get('repeats', 1)} "
+        f"· max retries: 3 · temperature: {meta['temperature']}"
         + (" · **MOCK RUN (pipeline test, not a real result)**" if meta["mock"] else ""),
         "",
-        "| Mode | Pass rate (held-out) | Min–max over repeats | Avg attempts | Model calls / run | Tokens / run |",
+        "| Mode | Pass rate (held-out) | Hard tasks only | Avg attempts | Model calls (scored tasks) | Tokens (scored tasks) |",
         "|---|---|---|---|---|---|",
     ]
     for mode in meta["modes"]:
         s = data["summary"].get(mode)
         if not s:
             continue
+        if s.get("incomplete"):
+            lines.append(f"| {mode} | **INCOMPLETE** ({s['tasks_done']}/{s['tasks_total']} tasks run, no result) | | | | |")
+            continue
         passed = round(s["pass_rate_mean"] * n, 1)
-        lines.append(
-            f"| {mode} | {s['pass_rate_mean']:.0%} ({passed:g}/{n}) | {s['pass_rate_min']:.0%}–{s['pass_rate_max']:.0%} "
-            f"(n={s['repeats']}) | {s['avg_attempts']:.2f} | {s['calls_per_run']:.0f} | {s['tokens_per_run']:,.0f} |"
-        )
+        spread = f" [{s['pass_rate_min']:.0%}–{s['pass_rate_max']:.0%}]" if s["repeats"] > 1 else ""
+        hard = f"{s['hard_pass_rate_mean']:.0%} ({round(s['hard_pass_rate_mean'] * n_hard, 1):g}/{n_hard})" \
+            if "hard_pass_rate_mean" in s else "–"
+        calls = f"{s['calls_scored']:.0f}" if "calls_scored" in s else "n/a"
+        tokens = f"{s['tokens_scored']:,.0f}" if "tokens_scored" in s else "n/a"
+        lines.append(f"| {mode} | {s['pass_rate_mean']:.0%} ({passed:g}/{n}){spread} | {hard} "
+                     f"| {s['avg_attempts']:.2f} | {calls} | {tokens} |")
     return "\n".join(lines) + "\n"
 
 
 def save(path: Path, data: dict) -> None:
-    data["summary"] = {mode: summarize(data["runs"].get(mode, [])) for mode in data["meta"]["modes"]}
+    n = len(data["meta"]["split"]["heldout"])
+    data["summary"] = {mode: summarize(data["runs"].get(mode, []), n) for mode in data["meta"]["modes"]}
     path.write_text(json.dumps(data, indent=2) + "\n")
     path.with_suffix(".md").write_text(table(data))
 
@@ -145,6 +174,10 @@ def run_mode(data: dict, mode: str, repeat: int, model: Model, out: Path, sleep:
         record = {
             "task_id": task_id,
             "kind": task.meta.get("kind"),
+            "difficulty": task.meta.get("difficulty"),
+            "usage": {"calls": after["calls"] - before["calls"],
+                      "tokens": (after["prompt_tokens"] - before["prompt_tokens"])
+                                + (after["completion_tokens"] - before["completion_tokens"])},
             "scored": task_id in split["heldout"],
             "passed": result.passed,
             "num_attempts": result.num_attempts,

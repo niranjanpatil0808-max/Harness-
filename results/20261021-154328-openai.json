@@ -365,18 +365,12 @@
       "pass_rate_mean": 0.125,
       "pass_rate_min": 0.125,
       "pass_rate_max": 0.125,
-      "avg_attempts": 1,
-      "calls_per_run": 16,
-      "tokens_per_run": 18386
+      "avg_attempts": 1
     },
     "loop": {
-      "repeats": 1,
-      "pass_rate_mean": 0.0,
-      "pass_rate_min": 0.0,
-      "pass_rate_max": 0.0,
-      "avg_attempts": 4,
-      "calls_per_run": 16,
-      "tokens_per_run": 28921
+      "incomplete": true,
+      "tasks_done": 4,
+      "tasks_total": 16
     },
     "loop+memory": {},
     "full": {}

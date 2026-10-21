@@ -1,0 +1,6 @@
+{
+  "id": "h08_nested_decode",
+  "description": "decode(s) expands a compressed string. A letter (a-z, A-Z) stands for itself. A number directly followed by a letter repeats just that letter, so '3a' is 'aaa' and '2ab' is 'aab'. A number directly followed by '(' repeats everything up to the matching ')' that many times, and groups can be nested: '3(ab2(c))' is 'abccabccabcc'. Numbers can have several digits ('12a'), a count of 0 removes the group or letter, and an empty string decodes to ''. Raise ValueError for anything else: unbalanced parentheses, a number that is not followed by a letter or '(', a '(' without a number in front of it, or any other character.",
+  "difficulty": "hard",
+  "kind": "single"
+}

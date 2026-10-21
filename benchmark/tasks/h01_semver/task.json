@@ -1,0 +1,6 @@
+{
+  "id": "h01_semver",
+  "description": "compare_versions(a, b) compares two semantic versions such as '1.2.3', '1.0.0-alpha.1' or '2.0.0+build.5' and returns -1 if a < b, 0 if they are equal in precedence, and 1 if a > b. Rules: compare major, minor and patch numerically. A version with a pre-release part (after '-') has LOWER precedence than the same version without one. Pre-release identifiers are separated by dots and compared left to right: two numeric identifiers compare as numbers, two other identifiers compare as strings (ASCII order), and a numeric identifier is lower than a non-numeric one. If all shared identifiers are equal, the version with more identifiers is higher. Build metadata (after '+') is ignored completely.",
+  "difficulty": "hard",
+  "kind": "single"
+}

@@ -982,36 +982,28 @@
       "pass_rate_mean": 1.0,
       "pass_rate_min": 1.0,
       "pass_rate_max": 1.0,
-      "avg_attempts": 1,
-      "calls_per_run": 16,
-      "tokens_per_run": 14223
+      "avg_attempts": 1
     },
     "loop": {
       "repeats": 1,
       "pass_rate_mean": 1.0,
       "pass_rate_min": 1.0,
       "pass_rate_max": 1.0,
-      "avg_attempts": 1,
-      "calls_per_run": 16,
-      "tokens_per_run": 14399
+      "avg_attempts": 1
     },
     "loop+memory": {
       "repeats": 1,
       "pass_rate_mean": 1.0,
       "pass_rate_min": 1.0,
       "pass_rate_max": 1.0,
-      "avg_attempts": 1,
-      "calls_per_run": 24,
-      "tokens_per_run": 21081
+      "avg_attempts": 1
     },
     "full": {
       "repeats": 1,
       "pass_rate_mean": 1.0,
       "pass_rate_min": 1.0,
       "pass_rate_max": 1.0,
-      "avg_attempts": 1,
-      "calls_per_run": 24,
-      "tokens_per_run": 18257
+      "avg_attempts": 1
     }
   }
 }

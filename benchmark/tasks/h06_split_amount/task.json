@@ -1,0 +1,6 @@
+{
+  "id": "h06_split_amount",
+  "description": "split_amount(total_cents, weights) divides a whole number of cents between people in proportion to integer weights and returns a list of integer amounts that always adds up to total_cents exactly. Use the largest remainder method: each person first gets floor(total_cents * weight / sum_of_weights); the cents still left over are handed out one each to the people with the largest fractional remainder, and on equal remainders to the one with the lower index. Weights are non-negative integers (a weight of 0 always gets 0). Raise ValueError if weights is empty, all weights are 0, a weight is negative, or total_cents is negative.",
+  "difficulty": "hard",
+  "kind": "single"
+}

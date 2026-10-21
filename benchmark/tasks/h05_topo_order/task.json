@@ -1,0 +1,6 @@
+{
+  "id": "h05_topo_order",
+  "description": "topo_order(graph) takes a dict mapping each node to a list of the nodes it depends on (they must come first) and returns all nodes as a list in a valid dependency order. Nodes that only appear inside dependency lists are part of the graph too. When several nodes are ready at the same time, always pick the alphabetically smallest one first. Repeated entries in a dependency list are harmless. If the graph contains a cycle (including a node that depends on itself), raise ValueError. An empty graph gives an empty list.",
+  "difficulty": "hard",
+  "kind": "single"
+}

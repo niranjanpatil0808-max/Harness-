@@ -126,8 +126,8 @@ class MemoryStore:
         reply = model.complete([{"role": "user", "content": REFLECT_PROMPT.format(
             description=task.description, output=result.output[-1200:])}])
         text = reply.strip().strip('"').strip()
-        if len(text) < 15:
-            return None
+        if len(text) < 15 or mentions_task_names(text, task):
+            return None  # empty, or not general: it names this task's own functions
         return self.add(text, result.error_type, task_words(task), task.id)
 
     # --- reading lessons -------------------------------------------------
@@ -171,6 +171,15 @@ class MemoryStore:
                 lesson.status = "promoted"
             elif lesson.uses >= PRUNE_AFTER_USES and lesson.wins == 0:
                 lesson.status = "pruned"
+
+
+def mentions_task_names(text: str, task: "Task") -> bool:
+    """True if the lesson names a function, class or constant defined in the task's own code."""
+    names: set[str] = set()
+    for code in task.sources.values():
+        names |= set(re.findall(r"^\s*(?:def|class)\s+([A-Za-z_]\w*)", code, re.M))
+        names |= set(re.findall(r"^([A-Z][A-Z0-9_]*)\s*=", code, re.M))
+    return any(len(name) >= 4 and re.search(rf"\b{re.escape(name)}\b", text) for name in names)
 
 
 def task_words(task: "Task") -> set[str]:

@@ -1,0 +1,6 @@
+{
+  "id": "h03_ttl_cache",
+  "description": "TTLCache(capacity, ttl, clock) is a cache with a size limit and expiry. clock() returns the current time in seconds. put(key, value) stores a value; get(key, default=None) returns it, or default if the key is missing or expired. len(cache) is the number of live entries. An entry expires ttl seconds after it was last PUT: it is live while clock() - put_time < ttl, so at exactly ttl seconds it is already expired. Reading with get does NOT extend the lifetime. get on a live key marks it as most recently used; get on an expired key removes it. put on an existing key replaces the value, restarts its lifetime and marks it most recently used. When put adds a NEW key to a full cache it first discards all expired entries, and only if the cache is still full does it evict the least recently used live entry.",
+  "difficulty": "hard",
+  "kind": "single"
+}

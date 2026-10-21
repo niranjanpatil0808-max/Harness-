@@ -1,0 +1,6 @@
+{
+  "id": "h07_business_days",
+  "description": "add_business_days(start, n, holidays) returns the date that is n business days after start (a datetime.date). holidays is a set of dates. Business days are Monday to Friday that are not in holidays. The start date itself is never counted, and it does not have to be a business day. A negative n moves backwards in time by that many business days. n = 0 returns start unchanged, even if start is a weekend or a holiday. Holidays that fall on a weekend change nothing.",
+  "difficulty": "hard",
+  "kind": "single"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "h04_csv_line",
+  "description": "parse_csv_line(line) splits one line of CSV text into a list of field strings. Fields are separated by commas. A field that STARTS with a double quote is a quoted field: it ends at the next double quote that is not doubled; commas inside it are ordinary characters and a doubled quote (\"\") stands for one literal quote. A closing quote must be followed by a comma or the end of the line, otherwise raise ValueError; a quoted field that never closes also raises ValueError. Quote characters in the middle of an unquoted field are ordinary characters. Spaces are never trimmed. An empty line gives [''], and a trailing comma gives a final empty field.",
+  "difficulty": "hard",
+  "kind": "single"
+}
