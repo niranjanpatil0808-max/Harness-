@@ -47,13 +47,15 @@ jobs:
           fi
           set -a; . benchmark/run.config; set +a
           status=0
-          # One run per "model:max_tokens[:repeats]" entry in RUNS, one after the other (shared rate limit).
+          # One run per "model|max_tokens|repeats|modes" entry in RUNS, one after the other (shared rate limit).
+          # repeats and modes are optional; modes are comma separated, e.g. baseline,loop,full.
           for entry in "${RUNS[@]}"; do
-            IFS=: read -r model tokens repeats <<< "$entry"
-            echo "=== $model (max_tokens $tokens, repeats ${repeats:-${REPEATS:-1}}) ==="
+            IFS='|' read -r model tokens repeats modes <<< "$entry"
+            modes="${modes:-${MODES:-baseline loop loop+memory full}}"
+            echo "=== $model (max_tokens $tokens, repeats ${repeats:-${REPEATS:-1}}, modes ${modes//,/ }) ==="
             KINTSUGI_MODEL="$model" KINTSUGI_MAX_TOKENS="$tokens" \
               python benchmark/run_benchmark.py --model openai --repeats "${repeats:-${REPEATS:-1}}" --sleep "${SLEEP:-0}" \
-                --modes ${MODES:-baseline loop loop+memory full} || status=1
+                --modes ${modes//,/ } || status=1
           done
           exit $status
 
