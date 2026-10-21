@@ -74,6 +74,26 @@ def parse_files(reply: str, task: Task, editable: list[str] | None = None) -> di
         name = name.removeprefix("./") if name else name
         if name in editable:
             files[name] = body.rstrip() + "\n"
+    return files or parse_unfenced(reply, editable)
+
+
+# Some small models write "# file: x.py" and the code but leave out the opening ``` fence.
+FILE_LINE_RE = re.compile(r"^[ \t]*#\s*file:\s*([\w./-]+\.py)[ \t]*$", re.M)
+
+
+def parse_unfenced(reply: str, editable: list[str]) -> dict[str, str]:
+    """Fallback for replies with no fenced blocks: sections that start with a '# file: path' line.
+
+    A section ends at the next '# file:' line or at a stray closing ``` fence.
+    """
+    marks = list(FILE_LINE_RE.finditer(reply))
+    files: dict[str, str] = {}
+    for i, mark in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(reply)
+        body = reply[mark.end():end].split("```", 1)[0]
+        name = mark.group(1).removeprefix("./")
+        if name in editable and body.strip():
+            files[name] = body.strip("\n").rstrip() + "\n"
     return files
 
 

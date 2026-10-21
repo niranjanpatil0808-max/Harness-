@@ -28,6 +28,21 @@ class TestParse(unittest.TestCase):
         reply = "```python\n# file: test_calc.py\nprint('cheat')\n```"
         self.assertEqual(parse_files(reply, self.task), {})
 
+    def test_unfenced_reply_is_accepted(self):
+        reply = ("# file: calc.py\ndef add(a, b):\n    return a + b\n\n"
+                 "# file: test_calc.py\nprint('not allowed')\n")
+        files = parse_files(reply, self.task)
+        self.assertEqual(list(files), ["calc.py"])  # the test file section is ignored
+        self.assertIn("a + b", files["calc.py"])
+
+    def test_unfenced_reply_with_stray_closing_fence(self):
+        files = parse_files("# file: calc.py\ndef add(a, b):\n    return a + b\n```", self.task)
+        self.assertEqual(files["calc.py"], "def add(a, b):\n    return a + b\n")
+
+    def test_fenced_blocks_take_precedence_over_unfenced_text(self):
+        reply = "# file: calc.py\nbogus\n\n" + RIGHT
+        self.assertIn("a + b", parse_files(reply, self.task)["calc.py"])
+
 
 class TestSolve(unittest.TestCase):
     def setUp(self):
