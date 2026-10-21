@@ -1,0 +1,2004 @@
+{
+  "meta": {
+    "started": "2026-10-21T16:36:52+00:00",
+    "git_commit": "d052cf8",
+    "mock": false,
+    "modes": [
+      "baseline",
+      "loop",
+      "loop+memory",
+      "full"
+    ],
+    "repeats": 1,
+    "temperature": 0.0,
+    "split": {
+      "note": "Lessons are learned on warmup tasks only. Pass rates are reported on held-out tasks. 'hard' lists the hard-tier tasks (8 written after the first real runs showed the original 24 were too easy for capable models; see README).",
+      "warmup": [
+        "s01_median",
+        "s04_flatten",
+        "s07_roman",
+        "s10_dedupe",
+        "s13_caesar",
+        "m01_order_total",
+        "m04_units",
+        "m07_slugify",
+        "h01_semver",
+        "h03_ttl_cache",
+        "h05_topo_order"
+      ],
+      "heldout": [
+        "s02_palindrome",
+        "s03_binary_search",
+        "s05_word_count",
+        "s06_chunk",
+        "s08_merge_intervals",
+        "s09_rotate",
+        "s11_duration",
+        "s12_moving_average",
+        "s14_fibonacci",
+        "s15_brackets",
+        "s16_top_k",
+        "m02_display_name",
+        "m03_config_defaults",
+        "m05_bank_errors",
+        "m06_coupon",
+        "m08_scheduler",
+        "h02_wrap_text",
+        "h04_csv_line",
+        "h06_split_amount",
+        "h07_business_days",
+        "h08_nested_decode"
+      ],
+      "hard": [
+        "h01_semver",
+        "h02_wrap_text",
+        "h03_ttl_cache",
+        "h04_csv_line",
+        "h05_topo_order",
+        "h06_split_amount",
+        "h07_business_days",
+        "h08_nested_decode"
+      ]
+    },
+    "model": "qwen/qwen3.8-27b",
+    "base_url": "https://api.groq.com/openai/v1",
+    "finished": "2026-10-21T16:50:47+00:00"
+  },
+  "runs": {
+    "baseline": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 334
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 491
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 388
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 379
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 512
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 428
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 472
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 413
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 388
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "AssertionError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "--------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/kintsugi-vsz7c7x2/task/test_fib.py\", line 12, in test_sequence\n    self.assertEqual([fib(i) for i in range(10)], [0, 1, 1, 2, 3, 5, 8, 13, 21, 34])\nAssertionError: Lists differ: [0, 0, 1, 1, 2, 3, 5, 8, 13, 21] != [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]\n\nFirst differing element 1:\n0\n1\n\n- [0, 0, 1, 1, 2, 3, 5, 8, 13, 21]\n?     ---\n\n+ [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]\n?                             ++++\n\n\n----------------------------------------------------------------------\nRan 2 tests in 0.001s\n\nFAILED (failures=2)",
+            "last_reply": "```python\n# file: fib.py\ndef fib(n):\n    if n == 0:\n        return 0\n    a, b = 0, 1\n    for _ in range(n - 1):\n        a, b = b, a + b\n    return a\n```"
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 452
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 418
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1079
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1081
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1151
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1162
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1006
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h02_wrap_text",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1095
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h04_csv_line",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1044
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h06_split_amount",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1015
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h07_business_days",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 881
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h08_nested_decode",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1030
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "AssertionError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "......F.\n======================================================================\nFAIL: test_unbalanced (test_rle.TestDecode.test_unbalanced)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/kintsugi-qxg403jk/task/test_rle.py\", line 31, in test_unbalanced\n    with self.assertRaises(ValueError, msg=bad):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised : 2(ab\n\n----------------------------------------------------------------------\nRan 8 tests in 0.001s\n\nFAILED (failures=1)",
+            "last_reply": "```python\n# file: rle.py\ndef decode(s):\n    pos = 0\n    n = len(s)\n\n    def parse_group():\n        nonlocal pos\n        result = []\n        while pos < n:\n            c = s[pos]\n            if c == ')':\n                pos += 1\n                return ''.join(result)\n            elif c.isdigit():\n                start = pos\n                while pos < n and s[pos].isdigit():\n                    pos += 1\n                count = int(s[start:pos])\n                if pos >= n:\n                    rai"
+          }
+        ],
+        "usage": {
+          "calls": 21,
+          "prompt_tokens": 12539,
+          "completion_tokens": 2680
+        }
+      }
+    ],
+    "loop": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 334
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 491
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 388
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 379
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 512
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 428
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 472
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 413
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 372
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 452
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 418
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1079
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1081
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1151
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1167
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1006
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h02_wrap_text",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1095
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h04_csv_line",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1044
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h06_split_amount",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1015
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h07_business_days",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 881
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h08_nested_decode",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 3,
+              "tokens": 4949
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 3,
+            "error_types": [
+              "AssertionError",
+              "AssertionError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 23,
+          "prompt_tokens": 15741,
+          "completion_tokens": 3386
+        }
+      }
+    ],
+    "loop+memory": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s01_median",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 414
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s04_flatten",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 393
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s07_roman",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 496
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s10_dedupe",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 349
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s13_caesar",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 459
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m01_order_total",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 921
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m04_units",
+            "kind": "multi",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 903
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m07_slugify",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 904
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h01_semver",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1355
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h03_ttl_cache",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1616
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h05_topo_order",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1023
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 334
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 491
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 388
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 379
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 512
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 428
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 472
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 413
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 3,
+              "tokens": 1832
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 2,
+            "error_types": [
+              "AssertionError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [
+              "L001"
+            ],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 452
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 418
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1131
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1133
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1203
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1219
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1058
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h02_wrap_text",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1095
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h04_csv_line",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1044
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h06_split_amount",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1087
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h07_business_days",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 881
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h08_nested_decode",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1248
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 34,
+          "prompt_tokens": 21440,
+          "completion_tokens": 4611
+        }
+      }
+    ],
+    "full": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s01_median",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 414
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s04_flatten",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 393
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s07_roman",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 496
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s10_dedupe",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 349
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s13_caesar",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 459
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m01_order_total",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 533
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m04_units",
+            "kind": "multi",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 506
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m07_slugify",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 502
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h01_semver",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1355
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h03_ttl_cache",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1616
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h05_topo_order",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1066
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 334
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 491
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 388
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 379
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 512
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 428
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 472
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 413
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 3,
+              "tokens": 1832
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 2,
+            "error_types": [
+              "AssertionError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [
+              "L001"
+            ],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 452
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 418
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 723
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 724
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 835
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 832
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 662
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h02_wrap_text",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1095
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h04_csv_line",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1044
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h06_split_amount",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1087
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h07_business_days",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 881
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h08_nested_decode",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1248
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [
+              "L001"
+            ],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 34,
+          "prompt_tokens": 18285,
+          "completion_tokens": 4654
+        }
+      }
+    ]
+  },
+  "summary": {
+    "baseline": {
+      "repeats": 1,
+      "pass_rate_mean": 0.9047619047619048,
+      "pass_rate_min": 0.9047619047619048,
+      "pass_rate_max": 0.9047619047619048,
+      "avg_attempts": 1,
+      "hard_pass_rate_mean": 0.8,
+      "calls_scored": 21,
+      "tokens_scored": 15219
+    },
+    "loop": {
+      "repeats": 1,
+      "pass_rate_mean": 1.0,
+      "pass_rate_min": 1.0,
+      "pass_rate_max": 1.0,
+      "avg_attempts": 1.0952380952380953,
+      "hard_pass_rate_mean": 1.0,
+      "calls_scored": 23,
+      "tokens_scored": 19127
+    },
+    "loop+memory": {
+      "repeats": 1,
+      "pass_rate_mean": 1.0,
+      "pass_rate_min": 1.0,
+      "pass_rate_max": 1.0,
+      "avg_attempts": 1.0476190476190477,
+      "hard_pass_rate_mean": 1.0,
+      "calls_scored": 23,
+      "tokens_scored": 17218
+    },
+    "full": {
+      "repeats": 1,
+      "pass_rate_mean": 1.0,
+      "pass_rate_min": 1.0,
+      "pass_rate_max": 1.0,
+      "avg_attempts": 1.0476190476190477,
+      "hard_pass_rate_mean": 1.0,
+      "calls_scored": 23,
+      "tokens_scored": 15250
+    }
+  }
+}

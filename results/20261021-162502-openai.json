@@ -1,0 +1,2012 @@
+{
+  "meta": {
+    "started": "2026-10-21T16:25:02+00:00",
+    "git_commit": "d052cf8",
+    "mock": false,
+    "modes": [
+      "baseline",
+      "loop",
+      "loop+memory",
+      "full"
+    ],
+    "repeats": 1,
+    "temperature": 0.0,
+    "split": {
+      "note": "Lessons are learned on warmup tasks only. Pass rates are reported on held-out tasks. 'hard' lists the hard-tier tasks (8 written after the first real runs showed the original 24 were too easy for capable models; see README).",
+      "warmup": [
+        "s01_median",
+        "s04_flatten",
+        "s07_roman",
+        "s10_dedupe",
+        "s13_caesar",
+        "m01_order_total",
+        "m04_units",
+        "m07_slugify",
+        "h01_semver",
+        "h03_ttl_cache",
+        "h05_topo_order"
+      ],
+      "heldout": [
+        "s02_palindrome",
+        "s03_binary_search",
+        "s05_word_count",
+        "s06_chunk",
+        "s08_merge_intervals",
+        "s09_rotate",
+        "s11_duration",
+        "s12_moving_average",
+        "s14_fibonacci",
+        "s15_brackets",
+        "s16_top_k",
+        "m02_display_name",
+        "m03_config_defaults",
+        "m05_bank_errors",
+        "m06_coupon",
+        "m08_scheduler",
+        "h02_wrap_text",
+        "h04_csv_line",
+        "h06_split_amount",
+        "h07_business_days",
+        "h08_nested_decode"
+      ],
+      "hard": [
+        "h01_semver",
+        "h02_wrap_text",
+        "h03_ttl_cache",
+        "h04_csv_line",
+        "h05_topo_order",
+        "h06_split_amount",
+        "h07_business_days",
+        "h08_nested_decode"
+      ]
+    },
+    "model": "openai/gpt-oss-20b",
+    "base_url": "https://api.groq.com/openai/v1",
+    "finished": "2026-10-21T16:36:52+00:00"
+  },
+  "runs": {
+    "baseline": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 531
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1176
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 669
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 591
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 953
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 824
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 650
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 593
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 491
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 601
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 650
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1221
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1326
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1284
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1416
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1180
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h02_wrap_text",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 8971
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h04_csv_line",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1382
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h06_split_amount",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8992, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h07_business_days",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8923, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h08_nested_decode",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8980, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 18,
+          "prompt_tokens": 10700,
+          "completion_tokens": 13809
+        }
+      }
+    ],
+    "loop": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8520, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8619, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8554, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 618
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8632, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 843
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 650
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 593
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 491
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 662
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 650
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1239
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 9143, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1282
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 9235, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1178
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h02_wrap_text",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8971, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h04_csv_line",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 4519
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h06_split_amount",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1515
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h07_business_days",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1160
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h08_nested_decode",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 2127
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 2,
+            "error_types": [
+              "ValueError",
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 9836, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 14,
+          "prompt_tokens": 8689,
+          "completion_tokens": 8838
+        }
+      }
+    ],
+    "loop+memory": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s01_median",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": false,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8571, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s04_flatten",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 584
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s07_roman",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": false,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8589, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s10_dedupe",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 524
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s13_caesar",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 684
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m01_order_total",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1307
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m04_units",
+            "kind": "multi",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": false,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 9037, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m07_slugify",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1213
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h01_semver",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1897
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h03_ttl_cache",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 3223
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h05_topo_order",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": false,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8912, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 531
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1038
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 755
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8574, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 969
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8588, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8598, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 593
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8554, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 662
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 650
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1304
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 9143, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1282
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1432
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1119
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h02_wrap_text",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8971, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h04_csv_line",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 2493
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h06_split_amount",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8992, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h07_business_days",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1160
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h08_nested_decode",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 4367
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 21,
+          "prompt_tokens": 14057,
+          "completion_tokens": 13730
+        }
+      }
+    ],
+    "full": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "s01_median",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 705
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s04_flatten",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 584
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s07_roman",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 754
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s10_dedupe",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 524
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s13_caesar",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 613
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m01_order_total",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 874
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m04_units",
+            "kind": "multi",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 786
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m07_slugify",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 621
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h01_semver",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 2282
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h03_ttl_cache",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 3048
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h05_topo_order",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1486
+            },
+            "scored": false,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s02_palindrome",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 531
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s03_binary_search",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1038
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s05_word_count",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 664
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s06_chunk",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 618
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s08_merge_intervals",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 834
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s09_rotate",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 824
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s11_duration",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 646
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s12_moving_average",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 611
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s14_fibonacci",
+            "kind": "single",
+            "difficulty": "easy",
+            "usage": {
+              "calls": 1,
+              "tokens": 491
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s15_brackets",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 589
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "s16_top_k",
+            "kind": "single",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 698
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m02_display_name",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1057
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m03_config_defaults",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 909
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m05_bank_errors",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 988
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m06_coupon",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1104
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "m08_scheduler",
+            "kind": "multi",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 764
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h02_wrap_text",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 3436
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h04_csv_line",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 2,
+              "tokens": 12544
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 2,
+            "error_types": [
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h06_split_amount",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1519
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h07_business_days",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 1,
+              "tokens": 1160
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "h08_nested_decode",
+            "kind": "single",
+            "difficulty": "hard",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 413: b'{\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-20b` in organization `org_01kregyt46echs1yr3ztr114sa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8980, please reduce your message size and try again. Need more tokens? Upgrade to D",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 32,
+          "prompt_tokens": 17548,
+          "completion_tokens": 25754
+        }
+      }
+    ]
+  },
+  "summary": {
+    "baseline": {
+      "repeats": 1,
+      "pass_rate_mean": 0.8095238095238095,
+      "pass_rate_min": 0.8095238095238095,
+      "pass_rate_max": 0.8095238095238095,
+      "avg_attempts": 1,
+      "hard_pass_rate_mean": 0.2,
+      "calls_scored": 18,
+      "tokens_scored": 24509
+    },
+    "loop": {
+      "repeats": 1,
+      "pass_rate_mean": 0.6190476190476191,
+      "pass_rate_min": 0.6190476190476191,
+      "pass_rate_max": 0.6190476190476191,
+      "avg_attempts": 1.0476190476190477,
+      "hard_pass_rate_mean": 0.6,
+      "calls_scored": 14,
+      "tokens_scored": 17527
+    },
+    "loop+memory": {
+      "repeats": 1,
+      "pass_rate_mean": 0.6666666666666666,
+      "pass_rate_min": 0.6666666666666666,
+      "pass_rate_max": 0.6666666666666666,
+      "avg_attempts": 1,
+      "hard_pass_rate_mean": 0.6,
+      "calls_scored": 14,
+      "tokens_scored": 18355
+    },
+    "full": {
+      "repeats": 1,
+      "pass_rate_mean": 0.9523809523809523,
+      "pass_rate_min": 0.9523809523809523,
+      "pass_rate_max": 0.9523809523809523,
+      "avg_attempts": 1.0476190476190477,
+      "hard_pass_rate_mean": 0.8,
+      "calls_scored": 21,
+      "tokens_scored": 31025
+    }
+  }
+}
