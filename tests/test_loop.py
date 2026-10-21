@@ -2,7 +2,8 @@ import unittest
 from pathlib import Path
 
 from kintsugi.loop import headline, load_task, parse_files, solve
-from kintsugi.model import MockModel, ModelRequestError
+from kintsugi.memory import MemoryStore
+from kintsugi.model import MockModel, ModelInfraError, ModelRequestError
 
 FIXTURE = Path(__file__).parent / "fixtures" / "add_bug"
 WRONG = "```python\n# file: calc.py\ndef add(a, b):\n    return a * b\n```"
@@ -108,6 +109,16 @@ class TestSolve(unittest.TestCase):
         model = MockModel([original, RIGHT])
         solve(self.task, model, max_retries=2)
         self.assertIn("original code unchanged", model.prompts[1][-1]["content"])
+
+    def test_infrastructure_error_is_not_a_model_failure(self):
+        def reply(messages):
+            raise ModelInfraError("429 slow down")
+
+        store = MemoryStore()
+        result = solve(self.task, MockModel(reply), max_retries=3, memory=store)
+        self.assertTrue(result.errored)
+        self.assertEqual(result.attempts[-1].error_type, "ApiError")
+        self.assertEqual(store.lessons, [])  # an outage must not teach (or punish) any lesson
 
     def test_headline_picks_the_exception_line(self):
         output = "FAIL: test_add\nTraceback...\nAssertionError: -1 != 5\n\nRan 1 test"

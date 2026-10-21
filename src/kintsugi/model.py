@@ -24,7 +24,16 @@ USER_AGENT = "kintsugi/0.1 (+https://github.com/niranjanpatil0808-max/KINTSUGI)"
 
 
 class ModelRequestError(RuntimeError):
-    """The API rejected this particular request (bad request, too long...). Other tasks can still run."""
+    """The API rejected this particular request as invalid or too long for the model. Counts against the model."""
+
+
+class ModelInfraError(RuntimeError):
+    """No answer for reasons that say nothing about the model: rate limit, request over the
+    per-minute token limit, timeout, server error. Never counted as a failed task."""
+
+
+class QuotaExhausted(RuntimeError):
+    """A daily quota is used up: stop the whole run (finished tasks are already saved)."""
 
 
 @dataclass
@@ -100,21 +109,26 @@ class OpenAIAdapter(Model):
                     data = json.load(response)
                 break
             except urllib.error.HTTPError as err:
-                # Rate limits and server hiccups are retried; anything else is a real error.
-                detail = f"Model API error {err.code}: {err.read()[:500]!r}"
-                if err.code in (400, 413, 422):
+                body_text = err.read()[:500].decode("utf-8", "replace")
+                detail = f"Model API error {err.code}: {body_text!r}"
+                per_minute = "per minute" in body_text.lower()
+                if err.code in (400, 422) or (err.code == 413 and not per_minute):
                     raise ModelRequestError(detail) from err
-                if err.code not in (429, 500, 502, 503, 504) or attempt == self.max_retries:
-                    raise RuntimeError(detail) from err
+                if err.code == 413:  # request + max_tokens larger than the per-minute token limit
+                    raise ModelInfraError(f"{detail} (lower KINTSUGI_MAX_TOKENS)") from err
+                if err.code not in (429, 500, 502, 503, 504):
+                    raise RuntimeError(detail) from err  # bad key, unknown model...: a setup problem
                 retry_after = err.headers.get("retry-after")
                 wait = float(retry_after) if retry_after else delay
-                if wait > MAX_WAIT:  # a daily quota, not a short rate limit: stop instead of sleeping for hours
-                    raise RuntimeError(f"{detail} (asked to wait {wait:.0f}s)") from err
+                if wait > MAX_WAIT:  # a daily quota, not a short rate limit
+                    raise QuotaExhausted(f"{detail} (asked to wait {wait:.0f}s)") from err
+                if attempt == self.max_retries:
+                    raise ModelInfraError(detail) from err
                 time.sleep(wait)
                 delay *= 2
-            except (urllib.error.URLError, TimeoutError):
+            except (urllib.error.URLError, TimeoutError) as err:
                 if attempt == self.max_retries:
-                    raise
+                    raise ModelInfraError(f"Model API unreachable: {err}") from err
                 time.sleep(delay)
                 delay *= 2
         self.usage.calls += 1

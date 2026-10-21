@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .graph import ContextGraph
-from .model import Model, ModelRequestError
+from .model import Model, ModelInfraError, ModelRequestError
 from .verifier import VerifyResult, verify
 
 if TYPE_CHECKING:
@@ -123,6 +123,11 @@ class TaskResult:
     def num_attempts(self) -> int:
         return len(self.attempts)
 
+    @property
+    def errored(self) -> bool:
+        """True if the task ended on an infrastructure error: it says nothing about the model."""
+        return bool(self.attempts) and self.attempts[-1].error_type == "ApiError"
+
 
 def build_prompt(task: Task, use_graph: bool, lessons_text: str) -> tuple[str, list[str]]:
     """Return the first user prompt and the files the model is allowed to edit."""
@@ -190,6 +195,10 @@ def solve(
             # e.g. the request was too long for the model's context window: the task fails, the run goes on.
             attempts.append(Attempt(number, False, "ModelError", str(err)[:300], [], used_ids))
             break
+        except ModelInfraError as err:
+            # Rate limit, size over the per-minute token limit, timeout...: not the model's fault.
+            attempts.append(Attempt(number, False, "ApiError", str(err)[:300], [], used_ids))
+            break
         files = parse_files(reply, task, editable)
         if files:
             result = verify(task.dir, files, timeout=timeout)
@@ -222,8 +231,9 @@ def solve(
             ]
 
     passed = attempts[-1].passed
-    if memory and learn:
+    result = TaskResult(task.id, passed, attempts, learned)
+    if memory and learn and not result.errored:
         # Credit lessons only once the outcome is known (Harness²-style: keep what wins).
         memory.record_outcome(used_ids + shown, passed, task.id)
         memory.save()
-    return TaskResult(task.id, passed, attempts, learned)
+    return result

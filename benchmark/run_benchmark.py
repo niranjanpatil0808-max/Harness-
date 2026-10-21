@@ -33,6 +33,8 @@ from kintsugi.model import MockModel, Model, OpenAIAdapter
 
 ROOT = Path(__file__).parent
 RESULTS = ROOT.parent / "results"
+API_RETRIES = 2  # extra tries for a task that hit an infrastructure error (rate limit, size limit, timeout)
+API_PAUSE = 45.0  # seconds to wait first: per-minute limits reset after a minute
 MODES = {
     "baseline": dict(max_retries=0, memory=False, use_graph=False),
     "loop": dict(max_retries=3, memory=False, use_graph=False),
@@ -67,6 +69,17 @@ def git_commit() -> str:
         return "unknown"
 
 
+def is_api_error(record: dict) -> bool:
+    """True if the task ended without an answer for infrastructure reasons.
+
+    Early result files labelled the 'request over the per-minute token limit' error as ModelError,
+    so that case is recognised by its message too.
+    """
+    if "ApiError" in record["error_types"]:
+        return True
+    return "ModelError" in record["error_types"] and "per minute" in record.get("last_output", "").lower()
+
+
 def summarize(runs: list[dict], n_heldout: int) -> dict:
     """Aggregate scored (held-out) results over repeats.
 
@@ -81,9 +94,10 @@ def summarize(runs: list[dict], n_heldout: int) -> dict:
         if not scored:
             continue
         started += 1
-        most_done = max(most_done, len(scored))
-        if len(scored) < n_heldout:
-            continue
+        api_errors = sum(is_api_error(r) for r in scored)
+        most_done = max(most_done, len(scored) - api_errors)
+        if len(scored) - api_errors < n_heldout:
+            continue  # stopped early, or some tasks never got an answer: not a result
         rates.append(sum(r["passed"] for r in scored) / len(scored))
         hard = [r for r in scored if r.get("difficulty") == "hard"]
         if hard:
@@ -128,7 +142,8 @@ def table(data: dict) -> str:
         if not s:
             continue
         if s.get("incomplete"):
-            lines.append(f"| {mode} | **INCOMPLETE** ({s['tasks_done']}/{s['tasks_total']} tasks run, no result) | | | | |")
+            lines.append(f"| {mode} | **INCOMPLETE** ({s['tasks_done']}/{s['tasks_total']} tasks answered; "
+                         "stopped early or hit API errors, so no result) | | | | |")
             continue
         passed = round(s["pass_rate_mean"] * n, 1)
         spread = f" [{s['pass_rate_min']:.0%}–{s['pass_rate_max']:.0%}]" if s["repeats"] > 1 else ""
@@ -155,7 +170,8 @@ def run_mode(data: dict, mode: str, repeat: int, model: Model, out: Path, sleep:
     while len(runs) <= repeat:
         runs.append({"repeat": len(runs), "tasks": [], "usage": {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0}})
     run = runs[repeat]
-    done = {r["task_id"] for r in run["tasks"]}
+    done = {r["task_id"] for r in run["tasks"] if not is_api_error(r)}
+    run["tasks"] = [r for r in run["tasks"] if r["task_id"] in done]  # tasks that hit API errors are redone
     memory = None
     memory_path = out.parent / f"{out.stem}.lessons.{mode}.r{repeat}.json"
     if config["memory"]:
@@ -166,8 +182,14 @@ def run_mode(data: dict, mode: str, repeat: int, model: Model, out: Path, sleep:
             continue
         task = load_task(ROOT / "tasks" / task_id)
         before = asdict(model.usage)
-        result = solve(task, model, max_retries=config["max_retries"], memory=memory,
-                       use_graph=config["use_graph"])
+        for tries in range(API_RETRIES + 1):
+            result = solve(task, model, max_retries=config["max_retries"], memory=memory,
+                           use_graph=config["use_graph"])
+            if not result.errored or tries == API_RETRIES:
+                break
+            print(f"[{mode} r{repeat}] {task_id}: API error ({result.attempts[-1].output[:90]}...); "
+                  f"retrying in {API_PAUSE:.0f}s", flush=True)
+            time.sleep(API_PAUSE)
         after = asdict(model.usage)
         for key in run["usage"]:
             run["usage"][key] += after[key] - before[key]
@@ -189,7 +211,7 @@ def run_mode(data: dict, mode: str, repeat: int, model: Model, out: Path, sleep:
         }
         run["tasks"].append(record)
         save(out, data)
-        mark = "PASS" if result.passed else "fail"
+        mark = "PASS" if result.passed else ("API-ERROR" if result.errored else "fail")
         print(f"[{mode} r{repeat}] {task_id:<22} {mark} after {result.num_attempts} attempt(s)", flush=True)
         if sleep:
             time.sleep(sleep)

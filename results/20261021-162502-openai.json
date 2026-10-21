@@ -1969,44 +1969,24 @@
   },
   "summary": {
     "baseline": {
-      "repeats": 1,
-      "pass_rate_mean": 0.8095238095238095,
-      "pass_rate_min": 0.8095238095238095,
-      "pass_rate_max": 0.8095238095238095,
-      "avg_attempts": 1,
-      "hard_pass_rate_mean": 0.2,
-      "calls_scored": 18,
-      "tokens_scored": 24509
+      "incomplete": true,
+      "tasks_done": 18,
+      "tasks_total": 21
     },
     "loop": {
-      "repeats": 1,
-      "pass_rate_mean": 0.6190476190476191,
-      "pass_rate_min": 0.6190476190476191,
-      "pass_rate_max": 0.6190476190476191,
-      "avg_attempts": 1.0476190476190477,
-      "hard_pass_rate_mean": 0.6,
-      "calls_scored": 14,
-      "tokens_scored": 17527
+      "incomplete": true,
+      "tasks_done": 13,
+      "tasks_total": 21
     },
     "loop+memory": {
-      "repeats": 1,
-      "pass_rate_mean": 0.6666666666666666,
-      "pass_rate_min": 0.6666666666666666,
-      "pass_rate_max": 0.6666666666666666,
-      "avg_attempts": 1,
-      "hard_pass_rate_mean": 0.6,
-      "calls_scored": 14,
-      "tokens_scored": 18355
+      "incomplete": true,
+      "tasks_done": 14,
+      "tasks_total": 21
     },
     "full": {
-      "repeats": 1,
-      "pass_rate_mean": 0.9523809523809523,
-      "pass_rate_min": 0.9523809523809523,
-      "pass_rate_max": 0.9523809523809523,
-      "avg_attempts": 1.0476190476190477,
-      "hard_pass_rate_mean": 0.8,
-      "calls_scored": 21,
-      "tokens_scored": 31025
+      "incomplete": true,
+      "tasks_done": 20,
+      "tasks_total": 21
     }
   }
 }
