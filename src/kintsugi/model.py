@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -17,6 +18,7 @@ from typing import Callable
 
 DEFAULT_BASE_URL = "https://api.groq.com/openai/v1"
 DEFAULT_MODEL = "llama-3.1-8b-instant"
+THINK_RE = re.compile(r"<think>.*?</think>", re.S)
 
 
 @dataclass
@@ -45,7 +47,7 @@ class OpenAIAdapter(Model):
         model: str | None = None,
         api_key: str | None = None,
         temperature: float = 0.0,
-        max_tokens: int = 2048,
+        max_tokens: int | None = None,
         timeout: float = 60.0,
         max_retries: int = 6,
     ) -> None:
@@ -56,7 +58,8 @@ class OpenAIAdapter(Model):
         if not self.api_key:
             raise RuntimeError("No API key: set KINTSUGI_API_KEY (or GROQ_API_KEY).")
         self.temperature = temperature
-        self.max_tokens = max_tokens
+        # Thinking models spend tokens reasoning before they answer, so this is configurable.
+        self.max_tokens = max_tokens or int(os.environ.get("KINTSUGI_MAX_TOKENS", "2048"))
         self.timeout = timeout
         self.max_retries = max_retries
 
@@ -94,7 +97,8 @@ class OpenAIAdapter(Model):
         usage = data.get("usage") or {}
         self.usage.prompt_tokens += usage.get("prompt_tokens", 0)
         self.usage.completion_tokens += usage.get("completion_tokens", 0)
-        return data["choices"][0]["message"]["content"] or ""
+        text = data["choices"][0]["message"].get("content") or ""
+        return THINK_RE.sub("", text).strip()  # drop <think> blocks some models put inline
 
 
 @dataclass

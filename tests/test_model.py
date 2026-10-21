@@ -1,6 +1,6 @@
 import unittest
 
-from kintsugi.model import MockModel
+from kintsugi.model import THINK_RE, MockModel
 
 
 class TestMockModel(unittest.TestCase):
@@ -13,6 +13,10 @@ class TestMockModel(unittest.TestCase):
     def test_callable_script(self):
         model = MockModel(lambda messages: messages[-1]["content"].upper())
         self.assertEqual(model.complete([{"role": "user", "content": "hi"}]), "HI")
+
+    def test_think_blocks_are_removed(self):
+        self.assertEqual(THINK_RE.sub("", "<think>hmm\nlet me see</think>```python\nx = 1\n```").strip(),
+                         "```python\nx = 1\n```")
 
 
 if __name__ == "__main__":
