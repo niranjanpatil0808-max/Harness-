@@ -73,7 +73,12 @@ class OpenAIAdapter(Model):
         request = urllib.request.Request(
             f"{self.base_url}/chat/completions",
             data=body,
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+                # Some providers' firewalls (Cloudflare error 1010) reject Python's default User-Agent.
+                "User-Agent": "kintsugi/0.1 (+https://github.com/niranjanpatil0808-max/Harness-)",
+            },
         )
         delay = 2.0
         for attempt in range(self.max_retries + 1):
