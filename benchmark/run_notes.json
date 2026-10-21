@@ -1,0 +1,11 @@
+{
+  "20261021-133709": "allam-2-7b on the original 24-task set. Almost every failure is a FormatError: the model writes the code after a `# file:` line but leaves out the opening code fence, and the parser of that day rejected it. This is not a fair measure of the model.",
+  "20261021-145450": "gpt-oss-20b on the original 24-task set: everything passes in every mode, so this set cannot separate the modes for a capable model.",
+  "20261021-153259": "Diagnostic run (baseline only) that saved raw replies; it showed the missing opening fences described above.",
+  "20261021-154328": "allam-2-7b after the parser began accepting unfenced replies: the baseline is 2/16 (it was 0/16). The loop mode was stopped by the daily token quota after 4 tasks, so it has no result.",
+  "20261021-155102": "qwen3.8-27b on the original 24-task set: everything passes in every mode.",
+  "20261021-162502": "INVALID. gpt-oss-20b on the 32-task set with max_tokens 8192: Groq rejected many requests as larger than the 8000 tokens-per-minute limit (HTTP 413). The code of that day scored those as model failures; they are unanswered tasks, so every mode is shown as incomplete.",
+  "20261021-163652": "Complete. qwen3.8-27b on the 32-task set, with the first version of the retry loop (the whole chat is resent on every retry).",
+  "20261021-165923": "gpt-oss-20b, 32-task set, bounded-context loop, max_tokens 4096. Stopped in loop mode by Groq's 200,000 tokens-per-day limit, so only the baseline has a result.",
+  "20261021-170243": "qwen3.8-27b, 32-task set, bounded-context loop. Stopped in full mode by Groq's 200,000 tokens-per-day limit; the other three modes are complete."
+}
