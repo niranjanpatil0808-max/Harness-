@@ -1,0 +1,6 @@
+{
+  "id": "s10_dedupe",
+  "description": "dedupe(items) removes duplicates from a list, keeping the first occurrence of each item and the original order.",
+  "difficulty": "easy",
+  "kind": "single"
+}

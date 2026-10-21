@@ -1,0 +1,6 @@
+{
+  "id": "s01_median",
+  "description": "median(values) returns the median of a non-empty list of numbers. For an even count it is the mean of the two middle values.",
+  "difficulty": "easy",
+  "kind": "single"
+}

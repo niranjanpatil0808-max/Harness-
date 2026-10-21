@@ -1,0 +1,6 @@
+{
+  "id": "m01_order_total",
+  "description": "order_total(items) in pricing.py returns the total price of all (price, quantity) items including sales tax, rounded to 2 decimals.",
+  "difficulty": "medium",
+  "kind": "multi"
+}

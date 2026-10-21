@@ -1,0 +1,6 @@
+{
+  "id": "s08_merge_intervals",
+  "description": "merge_intervals(intervals) merges overlapping or touching [start, end] intervals and returns them sorted by start. The input may be unsorted.",
+  "difficulty": "medium",
+  "kind": "single"
+}

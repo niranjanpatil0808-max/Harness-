@@ -1,0 +1,6 @@
+{
+  "id": "m02_display_name",
+  "description": "display_name(user) in users.py returns the user's full name in title case following the house style in text_utils.py: small words like 'of', 'and', 'the', 'van', 'de' stay lowercase unless they come first.",
+  "difficulty": "medium",
+  "kind": "multi"
+}

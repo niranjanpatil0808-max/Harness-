@@ -1,0 +1,6 @@
+{
+  "id": "s09_rotate",
+  "description": "rotate_clockwise(matrix) returns a new matrix rotated 90 degrees clockwise. The input is a list of equal-length rows and may be rectangular.",
+  "difficulty": "medium",
+  "kind": "single"
+}

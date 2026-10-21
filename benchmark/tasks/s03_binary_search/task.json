@@ -1,0 +1,6 @@
+{
+  "id": "s03_binary_search",
+  "description": "binary_search(items, target) returns the index of target in the sorted list items, or -1 if it is not present.",
+  "difficulty": "medium",
+  "kind": "single"
+}

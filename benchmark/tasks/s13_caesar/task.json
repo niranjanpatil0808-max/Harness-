@@ -1,0 +1,6 @@
+{
+  "id": "s13_caesar",
+  "description": "caesar(text, shift) shifts each letter by `shift` places in the alphabet, wrapping around from z to a. Upper and lower case are kept and other characters are unchanged. Negative shifts move backwards.",
+  "difficulty": "easy",
+  "kind": "single"
+}

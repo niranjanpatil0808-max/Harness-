@@ -1,0 +1,6 @@
+{
+  "id": "s14_fibonacci",
+  "description": "fib(n) returns the n-th Fibonacci number, where fib(0) = 0, fib(1) = 1 and fib(n) = fib(n-1) + fib(n-2).",
+  "difficulty": "easy",
+  "kind": "single"
+}

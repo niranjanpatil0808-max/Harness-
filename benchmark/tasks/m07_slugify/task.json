@@ -1,0 +1,6 @@
+{
+  "id": "m07_slugify",
+  "description": "slugify(title) in pipeline.py turns a title into a URL slug: lowercase words joined by '-', punctuation removed, and numbers kept.",
+  "difficulty": "medium",
+  "kind": "multi"
+}

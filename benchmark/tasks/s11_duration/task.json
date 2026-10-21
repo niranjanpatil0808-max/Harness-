@@ -1,0 +1,6 @@
+{
+  "id": "s11_duration",
+  "description": "parse_duration(text) converts a duration like '1h30m15s', '45m' or '2h' into a total number of seconds. Each unit is optional but they appear in h, m, s order.",
+  "difficulty": "medium",
+  "kind": "single"
+}

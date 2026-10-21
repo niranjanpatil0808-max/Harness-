@@ -1,0 +1,9 @@
+{
+  "note": "Lessons are learned on warmup tasks only. Pass rates are reported on held-out tasks.",
+  "warmup": ["s01_median", "s04_flatten", "s07_roman", "s10_dedupe", "s13_caesar",
+             "m01_order_total", "m04_units", "m07_slugify"],
+  "heldout": ["s02_palindrome", "s03_binary_search", "s05_word_count", "s06_chunk",
+              "s08_merge_intervals", "s09_rotate", "s11_duration", "s12_moving_average",
+              "s14_fibonacci", "s15_brackets", "s16_top_k",
+              "m02_display_name", "m03_config_defaults", "m05_bank_errors", "m06_coupon", "m08_scheduler"]
+}

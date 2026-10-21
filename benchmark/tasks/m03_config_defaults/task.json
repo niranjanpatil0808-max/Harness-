@@ -1,0 +1,6 @@
+{
+  "id": "m03_config_defaults",
+  "description": "get_setting(config, key) in settings.py returns config[key] if present, otherwise the project default for that key from defaults.py. Unknown keys raise KeyError.",
+  "difficulty": "medium",
+  "kind": "multi"
+}

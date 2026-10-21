@@ -1,0 +1,6 @@
+{
+  "id": "s07_roman",
+  "description": "roman_to_int(s) converts a Roman numeral string (I, V, X, L, C, D, M, including subtractive forms like IV and CM) to an integer.",
+  "difficulty": "medium",
+  "kind": "single"
+}

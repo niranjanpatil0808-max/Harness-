@@ -1,0 +1,6 @@
+{
+  "id": "s04_flatten",
+  "description": "flatten(nested) takes a list that may contain lists nested to any depth and returns a flat list of all non-list items in order.",
+  "difficulty": "easy",
+  "kind": "single"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "s12_moving_average",
+  "description": "moving_average(values, window) returns the averages of every run of `window` consecutive values, in order. If there are fewer values than window, it returns an empty list.",
+  "difficulty": "medium",
+  "kind": "single"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "m06_coupon",
+  "description": "checkout_total(cart, code) in checkout.py returns the cart subtotal with the coupon `code` applied (see discounts.py), plus the flat shipping fee. Unknown or missing codes give no discount.",
+  "difficulty": "medium",
+  "kind": "multi"
+}

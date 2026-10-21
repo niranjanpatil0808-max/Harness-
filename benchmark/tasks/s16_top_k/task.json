@@ -1,0 +1,6 @@
+{
+  "id": "s16_top_k",
+  "description": "top_k(words, k) returns the k most frequent words, most frequent first. Words with the same count are ordered alphabetically.",
+  "difficulty": "medium",
+  "kind": "single"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "s02_palindrome",
+  "description": "is_palindrome(text) returns True if text reads the same forwards and backwards, ignoring case, spaces and punctuation.",
+  "difficulty": "easy",
+  "kind": "single"
+}

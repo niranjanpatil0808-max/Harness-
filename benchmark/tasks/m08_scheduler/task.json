@@ -1,0 +1,6 @@
+{
+  "id": "m08_scheduler",
+  "description": "next_run(job, now) in jobs.py returns the datetime of the job's next run: `now` plus the job's interval from schedule_config.py.",
+  "difficulty": "medium",
+  "kind": "multi"
+}

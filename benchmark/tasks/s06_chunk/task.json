@@ -1,0 +1,6 @@
+{
+  "id": "s06_chunk",
+  "description": "chunk(items, size) splits a list into consecutive chunks of length size. The last chunk may be shorter.",
+  "difficulty": "easy",
+  "kind": "single"
+}

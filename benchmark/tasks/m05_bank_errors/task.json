@@ -1,0 +1,6 @@
+{
+  "id": "m05_bank_errors",
+  "description": "Account.withdraw(amount) in account.py subtracts amount from the balance. Withdrawing more than the balance must raise the project's InsufficientFunds error and leave the balance unchanged.",
+  "difficulty": "medium",
+  "kind": "multi"
+}

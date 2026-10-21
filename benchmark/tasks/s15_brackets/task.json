@@ -1,0 +1,6 @@
+{
+  "id": "s15_brackets",
+  "description": "is_balanced(text) returns True if every (, [ and { in text is closed by the matching bracket in the right order. Other characters are ignored.",
+  "difficulty": "medium",
+  "kind": "single"
+}

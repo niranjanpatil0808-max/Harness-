@@ -131,8 +131,8 @@ class ContextGraph:
                         self.edges[here][f"{module_names[alias.name]}::<module>"] = "imports"
 
     def _link(self, owner: str, name: str | None, by_name: dict[str, list[str]], kind: str) -> None:
-        if not name or owner not in self.nodes:
-            return
+        if not name or owner not in self.nodes or name.startswith("__"):
+            return  # dunders like __init__ exist on every class and would link everything
         for target in by_name.get(name, []):
             if target != owner and target not in self.edges[owner]:
                 self.edges[owner][target] = kind
@@ -169,8 +169,13 @@ class ContextGraph:
         return score
 
     def seeds_for(self, task: "Task") -> set[str]:
-        """Definitions named in the tests or the description."""
-        mentioned: set[str] = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", task.description))
+        """Definitions named in the tests or the description.
+
+        Plain words in the description ("error", "total") only seed top-level
+        definitions; methods are seeded only when the tests actually call them.
+        """
+        described = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", task.description))
+        mentioned: set[str] = set()
         for code in task.tests.values():
             try:
                 tree = ast.parse(code)
@@ -185,7 +190,8 @@ class ContextGraph:
                         mentioned.add(func.id)
                     elif isinstance(func, ast.Attribute):
                         mentioned.add(func.attr)
-        return {node.id for node in self.nodes.values() if node.name in mentioned}
+        return {node.id for node in self.nodes.values()
+                if node.name in mentioned or (node.name in described and node.kind != "method")}
 
     # --- rendering --------------------------------------------------------
 

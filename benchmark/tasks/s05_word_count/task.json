@@ -1,0 +1,6 @@
+{
+  "id": "s05_word_count",
+  "description": "word_count(text) returns a dict mapping each word to how many times it appears. Words are compared case-insensitively and surrounding punctuation is ignored.",
+  "difficulty": "easy",
+  "kind": "single"
+}
