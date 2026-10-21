@@ -14,11 +14,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .graph import ContextGraph
 from .model import Model
 from .verifier import VerifyResult, verify
 
 if TYPE_CHECKING:
-    from .graph import ContextGraph
     from .memory import MemoryStore
 
 SYSTEM_PROMPT = """You fix bugs in small Python projects.
@@ -59,8 +59,9 @@ def load_task(task_dir: Path) -> Task:
     return Task(meta.get("id", task_dir.name), task_dir, meta["description"], sources, tests, meta)
 
 
-def parse_files(reply: str, task: Task) -> dict[str, str]:
-    """Extract {path: code} from the model reply, ignoring edits to tests or unknown files."""
+def parse_files(reply: str, task: Task, editable: list[str] | None = None) -> dict[str, str]:
+    """Extract {path: code} from the model reply, ignoring edits to tests or files it wasn't shown."""
+    editable = list(task.sources) if editable is None else editable
     files: dict[str, str] = {}
     for fence_name, body in BLOCK_RE.findall(reply):
         name = fence_name
@@ -68,10 +69,10 @@ def parse_files(reply: str, task: Task) -> dict[str, str]:
         if tag:
             name = tag.group(1)
             body = body[tag.end():]
-        if not name and len(task.sources) == 1:
-            name = next(iter(task.sources))  # untagged block, only one file it can be
+        if not name and len(editable) == 1:
+            name = editable[0]  # untagged block, only one file it can be
         name = name.removeprefix("./") if name else name
-        if name in task.sources:
+        if name in editable:
             files[name] = body.rstrip() + "\n"
     return files
 
@@ -102,18 +103,19 @@ class TaskResult:
         return len(self.attempts)
 
 
-def build_prompt(task: Task, graph: "ContextGraph | None", lessons_text: str) -> str:
-    if graph is not None:
-        code = graph.context_for(task)
+def build_prompt(task: Task, use_graph: bool, lessons_text: str) -> tuple[str, list[str]]:
+    """Return the first user prompt and the files the model is allowed to edit."""
+    if use_graph:
+        code, editable = ContextGraph.build(task.sources).context_for(task)
     else:
-        code = format_files(task.sources)
+        code, editable = format_files(task.sources), list(task.sources)
     parts = [f"Task: {task.description}"]
     if lessons_text:
         parts.append(lessons_text)
     parts.append(f"Source files:\n{code}")
     parts.append(f"Tests (do not edit):\n{format_files(task.tests)}")
     parts.append("Return the fixed source file(s).")
-    return "\n\n".join(parts)
+    return "\n\n".join(parts), editable
 
 
 def solve(
@@ -121,7 +123,7 @@ def solve(
     model: Model,
     max_retries: int = 3,
     memory: "MemoryStore | None" = None,
-    graph: "ContextGraph | None" = None,
+    use_graph: bool = False,
     learn: bool = True,
     timeout: float = 10.0,
 ) -> TaskResult:
@@ -130,16 +132,17 @@ def solve(
     lessons_text = memory.format(lessons) if memory else ""
     used_ids = [lesson.id for lesson in lessons]
 
+    prompt, editable = build_prompt(task, use_graph, lessons_text)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": build_prompt(task, graph, lessons_text)},
+        {"role": "user", "content": prompt},
     ]
     attempts: list[Attempt] = []
     learned: list[str] = []
     shown: list[str] = []  # lessons put in front of the model during retries
     for number in range(1, max_retries + 2):
         reply = model.complete(messages)
-        files = parse_files(reply, task)
+        files = parse_files(reply, task, editable)
         if files:
             result = verify(task.dir, files, timeout=timeout)
         else:
