@@ -7,6 +7,13 @@
 > Built for the Meta Global AI Developer Hackathon (Indie developer track).
 > No runtime dependencies beyond the Python 3.10+ standard library.
 
+## Highlights
+
+- **Makes lessons for itself.** When a fix fails, the model writes its own short lesson about what went wrong. No human labels, no fine-tuning: the lessons are saved, deduplicated, tested against later tasks, kept when they help and dropped when they don't.
+- **Has its context graphified.** The codebase is turned into a graph of what calls, uses and imports what. For each task the harness walks that graph and hands the model only the connected code, not the whole repo.
+- **Retries against real tests.** Every fix is checked by unit tests in a separate process, and the error goes back to the model for another try.
+- **Honest numbers only.** Every result in this README is copied from a results file the benchmark wrote.
+
 ---
 
 ## How it works
@@ -51,7 +58,7 @@ Files shown in full for this task: jobs.py, schedule_config.py
 ## Quick start
 
 ```bash
-git clone https://github.com/niranjanpatil0808-max/Harness-.git kintsugi && cd kintsugi
+git clone https://github.com/niranjanpatil0808-max/KINTSUGI.git && cd KINTSUGI
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 
