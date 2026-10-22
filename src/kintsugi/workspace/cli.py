@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import os
 from pathlib import Path
 
@@ -15,6 +16,10 @@ from .core import Workspace, WorkspaceError
 def _open(args: argparse.Namespace) -> Workspace:
     factory = (lambda name: MockModel(["(mock model: I cannot really answer)"])) if args.mock else None
     # the server must not run agents inside its request threads, so it uses a worker pool
+    if args.wcmd == "serve" or (args.wcmd == "backup" and args.action == "restore"):
+        from . import backup
+
+        args.restored = backup.restore_if_empty(Path(args.dir))  # a free host that wiped its disk gets the encrypted backup back
     return Workspace(args.dir, model_factory=factory, sync=args.wcmd != "serve")
 
 
@@ -56,6 +61,9 @@ def add_parser(sub) -> None:
 
     log = cmds.add_parser("log", help="show a room's messages")
     log.add_argument("room")
+
+    backup = cmds.add_parser("backup", help="encrypted backup to your private GitHub repository (see docs/HOSTING.md)")
+    backup.add_argument("action", choices=["now", "status", "restore"], nargs="?", default="status")
 
     cmds.add_parser("approvals", help="list tool calls waiting for approval")
     approve = cmds.add_parser("approve", help="approve a waiting tool call")
@@ -114,6 +122,19 @@ def run(args: argparse.Namespace) -> int:
         elif cmd == "log":
             for m in ws.history(args.room, limit=50):
                 print(f"[{m['id']}] {m['sender']}: {m['text']}")
+        elif cmd == "backup":
+            from . import backup
+
+            if args.action == "restore":
+                if not args.restored:
+                    print("Nothing restored (the workspace already has data, or no backup is available).")
+                    return 1
+            elif args.action == "now":
+                result = ws.backups.run(force=True)
+                print("Backed up." if result["ok"] else f"Backup failed: {result['error']}")
+                return 0 if result["ok"] else 1
+            else:
+                print(json.dumps(ws.backups.status(), indent=2))
         elif cmd == "approvals":
             rows = ws.approvals()
             for a in rows:

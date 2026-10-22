@@ -32,6 +32,10 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8804';
   if ((await p.content()).includes('sk-search-very-secret')) errs.push('SEARCH KEY VISIBLE');
   await p.click('text=Test search'); await p.waitForSelector('text=Example result');
   await p.click('text=Remove key'); await p.click('.overlay:last-child .btn.primary'); await p.waitForSelector('text=Search is off');
+  // backup: explains itself when not set up, offers no button, and never shows secrets
+  await p.click('.tab:has-text("Backup")'); await p.waitForSelector('text=Backups are off');
+  if (await p.locator('text=Back up now').count()) errs.push('backup button shown while backups are off');
+  await p.waitForSelector('text=KINTSUGI_BACKUP_PASSPHRASE');
   // the theme and install section exist and nothing overflows sideways on a phone
   if (await p.evaluate(() => document.querySelector('.dialog').scrollWidth > document.querySelector('.dialog').clientWidth + 1)) errs.push('settings dialog overflows');
   console.log(errs.length ? 'PROBLEMS:\n' + errs.join('\n') : 'no errors');

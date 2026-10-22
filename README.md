@@ -20,7 +20,8 @@
 | **Web search** with your own key (Tavily or Brave): cited snippets, no page fetching | **Works** against test servers; **not yet tried against the live services** |
 | **Automations:** daily briefing, change watcher that stays silent unless something matters, research report, your own task; your time zone | **Works** (scheduling and time zones tested incl. daylight saving); search-based ones need a search key |
 | **Notifications** that never contain your message, plus unread markers and an app badge | **Works** in tests with a fake push service; **not yet verified against Google's, Apple's or Mozilla's real push services** |
-| Teams: separate logins, roles for approvals, shared rooms plus private chats, saving your data on free hosting | **Planned, after Oct 25** |
+| **Encrypted backup** to your private GitHub repo, restored automatically on an empty free host | **Works** against a fake GitHub in tests; **not yet tried against the real GitHub** ([docs/HOSTING.md](docs/HOSTING.md)) |
+| Teams: separate logins, invite links, roles for approvals, shared rooms plus private chats | **Planned, after Oct 25** |
 | Integrations: GitHub, then Slack, then Gmail and Calendar | **Planned, after teams** |
 
 Rows marked planned do not exist yet. This table is updated as each one lands, and it says what has and has not been verified.
@@ -62,7 +63,7 @@ Open the link on your computer or phone. Any OpenAI-compatible endpoint works (G
 
 - **Real-model reliability is unproven.** On the first real runs a tiny model (`allam-2-7b`) completed 6 of 15 practice tasks, and made up answers rather than running tools until safeguards were added. Better models should do better, but that has not been measured. No Meta model has been tested yet.
 - **The benefit of lessons and self-improvement is not measured** on real conversations. Tests show the mechanisms work, not that they make an agent better.
-- **Free hosting loses data** when the service restarts; an encrypted backup to a private GitHub repo is planned.
+- **Free hosting loses data** when the service restarts unless you turn on the encrypted backup (needs a private GitHub repo and a passphrase you must not lose).
 - **One shared access token, no accounts, no TLS of its own** (hosting platforms provide it).
 - **The practice suite is small.** A difference of a few points is noise.
 - Everything the measured research showed, and did not show, is in [research/README.md](research/README.md).
@@ -90,7 +91,7 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 ## Project layout
 
 ```
-src/kintsugi/workspace/   the product: core.py agents.py tools.py perms.py sandbox.py keychain.py scheduler.py
+src/kintsugi/workspace/   the product: core.py agents.py tools.py perms.py sandbox.py keychain.py scheduler.py backup.py
                           server.py db.py dojo.py improve.py cli.py  web/ (the interface)
 src/kintsugi/             engine modules the product reuses: model.py memory.py graph.py loop.py verifier.py
 SECURITY.md  Dockerfile  render.yaml  .devcontainer/  docs/ (PHONE, WORKSPACE, HOSTING, SELF_IMPROVEMENT, demo.html)

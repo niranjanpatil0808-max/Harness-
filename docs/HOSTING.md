@@ -26,7 +26,8 @@ Three ways, easiest first. All of them need **your own model API key** (for exam
 
 Things to know about the **free plan**: the service sleeps when idle (the first visit after a while is slow and
 scheduled jobs do not run while it sleeps), and **files are lost on every deploy or restart** (chats, agents,
-lessons). For lasting data use a paid plan with a persistent disk mounted at `/data` (the image keeps everything there).
+lessons). Two ways to keep your data: turn on the **encrypted backup** below (free), or use a paid plan with a
+persistent disk mounted at `/data` (the image keeps everything there).
 `KINTSUGI_DAILY_CALLS` in `render.yaml` caps model calls per day, so a loop cannot burn your free quota.
 
 ## 3. Any machine with Docker
@@ -49,8 +50,34 @@ you control sets `X-Forwarded-For`.
 | `KINTSUGI_API_KEY`, `KINTSUGI_BASE_URL`, `KINTSUGI_MODEL` | Your model provider (defaults to Groq). |
 | `KINTSUGI_DAILY_CALLS` | Model calls per day for the whole workspace (default 500, `0` = no cap). |
 | `KINTSUGI_SANDBOX` | `auto` (default) or `require` (disable `run_python` when code cannot be isolated). |
+| `KINTSUGI_BACKUP_REPO`, `KINTSUGI_BACKUP_TOKEN`, `KINTSUGI_BACKUP_PASSPHRASE`, `KINTSUGI_BACKUP_EVERY_MINUTES`, `KINTSUGI_BACKUP_PATH` | Encrypted backup to a private GitHub repo (see above). |
 | `KINTSUGI_WORKSPACE` | Where data lives (`/data` in the image). |
 | `PORT`, `KINTSUGI_HOST` | Where to listen (`0.0.0.0` in the image). |
+
+## Keeping your data on a free host: encrypted backup
+
+The server saves one encrypted copy of your whole workspace (chats, agents, files, lessons, settings, secrets) to a
+**private** GitHub repository, and restores it by itself when it starts on an empty disk.
+
+1. On GitHub, create a **private** empty repository (for example `my-kintsugi-vault`).
+2. Create a fine-grained token (Settings > Developer settings > Personal access tokens > Fine-grained): only that one
+   repository, permission **Contents: Read and write**, nothing else.
+3. On your hosting dashboard add three environment variables (secrets, never in the repository or a chat):
+   `KINTSUGI_BACKUP_REPO` = `yourname/my-kintsugi-vault`, `KINTSUGI_BACKUP_TOKEN` = the token,
+   `KINTSUGI_BACKUP_PASSPHRASE` = a long passphrase (12+ characters) that only you know.
+4. Open Settings > Backup and press **Back up now**. After that it backs up by itself about every hour (`KINTSUGI_BACKUP_EVERY_MINUTES`,
+   minimum 5) when something changed.
+
+How it behaves, honestly:
+- Encryption happens on the server before anything leaves it (PBKDF2-SHA256, 600,000 rounds, then authenticated AES via Fernet).
+  GitHub only sees an opaque file. **If you lose the passphrase, the backup cannot be read by anyone.** Keep it somewhere safe.
+- The backup refuses to run if the repository is public.
+- A restore only happens when the workspace is empty (no agents, no messages). It never overwrites existing data. A wrong passphrase
+  or a damaged file restores nothing and the log says why. You can also run `kintsugi workspace backup now|status|restore`.
+- You lose at most the changes since the last backup (up to the interval) if the disk vanishes. The sign-in token is not
+  part of the backup: it comes from `KINTSUGI_TOKEN`.
+- Needs the optional package (`pip install "kintsugi[push]"`; the Docker image already has it). Limit: about 25 MB per backup.
+- **Verified** against a fake GitHub server in tests; **not yet tried against the real api.github.com**.
 
 ## After it is running
 

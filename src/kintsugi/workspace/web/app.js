@@ -509,6 +509,22 @@ async function searchPanel() {
     out, h("p", {class: "muted", style: "font-size:13px;margin-top:14px"}, "Privacy: each search sends the words the agent chose to " + d.providers[d.provider].label + ". Secrets are never included, but think about what you ask. Search is counted and capped, and every search appears in the Log."));
 }
 
+/* ---------- settings: backup ---------- */
+async function backupPanel() {
+  const d = await api("/api/backup");
+  const when = (t) => new Date(t * 1000).toLocaleString();
+  let state;
+  if (!d.available) state = "Backups need an extra package on the server (pip install \"kintsugi[push]\").";
+  else if (d.problem) state = "Backup settings need fixing: " + d.problem;
+  else if (!d.configured) state = "Backups are off. Free hosts erase their disk when they restart, so turn this on if your data matters.";
+  else if (d.running) state = "Backing up now…";
+  else state = d.last ? (d.last.ok ? "Last backup: " + when(d.last.ts) + " (" + Math.max(1, Math.round(d.last.bytes / 1024)) + " KB, encrypted)." : "The last backup FAILED (" + when(d.last.ts) + "): " + d.last.error) : "Backups are on (to " + d.repo + "); none has run yet.";
+  return h("div", {}, h("p", {style: "margin-top:0"}, "Your whole workspace is encrypted on the server with your passphrase, then saved to a private GitHub repository. If the server loses its disk, the backup comes back automatically at the next start. Lose the passphrase and nobody can read it, including us."),
+    h("div", {class: "card"}, state),
+    d.configured && d.available ? h("div", {style: "margin:12px 0"}, h("button", {class: "btn primary", disabled: d.running, onclick: async () => { await act(() => api("/api/backup/run", {}), "Backup started"); setTimeout(async () => fill($("#settings-body"), await backupPanel()), 2500); }}, "Back up now"), d.every_minutes ? h("small", {class: "muted", style: "margin-left:10px"}, "Also automatic, about every " + d.every_minutes + " minutes when something changed.") : null) : null,
+    h("p", {class: "muted", style: "font-size:13px"}, "Set up on your hosting dashboard (never in this app): KINTSUGI_BACKUP_REPO (owner/private-repo), KINTSUGI_BACKUP_TOKEN (a fine-grained GitHub token for that one repo, Contents: read and write), KINTSUGI_BACKUP_PASSPHRASE (12+ characters). Steps are in docs/HOSTING.md. The access token is not included in backups."));
+}
+
 /* ---------- navigation ---------- */
 function openRoom(name) {
   S.room = name; S.last[name] = 0; S.loadedRooms[name] = false; S.stick = true; S.sig = {}; closeSidebarMobile(); focusAgent();
@@ -674,8 +690,8 @@ async function improvePanel() {
   content.append(h("div", {style: "display:flex;justify-content:flex-end;margin-top:8px"}, h("button", {class: "btn primary", onclick: save}, "Save settings")));
   return content;
 }
-const SETTINGS_TABS = [["general", "General"], ["search", "Search"], ["improve", "Improve"]];
-const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel()};
+const SETTINGS_TABS = [["general", "General"], ["search", "Search"], ["improve", "Improve"], ["backup", "Backup"]];
+const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel()};
 async function settingsDialog(tab) {
   if (typeof tab !== "string") tab = S.settingsTab || "general";
   S.settingsOpen = true;

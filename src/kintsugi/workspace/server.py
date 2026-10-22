@@ -236,6 +236,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
 
                 return {**ws.search_settings(), "used_today": ws.searches_today(),
                         "providers": {k: {kk: v[kk] for kk in ("label", "signup", "note")} for k, v in PROVIDERS.items()}}
+            if path == "/api/backup":
+                return ws.backups.status()
             if path == "/api/tone":
                 from .core import TONE_LABELS, TONES
 
@@ -351,6 +353,10 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/search/remove":
                 ws.remove_search_key()
                 return {"ok": True}
+            if path == "/api/backup/run":
+                if not ws.backups.start(force=True):
+                    raise WorkspaceError("a backup is already running")
+                return {"started": True}
             if path == "/api/tone":
                 return ws.set_tone("you", str(body["style"]), str(body.get("custom", "")))
             if path == "/api/improve/settings":

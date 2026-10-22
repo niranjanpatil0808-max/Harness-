@@ -96,6 +96,7 @@ class Workspace:
         self._models: dict[str, Model] = {}
         self._improver = None
         self._pusher = None
+        self._backups = None
         self.last_active = 0.0  # when the app last talked to the server (a person is probably looking at it)
         self.study_model_factory: Callable[[str | None], Model] | None = None  # tests/embedding; default uses the real API
         self._agent_locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
@@ -270,6 +271,14 @@ class Workspace:
                 threading.Thread(target=self.pusher.notify, args=(reason,), daemon=True).start()
         except Exception as err:  # a notification problem must never break messaging
             self.audit(None, "push-error", f"{type(err).__name__}: {str(err)[:150]}")
+
+    @property
+    def backups(self):
+        from .backup import Backups
+
+        if self._backups is None:
+            self._backups = Backups(self)
+        return self._backups
 
     @property
     def improver(self):
@@ -720,6 +729,8 @@ class Workspace:
     def close(self) -> None:
         if self._improver is not None:
             self._improver.stop()
+        if self._backups is not None:
+            self._backups.stop()
         if self._pool is not None:
             self.wait_idle(15)  # let running conversations finish before refusing new wake-ups
             with self._lock:
