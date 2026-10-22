@@ -29,6 +29,16 @@ SNIPPETS = 4
 SNIPPET_SHARE = 0.05  # snippets must score at least this share of the best node
 
 
+# Method names that almost always mean a dict/list/str/file call (`d.get(k)`), not a user-defined method
+# of the same name. Attribute calls with these names are not linked to user methods.
+COMMON_METHODS = frozenset({
+    "get", "set", "add", "put", "pop", "append", "extend", "insert", "remove", "clear", "copy", "update",
+    "items", "keys", "values", "join", "split", "strip", "lstrip", "rstrip", "replace", "format", "find",
+    "index", "count", "sort", "startswith", "endswith", "lower", "upper", "read", "write", "close",
+    "setdefault", "discard", "popitem", "encode", "decode", "partition",
+})
+
+
 @dataclass
 class Node:
     id: str  # "file.py::name" or "file.py::Class.method"
@@ -110,11 +120,11 @@ class ContextGraph:
                 if isinstance(sub, ast.Call):
                     func = sub.func
                     name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
-                    self._link(owner, name, by_name, "calls")
+                    self._link(owner, name, by_name, "calls", via_attribute=isinstance(func, ast.Attribute))
                 elif isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Load):
                     self._link(owner, sub.id, by_name, "references")
                 elif isinstance(sub, ast.Attribute):
-                    self._link(owner, sub.attr, by_name, "references")
+                    self._link(owner, sub.attr, by_name, "references", via_attribute=True)
         # Imports: file -> imported definition (from x import y) or file -> file (import x).
         here = f"{path}::<module>"
         for item in ast.walk(tree):
@@ -130,9 +140,12 @@ class ContextGraph:
                     if alias.name in module_names:
                         self.edges[here][f"{module_names[alias.name]}::<module>"] = "imports"
 
-    def _link(self, owner: str, name: str | None, by_name: dict[str, list[str]], kind: str) -> None:
+    def _link(self, owner: str, name: str | None, by_name: dict[str, list[str]], kind: str,
+              via_attribute: bool = False) -> None:
         if not name or owner not in self.nodes or name.startswith("__"):
             return  # dunders like __init__ exist on every class and would link everything
+        if via_attribute and name in COMMON_METHODS:
+            return  # `d.get(k)` is a dict call, not a call of some class's own `get`
         for target in by_name.get(name, []):
             if target != owner and target not in self.edges[owner]:
                 self.edges[owner][target] = kind

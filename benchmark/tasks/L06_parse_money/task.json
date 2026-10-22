@@ -1,0 +1,6 @@
+{
+  "id": "L06_parse_money",
+  "description": "parse_money(text) converts a money string such as '1,234.50' or '$19.99' into integer cents, rounding half up. It must never be off by a cent because of floating point.",
+  "difficulty": "medium",
+  "kind": "scale"
+}

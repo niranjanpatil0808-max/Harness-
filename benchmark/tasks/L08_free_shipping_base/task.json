@@ -1,0 +1,6 @@
+{
+  "id": "L08_free_shipping_base",
+  "description": "checkout(lines, weight_grams, region, lifetime_spend_cents) prices an order and adds shipping. Whether shipping is free must be decided the way the checkout documentation says.",
+  "difficulty": "medium",
+  "kind": "scale"
+}

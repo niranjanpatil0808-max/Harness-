@@ -61,7 +61,8 @@ class OpenAIAdapter(Model):
         base_url: str | None = None,
         model: str | None = None,
         api_key: str | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = None,
+        extra: dict | None = None,
         max_tokens: int | None = None,
         timeout: float = 60.0,
         max_retries: int = 6,
@@ -72,7 +73,10 @@ class OpenAIAdapter(Model):
         self.api_key = api_key or os.environ.get("KINTSUGI_API_KEY") or os.environ.get("GROQ_API_KEY")
         if not self.api_key:
             raise RuntimeError("No API key: set KINTSUGI_API_KEY (or GROQ_API_KEY).")
-        self.temperature = temperature
+        # Temperature and extra request fields (e.g. {"reasoning_effort": "low"}) can come from the environment.
+        env_temperature = os.environ.get("KINTSUGI_TEMPERATURE")
+        self.temperature = temperature if temperature is not None else float(env_temperature or 0.0)
+        self.extra = extra if extra is not None else json.loads(os.environ.get("KINTSUGI_EXTRA") or "{}")
         # Thinking models spend tokens reasoning before they answer, so this is configurable.
         self.max_tokens = max_tokens or int(os.environ.get("KINTSUGI_MAX_TOKENS", "2048"))
         self.timeout = timeout
@@ -91,6 +95,7 @@ class OpenAIAdapter(Model):
             "messages": messages,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
+            **self.extra,
         }).encode()
         request = urllib.request.Request(
             f"{self.base_url}/chat/completions",

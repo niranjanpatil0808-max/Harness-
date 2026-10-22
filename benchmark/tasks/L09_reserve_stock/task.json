@@ -1,0 +1,6 @@
+{
+  "id": "L09_reserve_stock",
+  "description": "Stock.available(sku) is the number of units that can still be reserved, and Stock.reserve must refuse to reserve more than that.",
+  "difficulty": "medium",
+  "kind": "scale"
+}

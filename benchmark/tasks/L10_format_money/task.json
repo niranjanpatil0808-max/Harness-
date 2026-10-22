@@ -1,0 +1,6 @@
+{
+  "id": "L10_format_money",
+  "description": "format_money(cents) renders integer cents as text with thousands separators and two decimals; negative amounts get a leading minus sign.",
+  "difficulty": "medium",
+  "kind": "scale"
+}

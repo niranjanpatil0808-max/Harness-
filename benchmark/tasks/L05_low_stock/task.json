@@ -1,0 +1,6 @@
+{
+  "id": "L05_low_stock",
+  "description": "Stock.low_stock() lists the products that need restocking, using the shop's definition of low stock.",
+  "difficulty": "medium",
+  "kind": "scale"
+}

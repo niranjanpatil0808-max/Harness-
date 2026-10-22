@@ -1,0 +1,6 @@
+{
+  "id": "L03_loyalty_tiers",
+  "description": "loyalty_discount_bps(lifetime_spend_cents) returns the discount of the loyalty tier a customer has reached, following the tier rules in the shop configuration.",
+  "difficulty": "medium",
+  "kind": "scale"
+}

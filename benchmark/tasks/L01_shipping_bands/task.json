@@ -1,0 +1,6 @@
+{
+  "id": "L01_shipping_bands",
+  "description": "shipping_cost(weight_grams, subtotal_cents) must charge the shipping band that contains the weight, using the band rules documented in the shop configuration. Orders at or above the free-shipping minimum ship free.",
+  "difficulty": "medium",
+  "kind": "scale"
+}

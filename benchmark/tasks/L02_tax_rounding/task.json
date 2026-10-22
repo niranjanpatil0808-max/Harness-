@@ -1,0 +1,6 @@
+{
+  "id": "L02_tax_rounding",
+  "description": "tax_for(cents, region) returns the sales tax on an amount, rounded to a whole cent the way the shop's money helpers round percentages.",
+  "difficulty": "medium",
+  "kind": "scale"
+}

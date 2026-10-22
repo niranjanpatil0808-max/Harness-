@@ -1,0 +1,6 @@
+{
+  "id": "L07_default_region",
+  "description": "tax_rate_bps(region) returns a region's tax rate. A region the shop has no rate for must be taxed like the shop's default region.",
+  "difficulty": "medium",
+  "kind": "scale"
+}

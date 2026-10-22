@@ -1,0 +1,6 @@
+{
+  "id": "L04_tax_after_discount",
+  "description": "order_summary(lines, region, lifetime_spend_cents) must price an order the way its documentation says: loyalty discount first, tax on what remains.",
+  "difficulty": "medium",
+  "kind": "scale"
+}

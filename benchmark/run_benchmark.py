@@ -4,7 +4,8 @@ Modes (ablation):
   baseline     one attempt, all files in the prompt, no memory
   loop         + up to 3 retries with the test error fed back
   loop+memory  + mistake memory (lessons learned on warmup tasks first)
-  full         + context graph instead of all files
+  loop+graph   loop + context graph instead of all files (no memory): isolates the graph
+  full         memory + context graph
 
 Scores are reported on the held-out tasks in split.json. Memory modes first run
 the warmup tasks to collect lessons; warmup results are kept but not scored.
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics
 import subprocess
 import sys
@@ -30,6 +32,7 @@ from pathlib import Path
 from kintsugi.loop import load_task, solve
 from kintsugi.memory import MemoryStore
 from kintsugi.model import MockModel, Model, OpenAIAdapter
+from stats import first_ok, is_api_error
 
 ROOT = Path(__file__).parent
 RESULTS = ROOT.parent / "results"
@@ -39,6 +42,7 @@ MODES = {
     "baseline": dict(max_retries=0, memory=False, use_graph=False),
     "loop": dict(max_retries=3, memory=False, use_graph=False),
     "loop+memory": dict(max_retries=3, memory=True, use_graph=False),
+    "loop+graph": dict(max_retries=3, memory=False, use_graph=True),
     "full": dict(max_retries=3, memory=True, use_graph=True),
 }
 
@@ -69,31 +73,22 @@ def git_commit() -> str:
         return "unknown"
 
 
-def is_api_error(record: dict) -> bool:
-    """True if the task ended without an answer for infrastructure reasons.
-
-    Early result files labelled the 'request over the per-minute token limit' error as ModelError,
-    so that case is recognised by its message too.
-    """
-    if "ApiError" in record["error_types"]:
-        return True
-    return "ModelError" in record["error_types"] and "per minute" in record.get("last_output", "").lower()
-
-
 def summarize(runs: list[dict], n_heldout: int) -> dict:
     """Aggregate scored (held-out) results over repeats.
 
     Only repeats that finished every held-out task are counted: a run that stopped
     early (rate limit, daily quota) must not show up as a pass rate.
     """
-    rates, hard_rates, attempts, calls, tokens = [], [], [], [], []
+    rates, hard_rates, attempts, calls, tokens, firsts = [], [], [], [], [], []
     started = 0
     most_done = 0
+    rejected = 0
     for run in runs:
         scored = [r for r in run["tasks"] if r["scored"]]
         if not scored:
             continue
         started += 1
+        rejected = max(rejected, sum("ModelError" in r["error_types"] and not is_api_error(r) for r in scored))
         api_errors = sum(is_api_error(r) for r in scored)
         most_done = max(most_done, len(scored) - api_errors)
         if len(scored) - api_errors < n_heldout:
@@ -103,6 +98,7 @@ def summarize(runs: list[dict], n_heldout: int) -> dict:
         if hard:
             hard_rates.append(sum(r["passed"] for r in hard) / len(hard))
         attempts.append(statistics.mean(r["num_attempts"] for r in scored))
+        firsts.append(statistics.mean(first_ok(r) for r in scored))
         if all("usage" in r for r in scored):  # scored tasks only: warmup calls are not part of the comparison
             calls.append(sum(r["usage"]["calls"] for r in scored))
             tokens.append(sum(r["usage"]["tokens"] for r in scored))
@@ -114,7 +110,10 @@ def summarize(runs: list[dict], n_heldout: int) -> dict:
         "pass_rate_min": min(rates),
         "pass_rate_max": max(rates),
         "avg_attempts": statistics.mean(attempts),
+        "first_attempt_rate_mean": statistics.mean(firsts),
     }
+    if rejected:
+        summary["rejected_tasks"] = rejected  # tasks where the model rejected the request (e.g. context too long)
     if hard_rates:
         summary["hard_pass_rate_mean"] = statistics.mean(hard_rates)
     if calls:
@@ -132,10 +131,11 @@ def table(data: dict) -> str:
     lines = [
         f"Model: `{meta['model']}` · held-out tasks: {n} ({n_hard} hard) · repeats: {repeats or meta.get('repeats', 1)} "
         f"· max retries: 3 · temperature: {meta['temperature']}"
+        + (f" · extra request fields: {json.dumps(meta['extra'])}" if meta.get("extra") else "")
         + (" · **MOCK RUN (pipeline test, not a real result)**" if meta["mock"] else ""),
         "",
-        "| Mode | Pass rate (held-out) | Hard tasks only | Avg attempts | Model calls (scored tasks) | Tokens (scored tasks) |",
-        "|---|---|---|---|---|---|",
+        "| Mode | Pass rate (held-out) | On the first attempt | Hard tasks only | Avg attempts | Model calls (scored tasks) | Tokens (scored tasks) |",
+        "|---|---|---|---|---|---|---|",
     ]
     for mode in meta["modes"]:
         s = data["summary"].get(mode)
@@ -143,15 +143,18 @@ def table(data: dict) -> str:
             continue
         if s.get("incomplete"):
             lines.append(f"| {mode} | **INCOMPLETE** ({s['tasks_done']}/{s['tasks_total']} tasks answered; "
-                         "stopped early or hit API errors, so no result) | | | | |")
+                         "stopped early or hit API errors, so no result) | | | | | |")
             continue
         passed = round(s["pass_rate_mean"] * n, 1)
         spread = f" [{s['pass_rate_min']:.0%}–{s['pass_rate_max']:.0%}]" if s["repeats"] > 1 else ""
         hard = f"{s['hard_pass_rate_mean']:.0%} ({round(s['hard_pass_rate_mean'] * n_hard, 1):g}/{n_hard})" \
             if "hard_pass_rate_mean" in s else "–"
+        if s.get("rejected_tasks"):
+            spread += f" ({s['rejected_tasks']} task run(s) rejected by the model, e.g. context too long)"
         calls = f"{s['calls_scored']:.0f}" if "calls_scored" in s else "n/a"
         tokens = f"{s['tokens_scored']:,.0f}" if "tokens_scored" in s else "n/a"
-        lines.append(f"| {mode} | {s['pass_rate_mean']:.0%} ({passed:g}/{n}){spread} | {hard} "
+        first = f"{s['first_attempt_rate_mean']:.0%}" if "first_attempt_rate_mean" in s else "n/a"
+        lines.append(f"| {mode} | {s['pass_rate_mean']:.0%} ({passed:g}/{n}){spread} | {first} | {hard} "
                      f"| {s['avg_attempts']:.2f} | {calls} | {tokens} |")
     return "\n".join(lines) + "\n"
 
@@ -227,6 +230,7 @@ def main() -> int:
     parser.add_argument("--modes", nargs="+", default=list(MODES), choices=list(MODES))
     parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument("--sleep", type=float, default=0.0, help="seconds to wait between tasks (rate limits)")
+    parser.add_argument("--split", default="split.json", help="which split file in benchmark/ to use")
     parser.add_argument("--resume", type=Path, help="continue an interrupted results/<run>.json")
     args = parser.parse_args()
 
@@ -244,10 +248,13 @@ def main() -> int:
             "mock": args.model == "mock",
             "modes": args.modes,
             "repeats": args.repeats,
-            "temperature": 0.0,
-            "split": json.loads((ROOT / "split.json").read_text()),
+            "temperature": float(os.environ.get("KINTSUGI_TEMPERATURE") or 0.0),
+            "extra": json.loads(os.environ.get("KINTSUGI_EXTRA") or "{}"),
+            "split_file": args.split,
+            "split": json.loads((ROOT / args.split).read_text()),
         }
-    model = mock_model() if data["meta"]["mock"] else OpenAIAdapter(temperature=data["meta"]["temperature"])
+    model = mock_model() if data["meta"]["mock"] else OpenAIAdapter(
+        temperature=data["meta"]["temperature"], extra=data["meta"].get("extra", {}))
     data["meta"]["model"] = model.name
     if not data["meta"]["mock"]:
         data["meta"]["base_url"] = model.base_url

@@ -7,7 +7,11 @@ run's timestamp prefix. Runs on the mock model are skipped.
 """
 
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from stats import describe  # noqa: E402
 
 ROOT = Path(__file__).parent.parent
 RESULTS = ROOT / "results"
@@ -30,6 +34,9 @@ def main() -> None:
                      f"· code `{meta.get('git_commit', '?')}`\n")
         parts.append(f"_{notes.get(stamp, 'No note.')}_\n")
         parts.append(path.with_suffix(".md").read_text())
+        comparisons = describe(data)
+        if comparisons:
+            parts.append("Paired comparisons (same tasks; interval = bootstrap over tasks):\n\n" + "\n".join(comparisons) + "\n")
         parts.append(f"Raw data: `results/{path.name}`\n")
     (ROOT / "RESULTS.md").write_text("\n".join(parts))
     print(f"wrote RESULTS.md ({len(parts)} blocks)")

@@ -1,0 +1,18 @@
+{
+  "note": "Large-project suite: one 17-module shop codebase with a different bug injected per task. Written before any model was run on it. Memory warms up on 3 tasks; 7 are scored.",
+  "warmup": [
+    "L06_parse_money",
+    "L09_reserve_stock",
+    "L10_format_money"
+  ],
+  "heldout": [
+    "L01_shipping_bands",
+    "L02_tax_rounding",
+    "L03_loyalty_tiers",
+    "L04_tax_after_discount",
+    "L05_low_stock",
+    "L07_default_region",
+    "L08_free_shipping_base"
+  ],
+  "hard": []
+}

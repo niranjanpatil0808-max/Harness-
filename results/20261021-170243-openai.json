@@ -1807,6 +1807,7 @@
       "pass_rate_min": 0.9047619047619048,
       "pass_rate_max": 0.9047619047619048,
       "avg_attempts": 1,
+      "first_attempt_rate_mean": 0.9047619047619048,
       "hard_pass_rate_mean": 0.8,
       "calls_scored": 21,
       "tokens_scored": 15219
@@ -1817,6 +1818,7 @@
       "pass_rate_min": 1.0,
       "pass_rate_max": 1.0,
       "avg_attempts": 1.1428571428571428,
+      "first_attempt_rate_mean": 0.9047619047619048,
       "hard_pass_rate_mean": 1.0,
       "calls_scored": 24,
       "tokens_scored": 20058
@@ -1827,6 +1829,7 @@
       "pass_rate_min": 1.0,
       "pass_rate_max": 1.0,
       "avg_attempts": 1.0476190476190477,
+      "first_attempt_rate_mean": 0.9523809523809523,
       "hard_pass_rate_mean": 1.0,
       "calls_scored": 23,
       "tokens_scored": 17748

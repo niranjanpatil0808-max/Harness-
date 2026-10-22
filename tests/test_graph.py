@@ -38,6 +38,20 @@ class TestGraph(unittest.TestCase):
         self.assertIn("TAX_RATE = 0.08", text)  # related constant shown from tax.py
         self.assertNotIn('center(40, "=")', text)  # unrelated body left out
 
+    def test_everyday_container_methods_do_not_link_to_user_methods(self):
+        graph = ContextGraph.build({
+            "store.py": "def lookup(d, key):\n    return d.get(key)\n",
+            "cache.py": "class Cache:\n    def get(self, key):\n        return key\n",
+        })
+        self.assertNotIn("cache.py::Cache.get", graph.edges.get("store.py::lookup", {}))
+
+    def test_plain_function_calls_still_link(self):
+        graph = ContextGraph.build({
+            "a.py": "from b import get\n\ndef run(x):\n    return get(x)\n",
+            "b.py": "def get(x):\n    return x\n",
+        })
+        self.assertEqual(graph.edges["a.py::run"]["b.py::get"], "calls")
+
     def test_unparsable_file_is_skipped(self):
         graph = ContextGraph.build({"ok.py": "def f():\n    return 1\n", "bad.py": "def (:\n"})
         self.assertIn("ok.py::f", graph.nodes)
