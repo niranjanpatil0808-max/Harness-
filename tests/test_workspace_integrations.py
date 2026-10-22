@@ -122,8 +122,9 @@ class FakeIMAP:
     log: list = []
     fail_login = False
 
-    def __init__(self, host, timeout=None):
+    def __init__(self, host, ssl_context=None, timeout=None):
         FakeIMAP.log.append(("connect", host))
+        FakeIMAP.context = ssl_context
 
     def login(self, user, password):
         FakeIMAP.log.append(("login", user, password))
@@ -390,6 +391,8 @@ class TestGmail(Base):
         self.assertEqual(out.status, "ok", out.output)
         self.assertIn("Subject: Invoice 3", out.output)
         self.assertIn("untrusted data", out.output)
+        import ssl
+        self.assertTrue(FakeIMAP.context.verify_mode == ssl.CERT_REQUIRED and FakeIMAP.context.check_hostname)  # the certificate is verified
         self.assertIn(("select", "INBOX", True), FakeIMAP.log)  # read-only
         self.assertTrue(all("PEEK" in c[2] for c in FakeIMAP.log if c[0] == "fetch"))  # PEEK does not set the 'read' flag
         self.assertNotIn(GMAIL_PASSWORD, out.output + self.everything())
@@ -399,7 +402,7 @@ class TestGmail(Base):
     def test_search_and_unread(self):
         self.run_tool("gmail_search", {"query": 'invoice" OR ALL'})
         search = [c for c in FakeIMAP.log if c[0] == "search"][-1][1]
-        self.assertEqual(search[:3], ("OR", "SUBJECT", '"invoice OR ALL"'))  # quotes stripped: no search-injection
+        self.assertEqual(search[:3], ("OR", "SUBJECT", '"invoice\\" OR ALL"'))  # the quote is escaped inside the string: it cannot end it early
         self.assertEqual(self.run_tool("gmail_search", {"query": "x"}).status, "error")
         self.run_tool("gmail_recent", {"unread_only": True})
         self.assertEqual([c for c in FakeIMAP.log if c[0] == "search"][-1][1], ("UNSEEN",))

@@ -40,6 +40,8 @@ def _clean(text: object, limit: int) -> str:
 
 def _safe_url(url: object) -> str:
     url = str(url or "").strip()
+    if re.search(r"[\x00-\x20\x7f]", url):
+        return ""
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc or len(url) > MAX_URL:
         return ""  # javascript:, data:, file: and the like are never shown as sources

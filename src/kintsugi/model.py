@@ -23,6 +23,16 @@ MAX_WAIT = 300.0  # longest rate-limit wait (seconds) we will sit through
 USER_AGENT = "kintsugi/0.1 (+https://github.com/niranjanpatil0808-max/KINTSUGI)"
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never follow a redirect: the default handler would copy an API key to wherever the answer points (even plain http)."""
+
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+urllib.request.install_opener(urllib.request.build_opener(_NoRedirect))  # covers every urlopen in the process: providers, search, backup, push
+
+
 class ModelRequestError(RuntimeError):
     """The API rejected this particular request as invalid or too long for the model. Counts against the model."""
 
@@ -75,7 +85,10 @@ def request_json(request: urllib.request.Request, timeout: float, max_retries: i
             if err.code not in (429, 500, 502, 503, 504, 529):
                 raise RuntimeError(detail) from err  # bad key, unknown model...: a setup problem
             retry_after = err.headers.get("retry-after")
-            wait = float(retry_after) if retry_after else delay
+            try:
+                wait = float(retry_after) if retry_after else delay
+            except ValueError:  # an HTTP-date instead of seconds
+                wait = delay
             if wait > MAX_WAIT:  # a daily quota, not a short rate limit
                 raise QuotaExhausted(f"{detail} (asked to wait {wait:.0f}s)") from err
             if attempt == max_retries:

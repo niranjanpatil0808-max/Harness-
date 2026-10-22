@@ -33,6 +33,7 @@ import imaplib
 import json
 import os
 import re
+import ssl
 import urllib.parse
 from datetime import date, datetime, timedelta, timezone
 from typing import TYPE_CHECKING
@@ -381,13 +382,14 @@ def tool_slack_post(ctx, args: dict) -> str:
 # --- Calendar (a secret iCal address, read-only) ------------------------------------------------
 
 def _unfold(text: str) -> list[str]:
-    lines: list[str] = []
+    """Join continuation lines (a leading space or tab) into logical lines, in linear time."""
+    parts: list[list[str]] = []
     for raw in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-        if raw[:1] in (" ", "\t") and lines:
-            lines[-1] += raw[1:]
+        if raw[:1] in (" ", "\t") and parts:
+            parts[-1].append(raw[1:])
         else:
-            lines.append(raw)
-    return lines
+            parts.append([raw])
+    return ["".join(p) for p in parts]
 
 
 def _ics_value(prop: str) -> tuple[str, dict, str]:
@@ -396,117 +398,153 @@ def _ics_value(prop: str) -> tuple[str, dict, str]:
     return name.upper(), {p.split("=", 1)[0].upper(): p.split("=", 1)[1] for p in params if "=" in p}, value
 
 
-def _ics_time(value: str, params: dict, default_tz) -> tuple[datetime, bool]:
-    """(moment in UTC, is_all_day)."""
+def _ics_time(value: str, params: dict) -> tuple[datetime, bool]:
+    """(the moment, in the event's own time zone; whether it is an all-day date). A date has no zone and is kept as that date."""
     if params.get("VALUE") == "DATE" or (len(value) == 8 and value.isdigit()):
-        d = datetime.strptime(value[:8], "%Y%m%d")
-        return d.replace(tzinfo=default_tz).astimezone(timezone.utc), True
-    stamp = datetime.strptime(value.rstrip("Z")[:15], "%Y%m%dT%H%M%S")
-    if value.endswith("Z"):
+        return datetime.strptime(value[:8], "%Y%m%d").replace(tzinfo=timezone.utc), True
+    stamp = datetime.strptime(value.rstrip("Zz")[:15], "%Y%m%dT%H%M%S")
+    if value.endswith(("Z", "z")):
         return stamp.replace(tzinfo=timezone.utc), False
     try:
         from zoneinfo import ZoneInfo
 
-        tz = ZoneInfo(params["TZID"]) if params.get("TZID") else default_tz
-    except Exception:
-        tz = default_tz
-    return stamp.replace(tzinfo=tz).astimezone(timezone.utc), False
+        return stamp.replace(tzinfo=ZoneInfo(params["TZID"]) if params.get("TZID") else timezone.utc), False
+    except Exception:  # an unknown zone name: treat the time as UTC rather than guess
+        return stamp.replace(tzinfo=timezone.utc), False
 
 
 WEEKDAYS = {"MO": 0, "TU": 1, "WE": 2, "TH": 3, "FR": 4, "SA": 5, "SU": 6}
+SUPPORTED_RULE_PARTS = {"FREQ", "INTERVAL", "COUNT", "UNTIL", "WKST", "BYDAY"}
+MAX_OCCURRENCES = 5000
 
 
-def _expand(start: datetime, rule: str, exdates: set, until_window: datetime, from_window: datetime) -> list[datetime]:
-    """Occurrences of a simple RRULE (DAILY/WEEKLY/MONTHLY/YEARLY, INTERVAL, COUNT, UNTIL, BYDAY) inside the window. Anything fancier
-    shows only its first occurrence, which is said in the output rather than silently guessed."""
+def _add_months(naive: datetime, months: int) -> datetime | None:
+    month = naive.month - 1 + months
+    try:
+        return naive.replace(year=naive.year + month // 12, month=month % 12 + 1)
+    except ValueError:
+        return None  # that month has no such day (the 31st): the rule says skip it, not slide to the 28th
+
+
+def _expand(start: datetime, rule: str, window_start: datetime, window_end: datetime) -> tuple[list[datetime], bool]:
+    """Occurrences (in the event's own zone, so daylight saving keeps the wall-clock time) of a repeat rule that fall inside the window.
+    Returns (occurrences, rule_understood). Daily, weekly (with plain weekday names), monthly and yearly rules with INTERVAL, COUNT and UNTIL
+    are understood; anything else (BYMONTHDAY, '1MO', BYSETPOS...) is reported as not understood and only the first date is shown."""
     parts = dict(p.split("=", 1) for p in rule.split(";") if "=" in p)
-    freq, interval = parts.get("FREQ"), max(1, int(parts.get("INTERVAL", 1)))
-    count = int(parts["COUNT"]) if parts.get("COUNT", "").isdigit() else None
+    freq = parts.get("FREQ")
+    days = [d for d in parts.get("BYDAY", "").split(",") if d]
+    understood = set(parts) <= SUPPORTED_RULE_PARTS and freq in ("DAILY", "WEEKLY", "MONTHLY", "YEARLY") and \
+        all(d in WEEKDAYS for d in days) and (not days or freq == "WEEKLY")
+    if not understood:
+        return ([start] if window_start <= start.astimezone(timezone.utc) <= window_end else []), False
+    interval = min(max(int(parts.get("INTERVAL", 1) or 1), 1), 1000)
+    count = min(int(parts["COUNT"]), MAX_OCCURRENCES) if parts.get("COUNT", "").isdigit() else None
     until = None
     if parts.get("UNTIL"):
-        until, _ = _ics_time(parts["UNTIL"], {}, timezone.utc)
-    days = [WEEKDAYS[d[-2:]] for d in parts.get("BYDAY", "").split(",") if d[-2:] in WEEKDAYS]
-    out, n, cur = [], 0, start
-    for _ in range(2000):
-        candidates = [cur]
-        if freq == "WEEKLY" and days:
-            monday = cur - timedelta(days=cur.weekday())
-            candidates = sorted(monday + timedelta(days=d) for d in days)
-            candidates = [c.replace(hour=start.hour, minute=start.minute, second=start.second) for c in candidates if c >= start]
-        for c in candidates:
-            if c < start:
-                continue
-            n += 1
-            if count is not None and n > count:
-                return out
-            if until and c > until:
-                return out
-            if c > until_window:
-                return out
-            if c >= from_window and c not in exdates:
-                out.append(c)
+        until, is_date = _ics_time(parts["UNTIL"], {})
+        if is_date:
+            until += timedelta(days=1) - timedelta(seconds=1)  # a date means the whole day
+    tz, base = start.tzinfo, start.replace(tzinfo=None)
+    weekdays = sorted(WEEKDAYS[d] for d in days) or [base.weekday()]
+    step = {"DAILY": timedelta(days=interval), "WEEKLY": timedelta(weeks=interval)}.get(freq)
+    k = 0
+    if count is None:  # jump close to the window instead of walking from the start (old events stay visible)
+        gap = window_start.astimezone(tz).replace(tzinfo=None) - base
+        if step is not None:
+            k = max(0, int(gap / step) - 1)
+        elif gap.days > 0:
+            k = max(0, gap.days // (28 * interval if freq == "MONTHLY" else 365 * interval) - 1)
+    out, n = [], 0
+    for index in range(k, k + MAX_OCCURRENCES):
         if freq == "DAILY":
-            cur += timedelta(days=interval)
+            cands = [base + step * index]
         elif freq == "WEEKLY":
-            cur += timedelta(weeks=interval)
+            monday = base.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=base.weekday()) + step * index
+            cands = [monday + timedelta(days=d, hours=base.hour, minutes=base.minute, seconds=base.second) for d in weekdays]
         elif freq == "MONTHLY":
-            month = cur.month - 1 + interval
-            try:
-                cur = cur.replace(year=cur.year + month // 12, month=month % 12 + 1)
-            except ValueError:
-                cur = cur.replace(year=cur.year + month // 12, month=month % 12 + 1, day=28)
-        elif freq == "YEARLY":
-            try:
-                cur = cur.replace(year=cur.year + interval)
-            except ValueError:
-                cur = cur.replace(year=cur.year + interval, day=28)
+            cands = [c for c in [_add_months(base, interval * index)] if c]
         else:
-            return out if out else ([start] if from_window <= start <= until_window else [])
-    return out
+            cands = [c for c in [_add_months(base, 12 * interval * index)] if c]
+        for c in cands:
+            if c < base:
+                continue
+            aware = c.replace(tzinfo=tz)
+            n += 1
+            if (count is not None and n > count) or (until and aware > until) or aware.astimezone(timezone.utc) > window_end:
+                return out, True
+            if aware.astimezone(timezone.utc) >= window_start:
+                out.append(aware)
+    return out, True
 
 
 def parse_ics(text: str, now: datetime, days: int) -> list[dict]:
     window_end = now + timedelta(days=days)
-    events, cur = [], None
+    raws, cur, stack = [], None, []
     for line in _unfold(text):
-        if line == "BEGIN:VEVENT":
-            cur = {"EXDATE": set()}
-        elif line == "END:VEVENT" and cur is not None:
-            try:
-                events.extend(_event_occurrences(cur, now, window_end))
-            except (ValueError, KeyError):
-                pass
-            cur = None
-        elif cur is not None and ":" in line:
+        up = line.upper()
+        if up.startswith("BEGIN:"):
+            stack.append(up[6:].strip())
+            if stack[-1] == "VEVENT" and len(stack) == 2:
+                cur = {"_ex": []}
+        elif up.startswith("END:"):
+            comp = up[4:].strip()
+            if stack and stack[-1] == comp:
+                stack.pop()
+            if comp == "VEVENT" and cur is not None:
+                raws.append(cur)
+                cur = None
+        elif cur is not None and stack and stack[-1] == "VEVENT" and ":" in line:  # properties of alarms and other nested parts are ignored
             name, params, value = _ics_value(line)
             if name == "EXDATE":
-                for v in value.split(","):
-                    try:
-                        cur["EXDATE"].add(_ics_time(v, params, timezone.utc)[0])
-                    except ValueError:
-                        pass
-            elif name in ("DTSTART", "DTEND", "SUMMARY", "LOCATION", "DESCRIPTION", "RRULE", "STATUS"):
+                cur["_ex"].append((value, params))
+            elif name in ("DTSTART", "DTEND", "SUMMARY", "LOCATION", "DESCRIPTION", "RRULE", "STATUS", "UID", "RECURRENCE-ID"):
                 cur[name] = (value, params)
+    moved = set()  # instances of a repeating event that were moved or changed: the original date must not show as well
+    for ev in raws:
+        if "RECURRENCE-ID" in ev and "UID" in ev:
+            try:
+                moved.add((ev["UID"][0], _ics_time(*ev["RECURRENCE-ID"])[0].astimezone(timezone.utc)))
+            except (ValueError, KeyError):
+                pass
+    events = []
+    for ev in raws:
+        try:
+            events.extend(_event_occurrences(ev, now, window_end, moved))
+        except Exception:  # one odd event (a huge interval, a bad date) must never hide the rest of the calendar
+            continue
     events.sort(key=lambda e: e["start"])
     return events[:40]
 
 
-def _event_occurrences(ev: dict, now: datetime, window_end: datetime) -> list[dict]:
+def _event_occurrences(ev: dict, now: datetime, window_end: datetime, moved: set) -> list[dict]:
     if ev.get("STATUS", ("", {}))[0].upper() == "CANCELLED":
         return []
-    value, params = ev["DTSTART"]
-    start, all_day = _ics_time(value, params, timezone.utc)
-    end = None
-    if "DTEND" in ev:
-        end = _ics_time(ev["DTEND"][0], ev["DTEND"][1], timezone.utc)[0]
+    start, all_day = _ics_time(*ev["DTSTART"])
+    end = _ics_time(*ev["DTEND"])[0] if "DTEND" in ev else None
     length = (end - start) if end else timedelta(0)
+    understood = True
     if "RRULE" in ev:
-        starts = _expand(start, ev["RRULE"][0], ev["EXDATE"], window_end, now - length)
+        starts, understood = _expand(start, ev["RRULE"][0], now - length, window_end)
     else:
-        starts = [start] if start + length >= now and start <= window_end else []
-    unescape = lambda v: v.replace("\\n", " ").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\")
-    return [{"start": s, "end": s + length, "all_day": all_day, "title": _clip(unescape(ev.get("SUMMARY", ("(no title)", {}))[0]), 120),
-             "where": _clip(unescape(ev.get("LOCATION", ("", {}))[0]), 80), "note": _clip(unescape(ev.get("DESCRIPTION", ("", {}))[0]), 160)} for s in starts]
+        starts = [start]
+    excluded = set()
+    for value, params in ev["_ex"]:
+        for v in value.split(","):
+            try:
+                excluded.add(_ics_time(v, params)[0].astimezone(timezone.utc))
+            except ValueError:
+                pass
+    uid = ev.get("UID", (None,))[0]
+    unescape = lambda v: v.replace("\\n", " ").replace("\\N", " ").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\")
+    out = []
+    for s in starts:
+        s_utc = s.astimezone(timezone.utc)
+        if s_utc in excluded or (("RRULE" in ev) and (uid, s_utc) in moved) or s_utc + length < now or s_utc > window_end:
+            continue
+        out.append({"start": s_utc, "end": s_utc + length, "all_day": all_day, "title": _clip(unescape(ev.get("SUMMARY", ("(no title)", {}))[0]), 120),
+                    "where": _clip(unescape(ev.get("LOCATION", ("", {}))[0]), 80), "note": _clip(unescape(ev.get("DESCRIPTION", ("", {}))[0]), 160),
+                    "partial": not understood})
+    return out
 
 
 def calendar_events(integ: Integrations, days: int) -> list[dict]:
@@ -529,9 +567,10 @@ def tool_calendar_upcoming(ctx, args: dict) -> str:
     tz = ctx.ws.local_datetime(ctx.ws.clock()).tzinfo or timezone.utc
     lines = []
     for e in events:
-        s = e["start"].astimezone(tz)
+        s = e["start"] if e["all_day"] else e["start"].astimezone(tz)  # an all-day date is a date: it never shifts with the time zone
         when = s.strftime("%a %Y-%m-%d") + ("" if e["all_day"] else s.strftime(" %H:%M") + "-" + e["end"].astimezone(tz).strftime("%H:%M"))
-        lines.append(f"{when}  {e['title']}" + (f" @ {e['where']}" if e["where"] else "") + (f" - {e['note']}" if e["note"] else ""))
+        lines.append(f"{when}  {e['title']}" + (f" @ {e['where']}" if e["where"] else "") + (f" - {e['note']}" if e["note"] else "")
+                     + ("  (repeating event: only its first date is shown, the repeat rule is not supported)" if e.get("partial") else ""))
     return _wrap("calendar", f"Next {days} days (times in the workspace time zone):\n" + ("\n".join(lines) or "No events."))
 
 
@@ -560,14 +599,18 @@ def gmail_fetch(integ: Integrations, count: int, unread_only: bool, query: str) 
         raise IntegrationError("Gmail is not set up")
     host = os.environ.get("KINTSUGI_IMAP_HOST", "imap.gmail.com")  # operator-only override, for tests
     try:
-        box = imaplib.IMAP4_SSL(host, timeout=20)
+        box = imaplib.IMAP4_SSL(host, ssl_context=ssl.create_default_context(), timeout=20)  # verify the certificate and name
         try:
             box.login(user, password)
             box.select("INBOX", readonly=True)  # read-only: nothing is marked read, moved or deleted
             criteria = ["UNSEEN"] if unread_only else ["ALL"]
+            charset = None
             if query:
-                criteria = ["OR", "SUBJECT", f'"{query}"', "FROM", f'"{query}"']
-            status, data = box.search(None, *criteria)
+                quoted = '"' + query.replace("\\", "\\\\").replace('"', '\\"') + '"'
+                criteria = ["OR", "SUBJECT", quoted, "FROM", quoted]
+                if not query.isascii():
+                    box._encoding, charset = "utf-8", "UTF-8"  # let imaplib send non-English search words
+            status, data = box.search(charset, *criteria)
             ids = data[0].split()[-count:] if status == "OK" and data and data[0] else []
             rows = []
             for mid in reversed(ids):
@@ -600,7 +643,7 @@ def tool_gmail_recent(ctx, args: dict) -> str:
 
 
 def tool_gmail_search(ctx, args: dict) -> str:
-    query = _clip(args.get("query"), 60).replace('"', "")
+    query = _clip(args.get("query"), 60)
     if len(query) < 2:
         raise IntegrationError("give a word or sender to look for (at least 2 characters)")
     rows = gmail_fetch(ctx.ws.integrations, 8, False, query)

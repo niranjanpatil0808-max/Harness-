@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 from pathlib import Path
 
 try:  # optional dependency
@@ -24,14 +25,20 @@ NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]{1,40}$")
 MIN_REDACT_LENGTH = 4
 
 
+_LOCK = threading.RLock()
+
+
 def _write_private(path: Path, data: bytes) -> None:
     """Write a file that is never readable by other users, not even for a moment."""
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     try:
         os.write(fd, data)
+        os.fsync(fd)
     finally:
         os.close(fd)
-    os.chmod(path, 0o600)  # also tightens a file that already existed
+    os.replace(tmp, path)  # atomic: a crash leaves the old file, never an empty one
+    os.chmod(path, 0o600)
 
 
 class Keychain:
@@ -69,14 +76,16 @@ class Keychain:
             raise ValueError("secret names look like API_TOKEN (capital letters, digits, underscores)")
         if not value:
             raise ValueError("empty secret")
-        secrets = self._load(agent)
-        secrets[name] = value
-        self._save(agent, secrets)
+        with _LOCK:
+            secrets = self._load(agent)
+            secrets[name] = value
+            self._save(agent, secrets)
 
     def delete(self, agent: str, name: str) -> None:
-        secrets = self._load(agent)
-        secrets.pop(name, None)
-        self._save(agent, secrets)
+        with _LOCK:
+            secrets = self._load(agent)
+            secrets.pop(name, None)
+            self._save(agent, secrets)
 
     def names(self, agent: str) -> list[str]:
         return sorted(self._load(agent))

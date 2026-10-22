@@ -51,7 +51,7 @@ def available() -> bool:
 
 def endpoint_ok(endpoint: str) -> bool:
     """Is this URL one of the real push services (https, known host, no credentials, sane length)?"""
-    if len(endpoint) > 600:
+    if len(endpoint) > 600 or not re.fullmatch(r"[A-Za-z0-9._~:/?#@!$&'()*+,;=%\[\]-]+", endpoint):  # no spaces, controls, backslashes or non-ASCII
         return False
     parsed = urllib.parse.urlparse(endpoint)
     if os.environ.get("KINTSUGI_PUSH_ALLOW_LOCAL") == "1" and parsed.hostname == "127.0.0.1":  # tests only
@@ -148,7 +148,10 @@ class Push:
             return 0
         delivered = 0
         for row in rows:
-            result = self.send_one(row["endpoint"])
+            try:
+                result = self.send_one(row["endpoint"])
+            except Exception:  # one bad subscription must never stop the others from being woken
+                result = "gone"
             if result == "gone":
                 self.ws.db.execute("DELETE FROM push_subs WHERE endpoint = ?", (row["endpoint"],))
             delivered += result == "ok"

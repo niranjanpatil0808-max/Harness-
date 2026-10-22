@@ -173,7 +173,9 @@ def _api(cfg: dict, method: str, path: str, body: dict | None = None, raw: bool 
     request = urllib.request.Request(base + path, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = response.read()
+            payload = response.read(MAX_BACKUP_BYTES * 2 + 1)
+            if len(payload) > MAX_BACKUP_BYTES * 2:
+                raise BackupError("the backup file is larger than the allowed size")
             return payload if raw else (json.loads(payload) if payload else {})
     except urllib.error.HTTPError as err:
         if err.code == 404:
@@ -218,7 +220,7 @@ def restore_if_empty(root: Path, say=print) -> bool:
             say("Backups are on, but there is no backup in the repository yet. Starting fresh.")
             return False
         unpack(decrypt(blob, cfg["passphrase"]), Path(root))
-    except BackupError as err:
+    except (BackupError, OSError, tarfile.TarError, EOFError, ValueError) as err:  # a damaged backup must never stop the server from starting
         say(f"Could not restore the backup: {err}. Starting fresh; nothing was overwritten.")
         return False
     say("Restored your workspace from the encrypted backup.")

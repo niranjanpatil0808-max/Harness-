@@ -48,9 +48,19 @@ def _allow_local() -> bool:
     return os.environ.get("KINTSUGI_FETCH_ALLOW_LOCAL") == "1"
 
 
+_NOT_PUBLIC_EXTRA = [ipaddress.ip_network(n) for n in ("fec0::/10", "192.88.99.0/24", "100.64.0.0/10", "198.18.0.0/15", "::/96", "64:ff9b::/96", "64:ff9b:1::/48", "2002::/16", "::ffff:0:0:0/96")]
+
+
 def _public(ip: ipaddress._BaseAddress) -> bool:
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
-        ip = ip.ipv4_mapped
+    """True only for an address on the public internet. IPv6 forms that carry an IPv4 address inside (mapped, compatible, NAT64, 6to4)
+    are judged by the IPv4 address they carry, and the transition ranges themselves are refused."""
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped:
+            return _public(ip.ipv4_mapped)
+        if any(ip in net for net in _NOT_PUBLIC_EXTRA):
+            return False
+    elif any(ip in net for net in _NOT_PUBLIC_EXTRA if net.version == 4):
+        return False
     return ip.is_global and not ip.is_multicast
 
 
@@ -142,7 +152,7 @@ def to_text(body: str, content_type: str) -> tuple[str, str]:
     if "html" in content_type or body.lstrip()[:200].lower().startswith(("<!doctype html", "<html")):
         parser = _Text()
         parser.feed(body)
-        text = html.unescape("".join(parser.parts))
+        text = "".join(parser.parts)  # already unescaped by the parser: a second pass would turn &amp;lt; into <
         title = " ".join(parser.title.split())
     else:
         text, title = body, ""
@@ -158,17 +168,29 @@ def roundtrip(url: str, method: str = "GET", headers: dict | None = None, body: 
     request carrying an API key is never forwarded anywhere else)."""
     extra = {k: v for k, v in (headers or {}).items()}
     can_redirect = method == "GET" and not extra and body is None
+    started = time.monotonic()  # one clock for the whole exchange: connecting, headers and body
     for _ in range(MAX_REDIRECTS + 1):
         parts = check_url(url)
         port = parts.port or (443 if parts.scheme == "https" else 80)
         ip = resolve(parts.hostname, port)
-        conn = (_PinnedTLS if parts.scheme == "https" else _Pinned)(parts.hostname, port, ip, TIMEOUT)
+        remaining = TOTAL_SECONDS - (time.monotonic() - started)
+        if remaining <= 0:
+            raise FetchError("the site was too slow to answer")
+        conn = (_PinnedTLS if parts.scheme == "https" else _Pinned)(parts.hostname, port, ip, min(TIMEOUT, remaining))
         path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
-        sent = {"Host": parts.netloc.rsplit("@", 1)[-1], "User-Agent": USER_AGENT, "Accept": "text/html,text/plain,application/json;q=0.9,*/*;q=0.1",
+        try:
+            host_header = parts.hostname.encode("idna").decode("ascii") + (f":{parts.port}" if parts.port else "")
+        except UnicodeError:
+            raise FetchError("that host name is not valid") from None
+        sent = {"Host": host_header, "User-Agent": USER_AGENT, "Accept": "text/html,text/plain,application/json;q=0.9,*/*;q=0.1",
                 "Accept-Encoding": "identity", "Connection": "close", **extra}
         try:
             conn.request(method, path, body=body, headers=sent)
             response = conn.getresponse()
+            if conn.sock is not None:  # headers can take no longer than the deadline allows either
+                conn.sock.settimeout(max(0.5, min(TIMEOUT, TOTAL_SECONDS - (time.monotonic() - started))))
+            if time.monotonic() - started > TOTAL_SECONDS:
+                raise FetchError("the site was too slow to answer")
             if response.status in (301, 302, 303, 307, 308):
                 target = response.getheader("Location")
                 if not can_redirect or not target:
@@ -176,7 +198,9 @@ def roundtrip(url: str, method: str = "GET", headers: dict | None = None, body: 
                 new = urllib.parse.urljoin(url, target)
                 old_parts, new_parts = urllib.parse.urlsplit(url), urllib.parse.urlsplit(new)
                 if (old_parts.scheme, old_parts.hostname, old_parts.port) != (new_parts.scheme, new_parts.hostname, new_parts.port):
-                    raise FetchError(f"the page moved to a different site ({new[:200]}). Fetch that address as a new request if you want it")
+                    shown = (new_parts.hostname or "another site")[:80]
+                    shown = shown if shown.isascii() and re.fullmatch(r"[A-Za-z0-9.-]+", shown) else "another site"
+                    raise FetchError(f"the page moved to a different site ({shown}). Ask for the new address as a separate request if you want it")
                 url = new
                 continue
             if response.status >= 400:
@@ -184,7 +208,7 @@ def roundtrip(url: str, method: str = "GET", headers: dict | None = None, body: 
             content_type = (response.getheader("Content-Type") or "").split(";")[0].strip().lower()
             if text_only and not content_type.startswith(TEXT_TYPES):
                 raise FetchError(f"that is not a text page (it is '{content_type or 'unknown'}'); downloads are not allowed")
-            chunks, got, deadline = [], 0, time.monotonic() + TOTAL_SECONDS
+            chunks, got, deadline = [], 0, started + TOTAL_SECONDS
             while got <= max_bytes:
                 chunk = response.read1(min(16384, max_bytes + 1 - got))  # returns what has arrived, so the deadline below is checked often
                 if not chunk:

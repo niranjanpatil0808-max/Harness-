@@ -43,7 +43,7 @@ ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,23}$")
 TOOL_RE = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 PARAM_RE = re.compile(r"^[a-z][a-z0-9_]{0,24}$")
 HOST_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$")
-HEADER_RE = re.compile(r"^(Authorization|X-API-Key|X-Api-Key|api-key|X-Auth-Token|X-[A-Za-z0-9-]{1,30})$")
+HEADER_RE = re.compile(r"(Authorization|X-API-Key|X-Api-Key|api-key|X-Auth-Token|X-[A-Za-z0-9-]{1,30})")  # used with fullmatch
 REPO_RE = re.compile(r"^([A-Za-z0-9_.-]{1,39})/([A-Za-z0-9_.-]{1,100})(?:@([A-Za-z0-9_./-]{1,60}))?$")
 PLACEHOLDER_RE = re.compile(r"\{([a-z][a-z0-9_]{0,24})\}")
 TOP_KEYS = {"id", "name", "version", "description", "author", "homepage", "skills", "tools"}
@@ -142,10 +142,14 @@ def _validate_tool(raw: object, pid: str, seen: set) -> dict:
         clean_hosts.append(host)
     url = _str(raw.get("url"), f"tool '{name}' url", 300)
     template = PLACEHOLDER_RE.sub("x", url)
-    parts = urllib.parse.urlsplit(template)
+    try:
+        parts = urllib.parse.urlsplit(template)
+        port = parts.port
+    except ValueError:
+        raise PluginError(f"tool '{name}': the url is not valid") from None
     if parts.scheme != "https" and not (_local_ok() and parts.scheme == "http"):
         raise PluginError(f"tool '{name}': the url must start with https://")
-    if parts.username or parts.password or parts.port not in (None, 443) and not _local_ok() or not parts.hostname or parts.hostname not in clean_hosts:
+    if parts.username or parts.password or port not in (None, 443) and not _local_ok() or not parts.hostname or parts.hostname not in clean_hosts:
         raise PluginError(f"tool '{name}': the url's host must be one of the declared hosts, with no password or odd port")
     if "{" in url.split("//", 1)[1].split("/", 1)[0]:
         raise PluginError(f"tool '{name}': parameters may only appear in the path or query, never in the host")
@@ -172,15 +176,18 @@ def _validate_tool(raw: object, pid: str, seen: set) -> dict:
         raise PluginError(f"tool '{name}': body lists parameter names and is only for POST")
     auth = raw.get("auth")
     if auth is not None:
-        if not isinstance(auth, dict) or set(auth) - {"secret", "header", "prefix"} or not SECRET_RE.match(str(auth.get("secret", ""))) or not HEADER_RE.match(str(auth.get("header", ""))):
+        if not isinstance(auth, dict) or set(auth) - {"secret", "header", "prefix"} or not SECRET_RE.match(str(auth.get("secret", ""))) or not HEADER_RE.fullmatch(str(auth.get("header", ""))):
             raise PluginError(f"tool '{name}': auth needs a secret NAME (like API_KEY) and a header name")
-        auth = {"secret": auth["secret"], "header": auth["header"], "prefix": str(auth.get("prefix", ""))[:20]}
+        prefix = str(auth.get("prefix", ""))
+        if not re.fullmatch(r"[ -~]{0,20}", prefix):
+            raise PluginError(f"tool '{name}': the auth prefix must be up to 20 plain characters")
+        auth = {"secret": auth["secret"], "header": auth["header"], "prefix": prefix}
     return {"name": name, "description": _str(raw.get("description"), f"tool '{name}' description", 200), "method": method, "url": url,
             "hosts": clean_hosts, "params": declared, "body": body, "auth": auth}
 
 
 def fingerprint(manifest: dict) -> str:
-    return hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:16]
+    return hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def summary(manifest: dict) -> dict:
@@ -400,6 +407,8 @@ def run_http_tool(ctx, manifest: dict, tool: dict, args: dict) -> str:
                 raise ToolError(f"'{pname}' is longer than {spec['max_length']} characters")
         if spec["enum"] is not None and value not in spec["enum"]:
             raise ToolError(f"'{pname}' must be one of: {', '.join(map(str, spec['enum']))}")
+        if isinstance(value, str) and value.strip(".") == "" and value:
+            raise ToolError(f"'{pname}' cannot be only dots")  # '..' would climb out of the declared path with the key attached
         values[pname] = value
     if "[secret:" in ctx.ws.keychain.redact(ctx.agent, json.dumps(values)):
         raise ToolError("an argument contains a secret value; plugin calls leave this server, so it was not sent")

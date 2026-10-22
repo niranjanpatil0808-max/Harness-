@@ -607,7 +607,7 @@ function pluginPreview(info, source) {
     info.writes.length ? h("div", {class: "card"}, h("strong", {}, "Can send data out (needs your approval each time): "), info.writes.join(", ")) : null,
     info.skills.length ? h("div", {}, h("h4", {}, "Skills (read these: agents will follow this as guidance)"), info.skills.map((s) => h("div", {class: "card"}, h("strong", {}, s.name), h("pre", {class: "view", style: "margin-top:6px;white-space:pre-wrap"}, s.text)))) : null,
     info.tools.length ? h("div", {}, h("h4", {}, "Tools"), info.tools.map((t) => h("div", {class: "card"}, h("strong", {}, t.name), " ", h("code", {}, t.method + " " + t.url), h("div", {class: "muted", style: "font-size:13px"}, t.description)))) : null,
-    h("h4", {}, "Fingerprint " + info.fingerprint), h("small", {class: "muted"}, "You approve exactly this. If the plugin changes, it will not install."), h("div", {style: "margin-top:10px"}, boxes));
+    h("h4", {}, "Fingerprint " + info.fingerprint.slice(0, 16)), h("small", {class: "muted"}, "You approve exactly this. If the plugin changes, it will not install."), h("div", {style: "margin-top:10px"}, boxes));
   dialog("Install " + info.name + "?", null, body, (close) => [h("button", {class: "btn", onclick: close}, "Cancel"), h("button", {class: "btn primary", onclick: async () => {
     const ok = await act(() => api("/api/plugins/install", {...source, fingerprint: info.fingerprint, enable_for: names.filter((n) => picks[n].checked)}), "Plugin installed"); if (ok) { close(); const b = $("#settings-body"); if (b && S.settingsTab === "plugins") fill(b, await pluginsPanel()); } }}, "Install")]);
 }

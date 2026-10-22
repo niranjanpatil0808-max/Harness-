@@ -68,3 +68,24 @@ Four independent reviewers were launched (each in its own worktree). Results so 
 13. LOW  keychain not crash-safe/thread-safe: temp file + os.replace + lock.
 Minor: to_text double html.unescape; web_search result URL control chars; Retry-After HTTP-date ValueError in model.py.
 (Reviewer verified fine: core SSRF literal/DNS checks, redirects, pinned connection, plugin archive reading, template quoting, backup crypto basics, secrets in errors.)
+
+## Access-control / web-UI review (reviewer 1) findings: FIX CHECKLIST (mark done as fixed)
+
+1. HIGH  Agent/person message HTML can carry CSS (`<style>`, style=, form/input, fixed overlays) that hides the approval card's real code/"not isolated" warning or blanks the app
+   (web/app.js:70 DOMPurify default config + CSP style-src unsafe-inline) -> DOMPurify with FORBID_TAGS [style,form,input,button,select,textarea,link,meta,iframe], FORBID_ATTR [style,id,name], and `.body{contain:paint;isolation:isolate;overflow:hidden}`; consider upgrading vendored DOMPurify (3.1.6).
+2. MED  Admins can read private-DM content via /api/audit (tool args in detail), /api/state approvals (full args, can_decide) and /api/approve output -> filter audit/approvals to rooms the viewer is in (owner sees all); log tool names only.
+3. MED  Admin can exfiltrate agent secret values (reversed print) by approving run_python with a non-empty `secrets` list -> make such approvals owner-only (extend Team.owner_only_tool).
+4. MED  send_message/schedule "asker must be in the room" guard bypassed via agent->agent hand-off (requester_of returns None) -> carry originating person through hops (requested_by on message/inherit in _dispatch); fail closed when asker unknown and room != ctx.room; add asker check to schedule(room=).
+5. MED  Revocation gaps: (a) invites outlive their creator (delete unused invites created_by=name on remove; revoke when role lowered); (b) removing a member from a room leaves their jobs firing and /api/automations/run working -> delete jobs on remove_member, require can_see_room in _owns_job.
+6. MED/LOW  Login-CSRF via `#token=` fragment silently replaces stored token -> confirm "Sign in as <name>? replaces your current sign-in" (fetch /api/me first).
+7. LOW/MED  Throttle: failure lock checked before token validation (right token refused after 10 wrong); shared IP behind proxy; Dockerfile sets KINTSUGI_TRUST_PROXY=1 by default (XFF spoofing/bypass) -> validate token first, throttle failures only, no default TRUST_PROXY (or last-hop XFF only from trusted peer); /api/join failures shouldn't lock real users.
+8. LOW  Published app can phish on the workspace origin (self-navigation) -> separate origin/port, or warn on publish_app approval card.
+9. LOW  open_dm joins names with "-": ambiguous (xa-yb,zc) vs (xa,yb-zc) -> separator not allowed in names, or insert members explicitly.
+10. LOW  /api/applink no agent-access check; push subscribe 20-device cap is global (cap per user); /api/jobs no cap (add per-user/global cap); /apps ?sig=%C3%A9 uncaught TypeError in compare_digest (compare bytes);
+    sign-out leaves kt-draft-*/kt-seen in localStorage; approval card shows only args.code (show secrets list + timeout); admin can delete anyone's DM and toggle improve share_lessons/auto_apply (owner-level);
+    admins can create agents named cron-5/owner (reserve names); improve/decide records by="web".
+    DOC GAP: integration/plugin tools run for ANY room member who talks to an enabled agent (a member can read the owner's Gmail/Calendar/GitHub/Slack through it) -> add to docs/TEAMS.md honest limits.
+(Reviewer verified fine: 66-endpoint role sweep, owner-only list, admin->owner gates, no member read of other rooms, invites single-use/hashed, token handling, atomic approvals, no script XSS, CSP/headers/SW caching.)
+
+## Progress on the internet-facing checklist (reviewer 2)
+Done in code (tests being finished): items 1-4, 6-11, 13 and minor ones, plus ICS parser rewrite (item 5). Item 12 partially (download cap + restore never crashes; rollback protection NOT done).
