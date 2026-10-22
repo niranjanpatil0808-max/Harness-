@@ -307,6 +307,7 @@ function renderInline() {
         a.requested_by && a.requested_by !== me().name ? h("div", {class: "meta"}, "Asked by " + a.requested_by) : null,
         a.can_decide === false ? h("div", {class: "meta"}, "Waiting for " + (S.state.approval_policy === "admins" ? "an admin" : "someone allowed") + " to decide.")
         : h("div", {class: "actions"}, h("button", {class: "btn primary", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: true})); }}, "Allow once"),
+          a.can_remember ? h("button", {class: "btn", title: "Next time " + a.agent + " makes exactly this call, it runs without asking. Revoke it any time in Settings.", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: true, remember: true}), "Remembered: this exact action will not ask again"); }}, "Always allow this exact one") : null,
           h("button", {class: "btn danger", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: false})); }}, "Deny")));
     }),
     busy.length ? h("div", {class: "working", "aria-live": "polite"}, SPARK(), h("span", {class: "wk"}, busy.map((n) => n + " is " + ((S.state.activity || {})[n] || "working") + "…").join(" · ")),
@@ -945,7 +946,7 @@ async function improvePanel() {
   content.append(h("div", {style: "display:flex;justify-content:flex-end;margin-top:8px"}, h("button", {class: "btn primary", onclick: save}, "Save settings")));
   return content;
 }
-const SETTINGS_TAB_LIST = [["general", "General", "member"], ["team", "Team", "admin"], ["models", "Models", "owner"], ["internet", "Internet", "owner"], ["integrations", "Integrations", "owner"], ["plugins", "Plugins", "owner"], ["search", "Search", "owner"], ["improve", "Improve", "admin"], ["backup", "Backup", "owner"]];
+const SETTINGS_TAB_LIST = [["general", "General", "member"], ["team", "Team", "admin"], ["models", "Models", "owner"], ["internet", "Internet", "owner"], ["integrations", "Integrations", "owner"], ["plugins", "Plugins", "owner"], ["search", "Search", "owner"], ["improve", "Improve", "admin"], ["approvals", "Remembered approvals", "owner"], ["backup", "Backup", "owner"]];
 const RANKS = {member: 0, admin: 1, owner: 2};
 const settingsTabs = () => SETTINGS_TAB_LIST.filter((t) => RANKS[me().role] >= RANKS[t[2]]).map((t) => [t[0], t[1]]);
 const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel(), team: () => teamPanel(), integrations: () => integrationsPanel(), models: () => modelsPanel(), internet: () => internetPanel(), plugins: () => pluginsPanel()};
@@ -1066,6 +1067,7 @@ async function poll(now) {
     if (S.drawer) { await loadTab(); renderDrawer(); }
     if (S.settingsOpen) await loadImproveSections();
     if (S.wantNew && S.state) { S.wantNew = false; newChatDialog(); }
+    if (S.shared && S.state && $("#msg")) { const ta = $("#msg"); ta.value = (ta.value ? ta.value + "\n" : "") + S.shared; S.shared = ""; ta.dispatchEvent(new Event("input")); ta.focus(); toast("Added to the message box. Pick a chat and send when you are ready."); }
     $("#main").classList.remove("offline");
   } catch (e) {
     if (!/access token/.test(e.message)) toast(e.message === "Failed to fetch" ? "Can't reach the workspace. Retrying…" : e.message, true);
@@ -1151,6 +1153,8 @@ function init() {
   const inv = location.hash.match(/invite=([^&]+)/);
   if (inv) { S.invite = decodeURIComponent(inv[1]); history.replaceState(null, "", location.pathname); }
   if (new URLSearchParams(location.search).get("action") === "new") { S.wantNew = true; history.replaceState(null, "", location.pathname + location.hash); }
+  const shared = ["share_title", "share_text", "share_url"].map((k) => new URLSearchParams(location.search).get(k) || "").filter(Boolean);
+  if (shared.length) { S.shared = [...new Set(shared)].join("\n").slice(0, 4000); history.replaceState(null, "", location.pathname + location.hash); }  // "Share to Kintsugi" from the phone: a draft, never sent by itself
   const sc = location.hash.match(/signin=([^&]+)/);
   if (sc) { S.signinCode = decodeURIComponent(sc[1]); history.replaceState(null, "", location.pathname); }
   const m = location.hash.match(/token=([^&]+)/);

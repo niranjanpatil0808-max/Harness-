@@ -23,7 +23,7 @@ from kintsugi.loop import load_task, parse_files, solve
 from kintsugi.memory import tokens
 
 from . import perms
-from . import origins
+from . import origins, standing
 from .sandbox import (MAX_FILE_BYTES, MAX_FOLDER_BYTES, PathError, folder_size, run_python, safe_path)
 from .scheduler import parse_cron
 
@@ -466,6 +466,11 @@ def execute(ctx: Ctx, name: str, args: object, approved: bool = False) -> Outcom
     if decision == perms.DENY:
         ctx.ws.audit(ctx.agent, "denied", name)
         return Outcome("denied", f"tool '{name}' is not allowed for this agent")
+    read_only = spec.risk == "safe"
+    if decision == perms.ASK and not (spec.net and spec.risk == "risky") and standing.matches(ctx.ws, ctx.agent, name, args) \
+            and standing.rememberable(ctx.ws, name, args, read_only):
+        ctx.ws.audit(ctx.agent, "auto-allowed", f"{name} (the owner chose to always allow this exact call)")
+        decision = perms.ALLOW
     if decision == perms.ASK:
         if len(json.dumps(args, ensure_ascii=False)) > MAX_APPROVAL_CHARS:  # a person must be able to read all of what they allow
             return Outcome("error", f"that is too long to ask a person to review (over {MAX_APPROVAL_CHARS:,} characters); split it into smaller steps")

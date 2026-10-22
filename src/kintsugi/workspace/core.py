@@ -21,7 +21,7 @@ from typing import Callable
 from kintsugi.memory import tokens
 from kintsugi.model import Model, ModelInfraError, ModelRequestError, OpenAIAdapter, QuotaExhausted
 
-from . import compact, explain, origins, perms, personal, providers, tasks, uploads
+from . import compact, explain, origins, perms, personal, providers, standing, tasks, uploads
 from .db import Database
 from .keychain import Keychain
 
@@ -781,6 +781,7 @@ class Workspace:
         self._clear_agent_grants(name)
         tasks.forget_agent(self, name)
         uploads.forget_agent(self, name)
+        standing.forget_agent(self, name)
         self.db.execute("DELETE FROM messages WHERE sender = ?", (name,))
         compact.forget(self)  # summaries may quote what it wrote
         self.db.execute("DELETE FROM members WHERE member = ?", (name,))

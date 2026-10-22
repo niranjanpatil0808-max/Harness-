@@ -3,11 +3,13 @@
    Loaded after app.js and uses its helpers (h, api, dialog, S, ...). No build step. */
 
 /* ---------- settings: a proper page with grouped sections ---------- */
-const SETTINGS_GROUPS = [["You", ["general"]], ["AI", ["models", "usage"]], ["Team", ["team"]], ["Connections", ["internet", "integrations", "plugins", "search"]], ["Safety and data", ["improve", "backup"]]];
+const SETTINGS_GROUPS = [["You", ["general"]], ["AI", ["models", "usage"]], ["Team", ["team"]], ["Connections", ["internet", "integrations", "plugins", "search"]], ["Safety and data", ["improve", "approvals", "backup"]]];
 if (!SETTINGS_TAB_LIST.some((t) => t[0] === "usage")) SETTINGS_TAB_LIST.push(["usage", "Usage", "admin"]);
 SETTINGS_PANELS.usage = () => usagePanel();
+if (!SETTINGS_TAB_LIST.some((t) => t[0] === "approvals")) SETTINGS_TAB_LIST.push(["approvals", "Remembered approvals", "owner"]);
+SETTINGS_PANELS.approvals = () => approvalsPanel();
 const SETTINGS_BLURB = {general: "Your account, voice, reply style and notifications", models: "Your AI providers and API keys", usage: "What the AI has used, and what it cost", team: "People, roles and approvals",
-  internet: "Whether agents may go online", integrations: "GitHub, Slack, Calendar, Gmail", plugins: "Add skills and tools", search: "Web search key", improve: "Let the workspace tune its agents", backup: "Keep your data safe"};
+  internet: "Whether agents may go online", integrations: "GitHub, Slack, Calendar, Gmail", plugins: "Add skills and tools", search: "Web search key", improve: "Let the workspace tune its agents", approvals: "Actions you chose to always allow", backup: "Keep your data safe"};
 
 settingsDialog = async function settingsDialog(tab) {
   if (typeof tab !== "string") tab = S.settingsTab || "general";
@@ -454,3 +456,14 @@ function runSlash(text) {
     pop.hidden = false;
   });
 })();
+
+/* ---------- settings: remembered approvals ---------- */
+async function approvalsPanel() {
+  const list = await api("/api/standing");
+  const refresh = async () => fill($("#set-panel"), await approvalsPanel());
+  return h("div", {}, h("p", {style: "margin-top:0"}, "When you tap \"Always allow this exact one\" on an approval, that one call runs without asking from then on, for example in a repeating task while nobody is around. It covers only that exact action by that agent. A different code, link or agent still asks, and anything that could use secrets, send data out or run without isolation always asks."),
+    list.length ? h("div", {class: "stack"}, list.map((e) => h("div", {class: "perm"}, h("h5", {}, e.agent + " · " + e.tool),
+      h("pre", {}, e.summary || ""), h("div", {class: "meta"}, "Allowed by " + e.by + (e.ts ? " · " + whenText(e.ts) : "")),
+      h("div", {class: "actions"}, h("button", {class: "btn danger", "aria-label": "Revoke " + e.agent + " " + e.tool, onclick: async () => { await act(() => api("/api/standing/revoke", {agent: e.agent, h: e.h}), "Revoked"); await refresh(); }}, "Revoke")))))
+      : h("p", {class: "muted"}, "Nothing is remembered. Approvals always ask."));
+}

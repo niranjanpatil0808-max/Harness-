@@ -78,6 +78,24 @@ def _lessons(ws: Workspace, agent: str) -> list[dict]:
     return [{"text": l.text, "uses": l.uses, "wins": l.wins, "status": l.status} for l in store.lessons]
 
 
+def _read_only_plugin_tool(ws, agent: str, tool: str) -> bool:
+    from .tools import TOOLS
+
+    found = None if tool in TOOLS else ws.plugins.find_tool(agent, tool)
+    return found is not None and found[1]["method"] == "GET"
+
+
+def _can_remember(ws, approval: dict) -> bool:
+    """Whether the owner may offer "always allow this exact one" on a pending approval (the same test the approve endpoint applies)."""
+    from . import standing
+
+    try:
+        args = json.loads(approval["args"])
+    except (TypeError, ValueError):
+        return False
+    return isinstance(args, dict) and standing.rememberable(ws, approval["tool"], args, _read_only_plugin_tool(ws, approval["agent"], approval["tool"]))
+
+
 def _apps(ws: Workspace, agent: str) -> list[str]:
     base = ws.www_dir(agent)
     return sorted(p.name for p in base.iterdir() if (p / "index.html").is_file()) if base.is_dir() else []
@@ -330,7 +348,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     "SELECT room, MAX(id) AS last_id, MAX(CASE WHEN sender != ? THEN id END) AS last_other FROM messages GROUP BY room", (who.name,))}
                 rooms = [r for r in ws.list_rooms() if ws.team.can_see_room(who, r["name"])]
                 seen = {r["name"] for r in rooms}
-                approvals = [{**a, "can_decide": ws.team.can_decide(who, a)} for a in ws.approvals() if a["room"] in seen or who.role == "owner"]
+                approvals = [{**a, "can_decide": ws.team.can_decide(who, a), "can_remember": who.role == "owner" and _can_remember(ws, a)}
+                             for a in ws.approvals() if a["room"] in seen or who.role == "owner"]
                 approvals = [a for a in approvals if a["can_decide"] or a.get("requested_by") == who.name]
                 jobs = ws.list_jobs() if who.at_least("admin") else [j for j in ws.list_jobs() if j["room"] in seen]
                 return {"me": {"name": who.name, "role": who.role}, "approval_policy": ws.team.policy(),
@@ -371,6 +390,10 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return personal.get(ws, me_name)
             if path == "/api/tasks":
                 return tasks.listing(ws, self.who, (query.get("room") or [None])[0])
+            if path == "/api/standing":
+                from . import standing as _standing
+
+                return _standing.listing(ws)
             if path == "/api/templates":
                 from . import templates
 
@@ -549,6 +572,10 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 if not ws.team.can_see_room(self.who, room):
                     raise Forbidden("you are not in that room")
                 return {"brief": ws.set_brief(room, str(body.get("text") or ""), "you" if self.who.role == "owner" else self.who.name)}
+            if path == "/api/standing/revoke":
+                from . import standing as _standing
+
+                return {"revoked": _standing.revoke(ws, str(body["agent"]), str(body["h"]))}
             if path == "/api/share":
                 self._rate_limit(self.who.name)
                 src = ws.db.one("SELECT room FROM messages WHERE id = ?", (int(body["id"]),))
@@ -765,6 +792,20 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     raise WorkspaceError("no such approval")
                 if not ws.team.can_decide(self.who, row):
                     raise Forbidden("you are not allowed to decide this one (ask an admin, or see the approval policy in Settings > Team)")
+                if body.get("remember"):  # only the owner can make an approval permanent, and only for an exact call that stays inside the folder
+                    if self.who.role != "owner":
+                        raise Forbidden("only the owner can always allow an action")
+                    if not body.get("approve"):
+                        raise WorkspaceError("only an approval can be remembered")
+                    from . import standing as _standing
+
+                    args = json.loads(row["args"])
+                    read_only = _read_only_plugin_tool(ws, row["agent"], row["tool"])
+                    if not _standing.rememberable(ws, row["tool"], args, read_only):
+                        raise WorkspaceError("this kind of action always asks: it could send data out, use secrets, or run without isolation")
+                    out = ws.decide(int(body["id"]), True, by=self.who.name)
+                    _standing.remember(ws, row["agent"], row["tool"], args, self.who.name, read_only)
+                    return {"output": out, "remembered": True}
                 return {"output": ws.decide(int(body["id"]), bool(body["approve"]), by=self.who.name)}
             if path == "/api/jobs":
                 self._may_use_room(str(body["room"]), str(body["agent"]))

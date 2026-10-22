@@ -213,3 +213,11 @@ there; run_python code can still read them: documented). Full run before origins
 Research: batch 2 (run 39845091741) started 20:00 UTC, check scheduled. Archive move still waiting for the user's yes.
 Still open: published apps share the workspace origin only via a sandboxed CSP (sound per review); sessionStorage copy of the token unused; token-in-owner-link;
 agents' lessons shared across chats; nothing tried against real services/phones/teams.
+
+## Update: remembered approvals (2026-10-22, night)
+standing.py: setting standing:<agent> = [{h=sha256(tool+sorted args), tool, summary, by, ts}], max 30/agent. tools.execute: ASK -> ALLOW only when the
+exact hash matches AND standing.rememberable (not owner_only_tool, run_python without secrets, run_python/web_search/web_fetch or a read-only tool)
+and not a risky net tool; audited "auto-allowed". /api/approve {remember:true} owner only, approve only; /api/standing (GET), /api/standing/revoke;
+/api/state approvals carry can_remember (owner only). delete_agent clears. UI: "Always allow this exact one" on approval cards; Settings >
+Remembered approvals (extras.js approvalsPanel). Tests: tests/test_workspace_standing.py (6), tests/ui/standing.js (stubs api; the mock server has no
+isolated sandbox so the real button path is covered by unit tests). Known: web_search/web_fetch queries are remembered by exact args only.

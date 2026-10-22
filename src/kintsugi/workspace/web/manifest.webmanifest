@@ -15,6 +15,7 @@
     {"src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
     {"src": "/static/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
   ],
+  "share_target": {"action": "/", "method": "GET", "params": {"title": "share_title", "text": "share_text", "url": "share_url"}},
   "shortcuts": [
     {"name": "New chat", "short_name": "New chat", "url": "/?action=new", "icons": [{"src": "/static/icons/icon-192.png", "sizes": "192x192"}]}
   ]

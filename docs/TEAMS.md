@@ -85,6 +85,12 @@ Settings > Team > *Who can approve risky actions* (owner only):
 Owners and admins can always decide. A scheduled run is attributed to the person who set the schedule up. Approval decisions are
 recorded with the name of whoever decided.
 
+**Always allow this exact one (owner only).** On an approval card the owner also sees *Always allow this exact one*. From then on that
+agent's identical call (same tool, same arguments, character for character) runs without asking, which keeps a repeating task from
+stalling while nobody is around. It never widens anything: other code, other links or another agent still ask, and calls that are given
+secrets, could send data out, or would run without isolation never offer the button. Settings > Remembered approvals lists every one with a
+Revoke button; deleting the agent clears them; each automatic run is recorded in the audit log as *auto-allowed*. Agents cannot add one.
+
 ## Honest limits
 
 - **What stays in its chat:** files you attach, notes an agent saves with `remember`, and the long-chat summary. These are only
