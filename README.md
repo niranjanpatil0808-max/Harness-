@@ -20,6 +20,10 @@
 | **Web search** with your own key (Tavily or Brave): cited snippets, no page fetching | **Works** against test servers; **not yet tried against the live services** |
 | **Automations:** daily briefing, change watcher that stays silent unless something matters, research report, your own task; your time zone | **Works** (scheduling and time zones tested incl. daylight saving); search-based ones need a search key |
 | **Notifications** that never contain your message, plus unread markers and an app badge | **Works** in tests with a fake push service; **not yet verified against Google's, Apple's or Mozilla's real push services** |
+| **Bring your own key:** any OpenAI-style API (OpenAI, DeepSeek, Groq, Together, OpenRouter, Ollama...), Anthropic or Gemini; set up in the app, per agent if you like | **Works** against fake servers in tests; **not yet tried with real keys** (I have none of those services here) |
+| **Internet control:** each agent is Off / Ask each time / Allow, plus a master switch; agents can read one public page as text | **Works** in tests (including attempts to reach private addresses); not yet tried on the live internet |
+| **Agents in parallel:** several agents work at once; `@all` gives everyone the same task; you set how many | **Works** (tested for real overlap) |
+| **Plugins:** skills and web-API tools from a folder or GitHub repo, previewed in full before install ([docs/PLUGINS.md](docs/PLUGINS.md)) | **Works** against fake servers; no plugin code runs; Python-code plugins are **not built** |
 | **Encrypted backup** to your private GitHub repo, restored automatically on an empty free host | **Works** against a fake GitHub in tests; **not yet tried against the real GitHub** ([docs/HOSTING.md](docs/HOSTING.md)) |
 | Teams: separate logins, invite links, roles for approvals, shared rooms plus private chats | **Planned, after Oct 25** |
 | Integrations: GitHub, then Slack, then Gmail and Calendar | **Planned, after teams** |
@@ -38,11 +42,10 @@ pip install -e .
 python -m unittest discover -s tests         # 250+ offline tests
 python examples/workspace_demo.py            # an offline tour, no key needed (a recording: docs/demo.html)
 
-export GROQ_API_KEY=...                      # or KINTSUGI_API_KEY / KINTSUGI_BASE_URL / KINTSUGI_MODEL
 kintsugi workspace serve                     # creates a starter team and prints a link with your access token
 ```
 
-Open the link on your computer or phone. Any OpenAI-compatible endpoint works (Groq by default; a Llama endpoint, Together, Fireworks or a local Ollama server by setting `KINTSUGI_BASE_URL` and `KINTSUGI_MODEL`).
+Open the link on your computer or phone. The app opens **Settings > Models** the first time: pick your provider (OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Together, Ollama, or any OpenAI-style address), paste **your own API key**, press Test. The key is stored in your keychain, never shown again, and only sent to that provider. (Server-side settings `KINTSUGI_API_KEY` / `KINTSUGI_BASE_URL` / `KINTSUGI_MODEL` still work as a fallback.)
 
 **On a phone with no computer:** open the repository in a GitHub Codespace (Code > Codespaces), or deploy it with the recipes in [docs/HOSTING.md](docs/HOSTING.md). Add your key as a secret, never in a chat or in the repository.
 
@@ -86,6 +89,7 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 | [Aider-AI/aider](https://github.com/Aider-AI/aider) (repo map) | Apache-2.0 | A map of definitions and references ranked with PageRank | `graph.py`: stdlib PageRank over the `ast` graph (used by the `map_project` tool and the research harness) |
 | [ReflexioAI/reflexio](https://github.com/ReflexioAI/reflexio) | Apache-2.0 | Turn repeated corrections into lasting, deduplicated behavior changes | Near-duplicate lessons merge and count how often they recur |
 | [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) | MIT | Harness state (prompts, memories) kept as durable files, updated in small evidence-backed steps | `lessons.json` and playbooks are plain data; every change records its evidence |
+| [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | MIT | An "everything is a plugin" harness: model adapters behind one seam, a tool pipeline that can allow, ask or deny before running, subagents, plugins that add tools and skills, a GitHub-topic plugin index. I read its documentation (not its source) | `providers.py` (adapters), the Off/Ask/Allow internet gate in `tools.execute`, `plugins.py`, `@all` parallel agents. Written from scratch in Python; no code copied |
 | Grok (xAI), as a product reference | not code | A witty-but-useful assistant with live web search, voice and a phone app | Inspiration for the planned tone choice, web search and voice; no Grok code or assets are used |
 
 ## Project layout

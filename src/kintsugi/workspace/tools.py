@@ -277,7 +277,7 @@ def schedule(ctx: Ctx, args: dict) -> str:
 
 
 TOOLS: dict[str, Tool] = {t.name: t for t in [
-    Tool("send_message", "safe", 'send_message {"room": optional room name, "text": "..."} - post a message', send_message),
+    Tool("send_message", "safe", 'send_message {"room": optional room name, "text": "..."} - post a message; start it with @name to hand work to another agent (they work at the same time as you)', send_message),
     Tool("read_file", "safe", 'read_file {"path": "notes.txt"} - read a file in your folder', read_file),
     Tool("list_files", "safe", 'list_files {"path": "."} - list a folder', list_files),
     Tool("write_file", "safe", 'write_file {"path": "a.txt", "content": "..."} - write a file in your folder', write_file),
@@ -329,13 +329,25 @@ def describe_tools(allowed: list[str] | None, ws: "Workspace | None" = None, age
     also needs the owner's search key."""
     searching = ws is None or ws.search_settings()["configured"]
     online = ws is None or agent is None or ws.internet_mode(agent) != "off"
-    return "\n".join(f"- {t.doc}" for t in TOOLS.values()
-                     if (allowed is None or t.name in allowed) and (not t.net or online) and (t.name != "web_search" or searching))
+    lines = [f"- {t.doc}" for t in TOOLS.values()
+             if (allowed is None or t.name in allowed) and (not t.net or online) and (t.name != "web_search" or searching)]
+    if ws is not None and agent is not None and online:
+        lines += [line for line in ws.plugins.describe(agent) if allowed is None or line.split()[1] in allowed]
+    return "\n".join(lines)
 
 
 def execute(ctx: Ctx, name: str, args: object, approved: bool = False) -> Outcome:
     """Apply the permission tier, then run the tool. `approved=True` skips the tier (a human said yes)."""
     spec = TOOLS.get(name)
+    if spec is None:
+        found = ctx.ws.plugins.find_tool(ctx.agent, str(name))  # a tool contributed by a plugin this agent has switched on
+        if found:
+            from . import plugins as plugin_mod
+
+            manifest, tool = found
+            args_doc = ", ".join(f'"{k}": {v["type"]}' for k, v in tool["params"].items())
+            spec = Tool(name, "safe" if tool["method"] == "GET" else "risky", f"{name} {{{args_doc}}} - {tool['description']}",
+                        lambda c, a, m=manifest, tl=tool: plugin_mod.run_http_tool(c, m, tl, a), net=True)
     if spec is None:
         near = difflib.get_close_matches(str(name), list(TOOLS), n=2, cutoff=0.5)
         hint = f" Did you mean: {', '.join(near)}?" if near else ""

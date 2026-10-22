@@ -107,7 +107,7 @@ class Workspace:
         self._closing = False
         self._pending: deque = deque()  # sync mode: wake-ups queued so that runs never nest
         self._draining = False
-        self._pool = None if sync else ThreadPoolExecutor(max_workers=4, thread_name_prefix="kintsugi-agent")
+        self._pool = None if sync else ThreadPoolExecutor(max_workers=self.parallel_limit(), thread_name_prefix="kintsugi-agent")
 
     # --- folders ---------------------------------------------------------
 
@@ -131,6 +131,8 @@ class Workspace:
             raise WorkspaceError(f"at most {MAX_AGENTS} agents")
         if not NAME_RE.match(name) or name == "system":
             raise WorkspaceError("names are lowercase letters, digits, '-' and '_', start with a letter, and cannot be 'system'")
+        if name in ("all", "everyone"):
+            raise WorkspaceError("'all' and 'everyone' are reserved: @all wakes every agent in a room")
         if tier not in perms.TIERS:
             raise WorkspaceError(f"tier must be one of {', '.join(perms.TIERS)}")
         if self.get_agent(name, missing_ok=True):
@@ -392,6 +394,14 @@ class Workspace:
             self.audit(None, "push-error", f"{type(err).__name__}: {str(err)[:150]}")
 
     @property
+    def plugins(self):
+        from .plugins import Plugins
+
+        if getattr(self, "_plugins", None) is None:
+            self._plugins = Plugins(self)
+        return self._plugins
+
+    @property
     def backups(self):
         from .backup import Backups
 
@@ -487,6 +497,25 @@ class Workspace:
                 raise WorkspaceError(f"today's limit of {cap} web searches is used up (the owner can raise it in Settings > Search)")
             self.db.execute("INSERT INTO usage (day, calls) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET calls = calls + 1",
                             (f"search-{self._day()}",))
+
+    # --- agents working at the same time ---
+
+    MAX_PARALLEL = 8
+
+    def parallel_limit(self) -> int:
+        """How many agents may think at once (different agents run in parallel; one agent never runs twice at once)."""
+        raw = self.get_setting("parallel", "") or os.environ.get("KINTSUGI_PARALLEL", "")
+        return min(max(int(raw), 1), self.MAX_PARALLEL) if raw.strip().isdigit() else 4
+
+    def set_parallel(self, limit: int) -> int:
+        limit = min(max(int(limit), 1), self.MAX_PARALLEL)
+        self.set_setting("parallel", str(limit))
+        if self._pool is not None:  # new work goes to the new pool; runs already started finish on the old one
+            with self._lock:
+                old, self._pool = self._pool, ThreadPoolExecutor(max_workers=limit, thread_name_prefix="kintsugi-agent")
+            old.shutdown(wait=False)
+        self.audit(None, "parallel-changed", str(limit))
+        return limit
 
     # --- internet access for agents: the owner decides (workspace switch + per agent Off / Ask / Allow) ---
 
@@ -661,6 +690,8 @@ class Workspace:
     def _targets(self, room: str, kind: str, sender: str, text: str) -> list[str]:
         members = set(self.members(room))
         wanted = set(MENTION_RE.findall(text))
+        if wanted & {"all", "everyone"}:  # @all wakes every agent in the room; they work at the same time
+            wanted |= members
         if kind == "dm":
             wanted |= members
         return sorted(a for a in wanted if a != sender and a in members and self.get_agent(a, missing_ok=True))
@@ -682,7 +713,8 @@ class Workspace:
                 if self._closing:
                     return
                 self._inflight += 1
-            self._pool.submit(self._run_async, agent, room, message_id, hops)
+                pool = self._pool
+            pool.submit(self._run_async, agent, room, message_id, hops)
             return
         # Single-threaded mode: an agent's reply may wake another agent (or the same one again). Queue
         # the wake-up and let the outermost call work through the queue, so runs never nest.

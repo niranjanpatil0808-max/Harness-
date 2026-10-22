@@ -148,48 +148,60 @@ def to_text(body: str, content_type: str) -> tuple[str, str]:
     return title[:200], cleaned
 
 
-def fetch(url: str) -> dict:
-    """Fetch one page. Returns {url, title, text, truncated}. Raises FetchError with a message safe to show."""
+def roundtrip(url: str, method: str = "GET", headers: dict | None = None, body: bytes | None = None, max_bytes: int = MAX_BYTES,
+              text_only: bool = True) -> tuple[str, str, bytes, bool]:
+    """One guarded HTTP exchange. Returns (final_url, content_type, raw_body, truncated). Every address is checked, the
+    connection is pinned to the checked address, and redirects are followed only for plain GETs without extra headers (a
+    request carrying an API key is never forwarded anywhere else)."""
+    extra = {k: v for k, v in (headers or {}).items()}
+    can_redirect = method == "GET" and not extra and body is None
     for _ in range(MAX_REDIRECTS + 1):
         parts = check_url(url)
         port = parts.port or (443 if parts.scheme == "https" else 80)
         ip = resolve(parts.hostname, port)
         conn = (_PinnedTLS if parts.scheme == "https" else _Pinned)(parts.hostname, port, ip, TIMEOUT)
         path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
+        sent = {"Host": parts.netloc.rsplit("@", 1)[-1], "User-Agent": USER_AGENT, "Accept": "text/html,text/plain,application/json;q=0.9,*/*;q=0.1",
+                "Accept-Encoding": "identity", "Connection": "close", **extra}
         try:
-            conn.request("GET", path, headers={"Host": parts.netloc.rsplit("@", 1)[-1], "User-Agent": USER_AGENT, "Accept": "text/html,text/plain,application/json;q=0.9,*/*;q=0.1",
-                                               "Accept-Encoding": "identity", "Connection": "close"})
+            conn.request(method, path, body=body, headers=sent)
             response = conn.getresponse()
             if response.status in (301, 302, 303, 307, 308):
                 target = response.getheader("Location")
-                if not target:
-                    raise FetchError("the page redirected without saying where")
+                if not can_redirect or not target:
+                    raise FetchError("the site redirected, which is not allowed for this kind of request")
                 url = urllib.parse.urljoin(url, target)
                 continue
             if response.status >= 400:
                 raise FetchError(f"the site answered with an error ({response.status})")
             content_type = (response.getheader("Content-Type") or "").split(";")[0].strip().lower()
-            if not content_type.startswith(TEXT_TYPES):
+            if text_only and not content_type.startswith(TEXT_TYPES):
                 raise FetchError(f"that is not a text page (it is '{content_type or 'unknown'}'); downloads are not allowed")
-            raw = response.read(MAX_BYTES + 1)
+            raw = response.read(max_bytes + 1)
+            charset_header = response.getheader("Content-Type") or ""
         except (OSError, http.client.HTTPException, ssl.SSLError) as err:
             raise FetchError(f"could not read the page ({type(err).__name__})") from None
         finally:
             conn.close()
-        truncated = len(raw) > MAX_BYTES
-        charset = "utf-8"
-        match = re.search(r"charset=([\w-]+)", response.getheader("Content-Type") or "", re.I)
-        if match:
-            charset = match.group(1)
-        try:
-            body = raw[:MAX_BYTES].decode(charset, "replace")
-        except LookupError:
-            body = raw[:MAX_BYTES].decode("utf-8", "replace")
-        title, text = to_text(body, content_type)
-        if len(text) > MAX_TEXT:
-            text, truncated = text[:MAX_TEXT], True
-        return {"url": url, "title": title, "text": text, "truncated": truncated}
+        return url, content_type + (";" + charset_header.split(";", 1)[1] if ";" in charset_header else ""), raw[:max_bytes], len(raw) > max_bytes
     raise FetchError("too many redirects")
+
+
+def fetch(url: str) -> dict:
+    """Fetch one page as readable text. Returns {url, title, text, truncated}. Raises FetchError with a message safe to show."""
+    final, content_type, raw, truncated = roundtrip(url)
+    charset = "utf-8"
+    match = re.search(r"charset=([\w-]+)", content_type, re.I)
+    if match:
+        charset = match.group(1)
+    try:
+        body = raw.decode(charset, "replace")
+    except LookupError:
+        body = raw.decode("utf-8", "replace")
+    title, text = to_text(body, content_type.split(";")[0])
+    if len(text) > MAX_TEXT:
+        text, truncated = text[:MAX_TEXT], True
+    return {"url": final, "title": title, "text": text, "truncated": truncated}
 
 
 def format_page(page: dict) -> str:

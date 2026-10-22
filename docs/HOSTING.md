@@ -47,7 +47,8 @@ you control sets `X-Forwarded-For`.
 | Variable | Meaning |
 |---|---|
 | `KINTSUGI_TOKEN` | Access token. Required on a network address, 24+ characters. |
-| `KINTSUGI_API_KEY`, `KINTSUGI_BASE_URL`, `KINTSUGI_MODEL` | Your model provider (defaults to Groq). |
+| `KINTSUGI_API_KEY`, `KINTSUGI_BASE_URL`, `KINTSUGI_MODEL` | Optional now: a model key set on the server. Most people add their own key in the app (Settings > Models) instead, which is saved in the keychain and (if you turn backups on) in your encrypted backup. |
+| `KINTSUGI_PARALLEL` | Agents that may work at once (1-8, default 4; the app's Settings > Models can change it). |
 | `KINTSUGI_DAILY_CALLS` | Model calls per day for the whole workspace (default 500, `0` = no cap). |
 | `KINTSUGI_SANDBOX` | `auto` (default) or `require` (disable `run_python` when code cannot be isolated). |
 | `KINTSUGI_BACKUP_REPO`, `KINTSUGI_BACKUP_TOKEN`, `KINTSUGI_BACKUP_PASSPHRASE`, `KINTSUGI_BACKUP_EVERY_MINUTES`, `KINTSUGI_BACKUP_PATH` | Encrypted backup to a private GitHub repo (see above). |

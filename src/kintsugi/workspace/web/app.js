@@ -528,6 +528,37 @@ async function searchPanel() {
     out, h("p", {class: "muted", style: "font-size:13px;margin-top:14px"}, "Privacy: each search sends the words the agent chose to " + d.providers[d.provider].label + ". Secrets are never included, but think about what you ask. Search is counted and capped, and every search appears in the Log."));
 }
 
+/* ---------- settings: plugins ---------- */
+function pluginPreview(info, source) {
+  const names = agents().map((x) => x.name), picks = {};
+  const boxes = names.map((n) => { const b = h("input", {type: "checkbox", "aria-label": "Switch on for " + n}); picks[n] = b; return h("label", {style: "display:flex;gap:8px;align-items:center;margin:4px 0"}, b, "Switch on for " + n); });
+  const body = h("div", {}, h("p", {class: "muted", style: "margin:0 0 8px"}, "by " + info.author + " · version " + info.version + (info.already_installed ? " · replaces the installed copy" : "")), info.description ? h("p", {}, info.description) : null,
+    info.hosts.length ? h("div", {class: "card"}, h("strong", {}, "It can contact: "), info.hosts.join(", "), h("div", {class: "muted", style: "font-size:13px"}, "Only these hosts, only through the guarded client, and only if the agent's Internet setting allows it.")) : h("div", {class: "card"}, "It makes no network calls."),
+    info.secrets.length ? h("div", {class: "card"}, h("strong", {}, "It needs these secrets on the agent: "), info.secrets.join(", ")) : null,
+    info.writes.length ? h("div", {class: "card"}, h("strong", {}, "Can send data out (needs your approval each time): "), info.writes.join(", ")) : null,
+    info.skills.length ? h("div", {}, h("h4", {}, "Skills (read these: agents will follow this as guidance)"), info.skills.map((s) => h("div", {class: "card"}, h("strong", {}, s.name), h("pre", {class: "view", style: "margin-top:6px;white-space:pre-wrap"}, s.text)))) : null,
+    info.tools.length ? h("div", {}, h("h4", {}, "Tools"), info.tools.map((t) => h("div", {class: "card"}, h("strong", {}, t.name), " ", h("code", {}, t.method + " " + t.url), h("div", {class: "muted", style: "font-size:13px"}, t.description)))) : null,
+    h("h4", {}, "Fingerprint " + info.fingerprint), h("small", {class: "muted"}, "You approve exactly this. If the plugin changes, it will not install."), h("div", {style: "margin-top:10px"}, boxes));
+  dialog("Install " + info.name + "?", null, body, (close) => [h("button", {class: "btn", onclick: close}, "Cancel"), h("button", {class: "btn primary", onclick: async () => {
+    const ok = await act(() => api("/api/plugins/install", {...source, fingerprint: info.fingerprint, enable_for: names.filter((n) => picks[n].checked)}), "Plugin installed"); if (ok) { close(); const b = $("#settings-body"); if (b && S.settingsTab === "plugins") fill(b, await pluginsPanel()); } }}, "Install")]);
+}
+async function previewPlugin(source) { try { pluginPreview(await api("/api/plugins/preview", source), source); } catch (e) { toast(e.message, true); } }
+async function pluginsPanel() {
+  const d = await api("/api/plugins"), names = agents().map((x) => x.name);
+  const list = d.plugins.length ? d.plugins.map((p) => h("div", {class: "card"}, h("div", {style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"}, h("strong", {style: "flex:1"}, p.name + " " + p.version), h("span", {class: "muted", style: "font-size:13px"}, p.hosts.length ? "calls " + p.hosts.join(", ") : "no network"),
+      h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + p.name + "?", "It stops working for every agent.", "Remove", async () => { await act(() => api("/api/plugins/uninstall", {id: p.id}), "Plugin removed"); fill($("#settings-body"), await pluginsPanel()); })}, "Remove")),
+    h("div", {class: "muted", style: "font-size:13px"}, p.description || ""), h("div", {style: "display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"}, names.map((n) => h("button", {class: "chip" + (p.enabled_for.includes(n) ? " on" : ""), "aria-pressed": p.enabled_for.includes(n),
+      onclick: async () => { await act(() => api("/api/plugins/enable", {agent: n, id: p.id, on: !p.enabled_for.includes(n)}), n + (p.enabled_for.includes(n) ? ": off" : ": on")); fill($("#settings-body"), await pluginsPanel()); }}, n))))) : [h("div", {class: "card"}, "No plugins yet.")];
+  const repo = h("input", {type: "text", placeholder: "owner/repository", "aria-label": "GitHub repository", autocapitalize: "none"});
+  const paste = h("textarea", {rows: 5, placeholder: "{ \"id\": \"my-plugin\", ... }", "aria-label": "Plugin manifest"});
+  return h("div", {}, h("p", {style: "margin-top:0"}, "Plugins add skills (instructions) and web-API tools to your agents. No plugin code runs on this server: a plugin can only read text and call the hosts it declares. You see everything before it installs, and it does nothing for an agent until you switch it on."),
+    list, h("h4", {style: "margin:18px 0 6px"}, "Add a plugin"),
+    h("div", {style: "display:flex;gap:8px"}, repo, h("button", {class: "btn primary", onclick: () => repo.value.trim() && previewPlugin({github: repo.value.trim()})}, "Preview")),
+    h("small", {class: "muted", style: "display:block;margin:4px 0 10px"}, "A GitHub repository with a plugin.json at its top level. Only install plugins you trust: you are responsible for what they are told to do."),
+    h("details", {}, h("summary", {style: "cursor:pointer"}, "Or paste a plugin.json"), paste, h("button", {class: "btn", style: "margin-top:6px", onclick: () => { try { previewPlugin({manifest: JSON.parse(paste.value)}); } catch (e) { toast("That is not valid JSON", true); } }}, "Preview")),
+    h("h4", {style: "margin:18px 0 6px"}, "Examples"), h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, Object.values(d.examples).map((x) => h("button", {class: "chip", onclick: () => previewPlugin({manifest: x})}, x.name))));
+}
+
 const NET_MODES = [["off", "Off", "This agent cannot use the internet."], ["ask", "Ask", "Every search or page fetch waits for your yes, showing exactly what it will look up."], ["allow", "Allow", "This agent may search and read public pages by itself."]];
 
 /* ---------- settings: internet ---------- */
@@ -551,6 +582,11 @@ async function modelsPanel() {
     h("button", {class: "btn", onclick: async () => { try { const r = await api("/api/providers/test", {id: p.id}); fill(out, r.ok ? h("div", {class: "card"}, h("strong", {}, "Works. "), r.reply ? "The model said: " + r.reply : (r.note || ""), r.models.length ? h("div", {class: "muted", style: "font-size:13px;margin-top:4px"}, "Models you can use: " + r.models.slice(0, 40).join(", ")) : null) : h("div", {class: "card"}, "Problem: " + r.error)); } catch (e) { toast(e.message, true); } }}, "Test"),
     p.default ? null : h("button", {class: "btn", onclick: async () => { await act(() => api("/api/providers/default", {id: p.id}), "Default changed"); fill($("#settings-body"), await modelsPanel()); }}, "Make default"),
     h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + p.label + "?", "Its saved key is deleted. Agents using it fall back to the default provider.", "Remove", async () => { await act(() => api("/api/providers/remove", {id: p.id}), "Provider removed"); fill($("#settings-body"), await modelsPanel()); })}, "Remove"))));
+  const par = await api("/api/parallel");
+  const limit = h("input", {type: "number", min: 1, max: par.max, value: par.limit, "aria-label": "Agents working at once", style: "max-width:90px"});
+  const parallel = h("div", {class: "card"}, h("div", {style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap"}, h("span", {style: "flex:1;min-width:180px"}, h("strong", {}, "Agents working at the same time"),
+    h("div", {class: "muted", style: "font-size:13px"}, "Use @all to give every agent in a room the same task at once. Each one makes its own model calls, so more at once means faster work and faster spending (your daily cap still applies).")),
+    limit, h("button", {class: "btn", onclick: () => act(() => api("/api/parallel", {limit: +limit.value}), "Saved")}, "Save")));
   const preset = h("select", {"aria-label": "Provider type"}, Object.entries(d.presets).map(([k, p]) => h("option", {value: k}, p.label)));
   const url = h("input", {type: "text", "aria-label": "Address", autocapitalize: "none", placeholder: "https://api.example.com/v1"});
   const key = h("input", {type: "password", "aria-label": "API key", autocomplete: "off", placeholder: "Paste your API key"});
@@ -566,7 +602,7 @@ async function modelsPanel() {
   const row = (label, el) => h("div", {style: "margin:10px 0"}, h("label", {style: "margin:0 0 4px"}, label), el);
   return h("div", {}, h("p", {style: "margin-top:0"}, "This app runs on your own API key. Add any provider; agents use the default one unless you pick another for an agent. Your key is stored in your keychain, never shown again, and only ever sent to the address you enter here."),
     d.profiles.length ? rows : h("div", {class: "card"}, d.env_fallback ? "Using the key from this server's settings. Add a provider here to override it." : "No model is set up yet. Add one below to start."), out,
-    h("h4", {style: "margin:18px 0 0"}, "Add a provider"), row("Service", preset), row("Address", url), kind, row("API key", key), row("Model", model), note,
+    parallel, h("h4", {style: "margin:18px 0 0"}, "Add a provider"), row("Service", preset), row("Address", url), kind, row("API key", key), row("Model", model), note,
     h("div", {style: "margin-top:12px"}, h("button", {class: "btn primary", onclick: save}, "Save")));
 }
 
@@ -605,6 +641,7 @@ function toggleDrawer(force) {
 async function loadTab() {
   const a = focusAgent(); if (!a || !S.drawer) return;
   const q = encodeURIComponent(a);
+  if (S.tab === "agent") S.cache.plugins = (await api("/api/plugins")).plugins;
   if (S.tab === "lessons") S.cache.lessons = await api("/api/lessons?agent=" + q);
   if (S.tab === "files") S.cache.files = await api("/api/files?agent=" + q);
   if (S.tab === "improve") S.cache.improve = await api("/api/improve");
@@ -615,7 +652,7 @@ function renderDrawer() {
   const a = agents().find((x) => x.name === focusAgent());
   const editing = d.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
   if (editing) return;
-  const data = {a, tab: S.tab, c: S.cache[S.tab], jobs: S.state.jobs, file: S.file, room: S.room, names: agents().map((x) => x.name), net: S.state.internet_enabled, prov: S.state.providers};
+  const data = {a, tab: S.tab, c: S.cache[S.tab], jobs: S.state.jobs, file: S.file, room: S.room, names: agents().map((x) => x.name), net: S.state.internet_enabled, prov: S.state.providers, pl: S.cache.plugins};
   if (!sigChanged("drawer", data)) return;
   const r = curRoom(), choices = (r && roomAgents(r).length ? roomAgents(r) : agents().map((x) => x.name));
   fill(d,
@@ -645,6 +682,8 @@ function tabBody(a) {
       h("h4", {}, "Internet"), h("div", {class: "seg", role: "group", "aria-label": "Internet access"}, NET_MODES.map(([m, label]) => h("button", {class: a.internet === m ? "on" : "", "aria-pressed": a.internet === m,
         onclick: () => act(() => api("/api/agent/internet", {agent: a.name, mode: m}), "Internet: " + label)}, label))),
       h("p", {class: "muted", style: "font-size:13px"}, NET_MODES.find((m) => m[0] === a.internet)[2] + (S.state.internet_enabled === false ? " (The workspace switch in Settings > Internet is OFF, so nothing goes online.)" : "")),
+      h("h4", {}, "Plugins"), S.cache.plugins && S.cache.plugins.length ? h("div", {style: "display:flex;gap:6px;flex-wrap:wrap"}, S.cache.plugins.map((p) => h("button", {class: "chip" + ((a.plugins || []).includes(p.id) ? " on" : ""), "aria-pressed": (a.plugins || []).includes(p.id),
+        onclick: () => act(() => api("/api/plugins/enable", {agent: a.name, id: p.id, on: !(a.plugins || []).includes(p.id)}), p.name + ((a.plugins || []).includes(p.id) ? ": off" : ": on"))}, p.name))) : h("p", {class: "muted", style: "font-size:13px"}, "No plugins installed. Add some in Settings > Plugins."),
       h("h4", {}, "Secrets"), a.secrets.length ? a.secrets.map((n) => h("div", {class: "card", style: "display:flex;align-items:center;gap:8px"}, h("code", {style: "flex:1"}, n), h("small", {}, "value hidden"),
         h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + n + "?", "The agent will no longer be able to use it.", "Remove", () => act(() => api("/api/secret/delete", {agent: a.name, name: n}), "Removed"))}, "Remove"))) : h("p", {class: "muted"}, "None."),
       secretForm(a),
@@ -755,8 +794,8 @@ async function improvePanel() {
   content.append(h("div", {style: "display:flex;justify-content:flex-end;margin-top:8px"}, h("button", {class: "btn primary", onclick: save}, "Save settings")));
   return content;
 }
-const SETTINGS_TABS = [["general", "General"], ["models", "Models"], ["internet", "Internet"], ["search", "Search"], ["improve", "Improve"], ["backup", "Backup"]];
-const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel(), models: () => modelsPanel(), internet: () => internetPanel()};
+const SETTINGS_TABS = [["general", "General"], ["models", "Models"], ["internet", "Internet"], ["plugins", "Plugins"], ["search", "Search"], ["improve", "Improve"], ["backup", "Backup"]];
+const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel(), models: () => modelsPanel(), internet: () => internetPanel(), plugins: () => pluginsPanel()};
 async function settingsDialog(tab) {
   if (typeof tab !== "string") tab = S.settingsTab || "general";
   S.settingsOpen = true;

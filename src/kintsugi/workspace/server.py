@@ -203,7 +203,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 latest = {row["room"]: {"last_id": row["last_id"], "last_other": row["last_other"] or 0} for row in ws.db.query(
                     "SELECT room, MAX(id) AS last_id, MAX(CASE WHEN sender != 'you' THEN id END) AS last_other FROM messages GROUP BY room")}
                 return {"agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools", "model", "provider", "internet", "playbook")},
-                                    "secrets": ws.keychain.names(a["name"]), "apps": _apps(ws, a["name"])}
+                                    "secrets": ws.keychain.names(a["name"]), "apps": _apps(ws, a["name"]), "plugins": ws.plugins.enabled_for(a["name"])}
                                    for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in ws.list_rooms()],
                         "approvals": ws.approvals(), "jobs": ws.list_jobs(), "busy": ws.busy(),
@@ -245,6 +245,12 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return ws.providers()
             if path == "/api/internet":
                 return ws.internet_settings()
+            if path == "/api/plugins":
+                from .plugin_examples import EXAMPLES
+
+                return {"plugins": ws.plugins.listing(), "examples": EXAMPLES}
+            if path == "/api/parallel":
+                return {"limit": ws.parallel_limit(), "max": ws.MAX_PARALLEL, "busy": ws.busy()}
             if path == "/api/tone":
                 from .core import TONE_LABELS, TONES
 
@@ -360,6 +366,27 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/search/remove":
                 ws.remove_search_key()
                 return {"ok": True}
+            if path.startswith("/api/plugins/"):
+                from .plugins import PluginError
+
+                try:
+                    action = path.rsplit("/", 1)[1]
+                    source = {k: body[k] for k in ("github", "manifest") if k in body}
+                    if action == "preview":
+                        return ws.plugins.preview(source)
+                    if action == "install":
+                        agents_on = [a["name"] for a in ws.list_agents()] if body.get("enable_for") == "all" else [str(a) for a in body.get("enable_for") or []]
+                        return ws.plugins.install(source, str(body.get("fingerprint", "")), agents_on)
+                    if action == "uninstall":
+                        ws.plugins.uninstall(str(body["id"]))
+                        return {"ok": True}
+                    if action == "enable":
+                        ws.plugins.set_enabled(str(body["agent"]), str(body["id"]), bool(body.get("on")))
+                        return {"ok": True}
+                except PluginError as err:
+                    raise WorkspaceError(str(err)) from None
+            if path == "/api/parallel":
+                return {"limit": ws.set_parallel(int(body["limit"])), "max": ws.MAX_PARALLEL}
             if path == "/api/internet":
                 return ws.set_internet(body.get("enabled"), body.get("fetch_cap"))
             if path == "/api/agent/internet":
