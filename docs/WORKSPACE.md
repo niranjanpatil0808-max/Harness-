@@ -89,7 +89,7 @@ The full list, with what is tested and what is not, is in [SECURITY.md](../SECUR
 - A **daily cap** on model calls (`KINTSUGI_DAILY_CALLS`, default 500) protects your API quota.
 - Your conversation text goes to your model provider; everything else stays on the server. You can download or delete
   your data from Details > Safety.
-- Not a hardened container, no user accounts, no built-in TLS, keychain not encrypted by default. Read SECURITY.md.
+- Not a hardened container, teammate logins but no single sign-on, no built-in TLS, keychain not encrypted by default. Read SECURITY.md.
 
 ## HTTP API (all calls need header `X-Token`)
 

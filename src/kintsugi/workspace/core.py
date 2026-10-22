@@ -97,6 +97,7 @@ class Workspace:
         self._improver = None
         self._pusher = None
         self._backups = None
+        self.activity: dict[str, float] = {}  # per person: when the app last talked to the server
         self.last_active = 0.0  # when the app last talked to the server (a person is probably looking at it)
         self.study_model_factory: Callable[[str | None], Model] | None = None  # tests/embedding; default uses the real API
         self._agent_locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
@@ -131,6 +132,8 @@ class Workspace:
             raise WorkspaceError(f"at most {MAX_AGENTS} agents")
         if not NAME_RE.match(name) or name == "system":
             raise WorkspaceError("names are lowercase letters, digits, '-' and '_', start with a letter, and cannot be 'system'")
+        if self.team.is_person(name):
+            raise WorkspaceError("that name belongs to a person in this workspace")
         if name in ("all", "everyone"):
             raise WorkspaceError("'all' and 'everyone' are reserved: @all wakes every agent in a room")
         if tier not in perms.TIERS:
@@ -380,18 +383,31 @@ class Workspace:
             self._pusher = Push(self)
         return self._pusher
 
-    def touch(self) -> None:
+    def touch(self, user: str = "you") -> None:
         self.last_active = time.time()
+        self.activity[user] = self.last_active
 
-    def notify_if_away(self, reason: str) -> None:
-        """Wake the owner's phone (text-free) when something needs them and they are not using the app right now."""
-        if time.time() - self.last_active < 90:
+    def notify_if_away(self, reason: str, users: list[str] | None = None) -> None:
+        """Wake phones (text-free) of the people something needs, when they are not using the app right now."""
+        now = time.time()
+        if users is None:
+            users = [u["user"] for u in self.db.query("SELECT DISTINCT user FROM push_subs")]
+        away = [u for u in users if now - self.activity.get(u, 0.0) >= 90]
+        if not away:
             return
         try:
             if self.pusher.count():
-                threading.Thread(target=self.pusher.notify, args=(reason,), daemon=True).start()
+                threading.Thread(target=self.pusher.notify, args=(reason, False, away), daemon=True).start()
         except Exception as err:  # a notification problem must never break messaging
             self.audit(None, "push-error", f"{type(err).__name__}: {str(err)[:150]}")
+
+    @property
+    def team(self):
+        from .team import Team
+
+        if getattr(self, "_team", None) is None:
+            self._team = Team(self)
+        return self._team
 
     @property
     def plugins(self):
@@ -641,6 +657,10 @@ class Workspace:
             raise WorkspaceError(f"bad member name: {member!r}")
         self.db.execute("INSERT OR IGNORE INTO members (room, member) VALUES (?, ?)", (room, member))
 
+    def remove_member(self, room: str, member: str) -> None:
+        self._require_room(room)
+        self.db.execute("DELETE FROM members WHERE room = ? AND member = ?", (room, member))
+
     def members(self, room: str) -> list[str]:
         return [r["member"] for r in self.db.query("SELECT member FROM members WHERE room = ? ORDER BY member", (room,))]
 
@@ -679,7 +699,7 @@ class Workspace:
         message_id = self.db.execute("INSERT INTO messages (room, sender, text, ts, hops) VALUES (?, ?, ?, ?, ?)",
                                      (room, sender, text, self.clock(), hops))
         if is_agent:
-            self.notify_if_away("message")
+            self.notify_if_away("message", [m for m in self.members(room) if self.team.is_person(m)])
         for agent in self._targets(room, kind, sender, text):
             if hops >= MAX_HOPS:
                 self.audit(agent, "loop-guard", f"{room}: not waking {agent} after {hops} hops")
@@ -774,10 +794,23 @@ class Workspace:
 
     # --- approvals -------------------------------------------------------
 
-    def request_approval(self, agent: str, room: str, tool: str, args: dict) -> int:
-        self.notify_if_away("approval")
-        return self.db.execute("INSERT INTO approvals (agent, room, tool, args, ts) VALUES (?, ?, ?, ?, ?)",
-                               (agent, room, tool, json.dumps(args), self.clock()))
+    def requester_of(self, situation: str) -> str | None:
+        """The person whose message started this run (None when an agent, a schedule or the system did)."""
+        try:
+            sender = self.db.one("SELECT sender FROM messages WHERE id = ?", (int(str(situation).rsplit("#", 1)[1]),))["sender"]
+        except (IndexError, ValueError, TypeError):
+            return None
+        if sender.startswith("cron-"):  # a scheduled run is attributed to whoever set the schedule up
+            job = self.db.one("SELECT owner FROM jobs WHERE id = ?", (int(sender[5:] or 0),)) if sender[5:].isdigit() else None
+            sender = job["owner"] if job else sender
+        return sender if self.team.is_person(sender) else None
+
+    def request_approval(self, agent: str, room: str, tool: str, args: dict, by: str | None = None) -> int:
+        approval_id = self.db.execute("INSERT INTO approvals (agent, room, tool, args, ts, requested_by) VALUES (?, ?, ?, ?, ?, ?)",
+                                      (agent, room, tool, json.dumps(args), self.clock(), by))
+        deciders = ["you"] + [u["name"] for u in self.team.users() if u["role"] == "admin"]
+        self.notify_if_away("approval", deciders + ([by] if by and self.team.policy() == "requester" and by not in deciders else []))
+        return approval_id
 
     def approvals(self, status: str | None = "pending") -> list[dict]:
         if status is None:

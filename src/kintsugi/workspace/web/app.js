@@ -83,7 +83,9 @@ const rooms = () => (S.state ? S.state.rooms : []);
 const agents = () => (S.state ? S.state.agents : []);
 const isAgent = (n) => agents().some((a) => a.name === n);
 const curRoom = () => rooms().find((r) => r.name === S.room);
-const roomLabel = (r) => (r.kind === "dm" ? r.members.filter((m) => m !== "you")[0] || r.name : r.name);
+function me() { return (S.state && S.state.me) || {name: "you", role: "owner"}; }
+const isAdmin = () => ["admin", "owner"].includes(me().role), isOwner = () => me().role === "owner";
+const roomLabel = (r) => (r.kind === "dm" ? r.members.filter((m) => m !== me().name)[0] || r.name : r.name);
 const roomAgents = (r) => (r ? r.members.filter(isAgent) : []);
 const busyIn = (r) => (r && S.state ? S.state.busy.filter((n) => r.members.includes(n)) : []);
 const pendingFor = (room) => (S.state ? S.state.approvals.filter((a) => a.room === room) : []);
@@ -114,12 +116,12 @@ function renderSidebar() {
       h("h4", {}, "Agents"),
       st.agents.map((a) => h("button", {class: "item", title: a.persona || a.name, onclick: () => dmWith(a.name)},
         avatar(a.name), h("span", {class: "t"}, a.name), st.busy.includes(a.name) ? h("span", {class: "dot"}) : h("span", {class: "muted", style: "font-size:12px"}, a.tier))),
-      h("button", {class: "item muted", onclick: newAgentDialog}, h("span", {style: "width:24px;text-align:center"}, "+"), "New agent"),
+      isAdmin() ? h("button", {class: "item muted", onclick: newAgentDialog}, h("span", {style: "width:24px;text-align:center"}, "+"), "New agent") : null,
       h("button", {class: "item muted", onclick: () => automationsDialog()}, h("span", {style: "width:24px;text-align:center"}, "⏰"), "Automations", jobBadge()),
       canInstall() ? h("button", {class: "item muted", onclick: installApp}, h("span", {style: "width:24px;text-align:center"}, "⤓"), "Install the app") : null),
-    h("div", {class: "side-foot"}, avatar("you"), h("span", {class: "who"}, "you"),
+    h("div", {class: "side-foot"}, avatar(me().name), h("span", {class: "who"}, me().name, me().role !== "owner" ? h("small", {class: "muted", style: "margin-left:6px"}, me().role) : null),
       h("button", {class: "icon-btn", "aria-label": "Change theme", title: "Theme", onclick: cycleTheme}, icon("theme")),
-      h("button", {class: "icon-btn", "aria-label": "Settings", title: "Settings: self-improvement", onclick: settingsDialog}, icon("gear"))));
+      h("button", {class: "icon-btn", "aria-label": "Settings", title: "Settings", onclick: settingsDialog}, icon("gear"))));
 }
 /* what you have already seen in each room, kept on this device */
 const seen = () => { try { return JSON.parse(store.get("kt-seen") || "{}"); } catch (e) { return {}; } };
@@ -176,7 +178,7 @@ function renderTopbar(force) {
     n ? h("button", {class: "pill-btn warn", onclick: () => { const a = st.approvals[0]; if (a.room !== S.room) openRoom(a.room); else $("#scroll").scrollTop = $("#scroll").scrollHeight; }}, n + " waiting for approval") : null,
     imp.running ? h("button", {class: "pill-btn", onclick: settingsDialog, title: imp.progress || ""}, SPARK(), "Studying…") : null,
     imp.pending ? h("button", {class: "pill-btn", onclick: settingsDialog}, imp.pending + " improvement" + (imp.pending > 1 ? "s" : "") + " to review") : null,
-    h("button", {class: "pill-btn", "aria-pressed": S.drawer, onclick: () => toggleDrawer()}, icon("panel", 16), "Details"));
+    isAdmin() ? h("button", {class: "pill-btn", "aria-pressed": S.drawer, onclick: () => toggleDrawer()}, icon("panel", 16), "Details") : null);
 }
 
 /* ---------- thread ---------- */
@@ -194,7 +196,7 @@ function bodyOf(m) {
     const job = S.state && S.state.jobs.find((j) => "cron-" + j.id === m.sender), body = m.text.replace(/^@\S+\s*/, "");
     return h("div", {class: "sys cron"}, "⏰ " + (job && job.title ? job.title : "Scheduled: " + body.slice(0, 90)));
   }
-  if (m.sender === "you") return h("div", {class: "row me", title: clock(m.ts)}, h("div", {class: "bubble"}, m.text));
+  if (m.sender === me().name) return h("div", {class: "row me", title: clock(m.ts)}, h("div", {class: "bubble"}, m.text));
   const agent = isAgent(m.sender);
   return h("div", {class: "row"}, avatar(m.sender, true),
     h("div", {class: "body-wrap", style: "flex:1;min-width:0"},
@@ -217,7 +219,7 @@ function renderThread(msgs) {
   if (S.threadRoom !== S.room) { th.replaceChildren(); S.threadRoom = S.room; }
   const wasNear = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 90 || S.stick;
   if (msgs.length) th.querySelector(".hello")?.remove();
-  msgs.forEach((m) => { th.append(bodyOf(m)); if (m.sender === "you") (S.talked = S.talked || {})[S.room] = true; });
+  msgs.forEach((m) => { th.append(bodyOf(m)); if (m.sender === me().name) (S.talked = S.talked || {})[S.room] = true; });
   const only = th.children.length === 1 && th.firstChild.classList.contains("hello");
   if (!th.children.length || (only && sigChanged("hello", [S.room, agents().map((a) => a.name)]))) th.replaceChildren(emptyState());
   if (msgs.length) { if (wasNear) { sc.scrollTop = sc.scrollHeight; $("#jump").hidden = true; } else $("#jump").hidden = false; }
@@ -241,7 +243,9 @@ function renderInline() {
       return h("div", {class: "perm"}, h("h5", {}, a.agent + " wants to use " + a.tool),
         h("div", {class: "meta"}, sandboxLine(a.tool)),
         h("pre", {}, code.length > 20000 ? code.slice(0, 20000) + "\n…(truncated)" : code),
-        h("div", {class: "actions"}, h("button", {class: "btn primary", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: true})); }}, "Allow once"),
+        a.requested_by && a.requested_by !== me().name ? h("div", {class: "meta"}, "Asked by " + a.requested_by) : null,
+        a.can_decide === false ? h("div", {class: "meta"}, "Waiting for " + (S.state.approval_policy === "admins" ? "an admin" : "someone allowed") + " to decide.")
+        : h("div", {class: "actions"}, h("button", {class: "btn primary", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: true})); }}, "Allow once"),
           h("button", {class: "btn danger", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: false})); }}, "Deny")));
     }),
     busy.length ? h("div", {class: "working", "aria-live": "polite"}, SPARK(), busy.join(", ") + (busy.length > 1 ? " are" : " is") + " working…") : null);
@@ -432,9 +436,9 @@ function newAutomationDialog(kind, onDone) {
     } catch (e) { toast(e.message, true); } }}, kind === "report" ? "Start" : "Create")]);
 }
 async function state_agent_room(agent) {
-  const r = rooms().find((x) => x.kind === "dm" && x.members.includes(agent) && x.members.includes("you")) || rooms().find((x) => x.members.includes(agent));
+  const r = rooms().find((x) => x.kind === "dm" && x.members.includes(agent) && x.members.includes(me().name)) || rooms().find((x) => x.members.includes(agent));
   if (r) return r.name;
-  return (await api("/api/dm", {a: "you", b: agent})).room;
+  return (await api("/api/dm", {a: me().name, b: agent})).room;
 }
 
 /* ---------- notifications (Web Push; the notification itself carries no text) ---------- */
@@ -505,7 +509,38 @@ async function generalPanel() {
     h("h4", {style: "margin:18px 0 4px"}, "Appearance"), row("Theme", theme),
     h("h4", {style: "margin:18px 0 4px"}, "This app"),
     canInstall() ? h("button", {class: "btn", onclick: installApp}, "Install on this device") : h("p", {class: "muted", style: "margin:4px 0"}, IS_STANDALONE() ? "You are using the installed app." : "To install: use your browser's menu and choose “Install app” or “Add to Home screen”."),
-    h("div", {style: "margin-top:12px"}, h("button", {class: "btn", onclick: () => { speak("Hello! This is how I sound."); }}, "Test voice")));
+    h("div", {style: "margin-top:12px"}, h("button", {class: "btn", onclick: () => { speak("Hello! This is how I sound."); }}, "Test voice")),
+    h("h4", {style: "margin:18px 0 4px"}, "Your account"), h("p", {style: "margin:4px 0"}, "Signed in as ", h("strong", {}, me().name), " (" + me().role + ")."),
+    h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, !isOwner() ? h("button", {class: "btn", onclick: () => confirmDialog("Make a new sign-in token?", "Your old token stops working at once, including on your other devices. This device switches to the new one.", "Make a new token", async () => { try { const r = await api("/api/me/token", {}); S.token = r.token; store.set("kt-token", S.token); try { sessionStorage.setItem("kt", S.token); } catch (e) { /* ok */ } toast("New token saved on this device"); } catch (e) { toast(e.message, true); } })}, "Make a new sign-in token") : null,
+      h("button", {class: "btn", onclick: () => confirmDialog("Sign out on this device?", isOwner() ? "You will need the access token to come back." : "You will need a new invite (or your token) to come back.", "Sign out", () => { store.set("kt-token", ""); try { sessionStorage.removeItem("kt"); } catch (e) { /* ok */ } location.reload(); })}, "Sign out on this device")));
+}
+
+/* ---------- team: people, invites, roles ---------- */
+const POLICY_LABELS = {admins: "Only admins can approve risky actions", requester: "The person who asked can also approve their own", everyone: "Anyone in the room can approve"};
+function inviteLinkDialog(made) {
+  const link = location.origin + "/#invite=" + made.code;
+  const box = h("input", {type: "text", readonly: true, value: link, "aria-label": "Invite link", onclick: (e) => e.target.select()});
+  dialog("Invite link ready", "Send it privately to one person. It works once, for " + Math.round((made.expires - Date.now() / 1000) / 86400) + " days, and joins them as " + made.role + (made.rooms.length ? " in: " + made.rooms.join(", ") : "") + ". Anyone who has the link can join, so do not post it publicly.",
+    h("div", {}, box), (close) => [h("button", {class: "btn", onclick: async () => { try { await navigator.clipboard.writeText(link); toast("Copied"); } catch (e) { box.select(); toast("Press copy on your keyboard"); } }}, "Copy link"), h("button", {class: "btn primary", onclick: close}, "Done")]);
+}
+async function teamPanel() {
+  const d = await api("/api/team"), refresh = async () => fill($("#settings-body"), await teamPanel());
+  const rows = [h("div", {class: "card", style: "display:flex;gap:8px;align-items:center"}, h("strong", {style: "flex:1"}, "you"), h("span", {class: "muted"}, "owner"))].concat(d.users.map((u) => h("div", {class: "card", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"},
+    h("strong", {style: "flex:1"}, u.name), isOwner() ? h("select", {"aria-label": "Role of " + u.name, onchange: async (e) => { await act(() => api("/api/team/role", {name: u.name, role: e.target.value}), u.name + " is now " + e.target.value); await refresh(); }}, ["member", "admin"].map((r) => h("option", {value: r, selected: u.role === r}, r))) : h("span", {class: "muted"}, u.role),
+    h("span", {class: "muted", style: "font-size:12px"}, u.last_seen ? "seen " + new Date(u.last_seen * 1000).toLocaleDateString() : "not yet"),
+    (isOwner() || u.role === "member") ? h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + u.name + "?", "Their sign-in stops working at once. Their messages stay in the rooms.", "Remove", async () => { await act(() => api("/api/team/remove", {name: u.name}), u.name + " removed"); await refresh(); })}, "Remove") : null)));
+  const role = h("select", {"aria-label": "Invite as"}, [["member", "Member"]].concat(isOwner() ? [["admin", "Admin"]] : []).map(([v, l]) => h("option", {value: v}, l)));
+  const rooms = d.rooms.map((r) => h("label", {style: "display:flex;gap:8px;align-items:center;font-weight:400"}, h("input", {type: "checkbox", value: r, checked: r === "team", style: "width:auto", "aria-label": "Add to " + r}), r));
+  const policy = h("select", {"aria-label": "Who can approve", onchange: (e) => act(() => api("/api/team/policy", {policy: e.target.value}), "Saved")}, Object.entries(POLICY_LABELS).map(([k, l]) => h("option", {value: k, selected: d.policy === k}, l)));
+  policy.disabled = !isOwner();
+  const open = d.invites.filter((i) => i.status === "open");
+  return h("div", {}, h("p", {style: "margin-top:0"}, "Give each person their own login. Members chat in the rooms they belong to and in private chats with agents; admins also manage agents, rooms and people. Only the owner manages API keys, plugins, backups and the internet switch."),
+    h("h4", {style: "margin:12px 0 6px"}, "People"), rows,
+    h("h4", {style: "margin:18px 0 6px"}, "Invite someone"), h("div", {style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"}, h("label", {style: "margin:0"}, "As"), role), d.rooms.length ? [h("div", {class: "muted", style: "font-size:13px;margin:8px 0 2px"}, "Add them to these rooms"), rooms] : null,
+    h("button", {class: "btn primary", style: "margin-top:8px", onclick: async () => { try { const made = await api("/api/team/invite", {role: role.value, rooms: [...document.querySelectorAll("#settings-body input[type=checkbox]:checked")].map((b) => b.value)}); inviteLinkDialog(made); await refresh(); } catch (e) { toast(e.message, true); } }}, "Create invite link"),
+    open.length ? [h("h4", {style: "margin:14px 0 6px"}, "Open invites"), open.map((i) => h("div", {class: "card", style: "display:flex;gap:8px;align-items:center"}, h("span", {style: "flex:1"}, i.role + " · by " + i.created_by + " · expires " + new Date(i.expires * 1000).toLocaleDateString()), h("button", {class: "btn", onclick: async () => { await act(() => api("/api/team/revoke-invite", {id: i.id}), "Invite revoked"); await refresh(); }}, "Revoke")))] : null,
+    h("h4", {style: "margin:18px 0 6px"}, "Who can approve risky actions"), policy,
+    h("p", {class: "muted", style: "font-size:13px;margin-top:14px"}, "Honest limits: the owner can read every room, including other people's private chats with agents (it is their server). Agents keep one shared memory and files per agent, so what someone tells an agent can come up when a teammate talks to it. Use HTTPS, and share invite links privately."));
 }
 
 /* ---------- settings: web search ---------- */
@@ -630,7 +665,7 @@ function openRoom(name) {
   poll(true);
 }
 async function dmWith(agent) {
-  try { const r = await api("/api/dm", {a: "you", b: agent}); S.agent = agent; await poll(true); openRoom(r.room); } catch (e) { toast(e.message, true); }
+  try { const r = await api("/api/dm", {a: me().name, b: agent}); S.agent = agent; await poll(true); openRoom(r.room); } catch (e) { toast(e.message, true); }
 }
 
 /* ---------- drawer ---------- */
@@ -795,15 +830,17 @@ async function improvePanel() {
   content.append(h("div", {style: "display:flex;justify-content:flex-end;margin-top:8px"}, h("button", {class: "btn primary", onclick: save}, "Save settings")));
   return content;
 }
-const SETTINGS_TABS = [["general", "General"], ["models", "Models"], ["internet", "Internet"], ["plugins", "Plugins"], ["search", "Search"], ["improve", "Improve"], ["backup", "Backup"]];
-const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel(), models: () => modelsPanel(), internet: () => internetPanel(), plugins: () => pluginsPanel()};
+const SETTINGS_TAB_LIST = [["general", "General", "member"], ["team", "Team", "admin"], ["models", "Models", "owner"], ["internet", "Internet", "owner"], ["plugins", "Plugins", "owner"], ["search", "Search", "owner"], ["improve", "Improve", "admin"], ["backup", "Backup", "owner"]];
+const RANKS = {member: 0, admin: 1, owner: 2};
+const settingsTabs = () => SETTINGS_TAB_LIST.filter((t) => RANKS[me().role] >= RANKS[t[2]]).map((t) => [t[0], t[1]]);
+const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel(), team: () => teamPanel(), models: () => modelsPanel(), internet: () => internetPanel(), plugins: () => pluginsPanel()};
 async function settingsDialog(tab) {
   if (typeof tab !== "string") tab = S.settingsTab || "general";
   S.settingsOpen = true;
   const body = h("div", {id: "settings-body"}), bar = h("div", {class: "tabs", role: "tablist", style: "padding:0;margin:0 0 12px"});
   const show = async (key) => {
     S.settingsTab = key;
-    fill(bar, SETTINGS_TABS.map(([k, label]) => h("button", {class: "tab" + (k === key ? " on" : ""), role: "tab", "aria-selected": k === key, onclick: () => show(k)}, label)));
+    fill(bar, settingsTabs().map(([k, label]) => h("button", {class: "tab" + (k === key ? " on" : ""), role: "tab", "aria-selected": k === key, onclick: () => show(k)}, label)));
     fill(body, h("p", {class: "muted"}, "Loading…"));
     try { fill(body, await SETTINGS_PANELS[key]()); } catch (e) { fill(body, h("p", {class: "muted"}, e.message)); }
     if (key === "improve") renderImproveSections(S.improve);
@@ -851,7 +888,7 @@ function newChatDialog() {
   const list = agents().map((a) => h("button", {class: "item", onclick: () => { close(); dmWith(a.name); }}, avatar(a.name), h("span", {class: "t"}, a.name), h("small", {class: "muted"}, a.persona.slice(0, 40))));
   const close = dialog("New chat", "Message one agent directly, or start a group room.", h("div", {},
     list.length ? list : h("p", {class: "muted"}, "No agents yet."),
-    h("div", {style: "display:flex;gap:8px;margin-top:10px"}, h("button", {class: "btn", onclick: () => { close(); newRoomDialog(); }}, "New group room"), h("button", {class: "btn", onclick: () => { close(); newAgentDialog(); }}, "New agent"))),
+    h("div", {style: "display:flex;gap:8px;margin-top:10px"}, isAdmin() ? h("button", {class: "btn", onclick: () => { close(); newRoomDialog(); }}, "New group room") : null, h("button", {class: "btn", onclick: () => { close(); newAgentDialog(); }}, "New agent"))),
     (c) => [h("button", {class: "btn", onclick: c}, "Close")]);
 }
 function newAgentDialog() {
@@ -865,10 +902,11 @@ function newAgentDialog() {
 }
 function newRoomDialog() {
   const name = h("input", {type: "text", placeholder: "project-x", "aria-label": "Room name", autocapitalize: "none"});
-  const boxes = agents().map((a) => h("label", {style: "display:flex;gap:8px;align-items:center;font-weight:400"}, h("input", {type: "checkbox", value: a.name, style: "width:auto"}), a.name));
-  dialog("New group room", "Agents answer when you @mention them. Agents can also mention each other, up to 4 replies in a row.", h("div", {}, h("label", {}, "Name"), name, h("label", {}, "Agents"), boxes),
+  const box = (n) => h("label", {style: "display:flex;gap:8px;align-items:center;font-weight:400"}, h("input", {type: "checkbox", value: n, style: "width:auto"}), n);
+  const boxes = agents().map((a) => box(a.name)), people = ((S.state && S.state.people) || []).map(box);
+  dialog("New group room", "Agents answer when you @mention them (or use @all). Agents can also mention each other, up to 4 replies in a row.", h("div", {}, h("label", {}, "Name"), name, h("label", {}, "Agents"), boxes, people.length ? [h("label", {}, "People"), people] : null),
     (close) => [h("button", {class: "btn", onclick: close}, "Cancel"), h("button", {class: "btn primary", onclick: async () => {
-      const members = ["you", ...[...document.querySelectorAll("#dialog-root input[type=checkbox]:checked")].map((b) => b.value)];
+      const members = [...document.querySelectorAll("#dialog-root input[type=checkbox]:checked")].map((b) => b.value);  // the server adds you
       const ok = await act(() => api("/api/rooms", {name: name.value.trim(), members}), "Room created");
       if (ok) { close(); openRoom(name.value.trim()); } }}, "Create")]);
 }
@@ -936,9 +974,27 @@ function setupMobile() {
     tracking = "";
   }, {passive: true});
 }
+function joinDialog(code) {
+  const name = h("input", {type: "text", placeholder: "your name, e.g. sam", "aria-label": "Your name", autocapitalize: "none", autocomplete: "off"});
+  const note = h("p", {class: "muted", style: "min-height:20px;margin:6px 0 0"});
+  const go = async (close) => {
+    note.textContent = "Joining…";
+    try {
+      const r = await fetch("/api/join", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({code, name: name.value})});
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { note.textContent = d.error || "That did not work."; return; }
+      S.token = d.token; store.set("kt-token", d.token); try { sessionStorage.setItem("kt", d.token); } catch (e) { /* ok */ }
+      close(); toast("Welcome, " + d.name + "!"); poll(true);
+    } catch (e) { note.textContent = "Could not reach the server."; }
+  };
+  dialog("You are invited", "Choose the name your teammates will see. Lowercase letters, digits, - and _. This browser will stay signed in as you.", h("div", {}, h("label", {}, "Name"), name, note),
+    (close) => [h("button", {class: "btn primary", onclick: () => go(close)}, "Join")]);
+}
 function init() {
   applyTheme();
   setupMobile();
+  const inv = location.hash.match(/invite=([^&]+)/);
+  if (inv) { S.invite = decodeURIComponent(inv[1]); history.replaceState(null, "", location.pathname); }
   if (new URLSearchParams(location.search).get("action") === "new") { S.wantNew = true; history.replaceState(null, "", location.pathname + location.hash); }
   const m = location.hash.match(/token=([^&]+)/);
   if (m) { S.token = decodeURIComponent(m[1]); store.set("kt-token", S.token); history.replaceState(null, "", location.pathname); }
@@ -950,6 +1006,7 @@ function init() {
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#dialog-root .dialog")) { if (S.drawer) toggleDrawer(false); closeSidebarMobile(); } });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { syncUnread(); poll(true); } });
   buildComposer(); syncVoiceButtons(); $("#sidebar").replaceChildren(h("div", {class: "brand"}, h("img", {src: "/static/logo.svg", alt: ""}), "Kintsugi"));
+  if (S.invite) { S.token = ""; joinDialog(S.invite); return; }  // an invite link: choose a name first
   poll(true);
 }
 init();

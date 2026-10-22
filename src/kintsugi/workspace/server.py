@@ -24,6 +24,8 @@ from .keychain import _write_private
 from .sandbox import PathError, safe_path
 from . import core as core_mod
 from .scheduler import Scheduler
+from .team import Identity, TeamError, required_role
+from .team import Identity, TeamError, required_role
 
 MAX_BODY = 64_000
 WEB = Path(__file__).parent / "web"
@@ -34,6 +36,10 @@ MAX_FAILURES, FAILURE_WINDOW = 10, 60  # wrong tokens per client per minute befo
 MIN_PUBLIC_TOKEN = 24
 APP_CSP = ("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; "
            "style-src 'unsafe-inline'; img-src data:")
+
+
+class Forbidden(Exception):
+    """The caller is who they say they are but is not allowed to do this (HTTP 403)."""
 
 
 def web_version() -> str:
@@ -126,9 +132,11 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 if len(recent) >= MAX_FAILURES:
                     return False
             given = self.headers.get("X-Token") or ""
-            if hmac.compare_digest(given.encode(), token.encode()):
+            who = ws.team.identify(given, token)
+            if who is not None:
+                self.who = who
                 if self.headers.get("X-Visible", "1") == "1":  # a hidden tab does not count as "looking at it"
-                    ws.touch()
+                    ws.touch(who.name)
                 return True
             with failure_lock:
                 failures.setdefault(client, []).append(now)
@@ -176,19 +184,57 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return self._static(url.path[len("/static/"):])
             if not self._authorized():
                 return self._json(401, {"error": "missing or wrong access token"})
-            self._guard(lambda: self._json(200, self._get(url.path, query)))
+            self._guard(lambda: self._json(200, self._get(url.path, query)), url.path)
 
         def do_POST(self):
             url = urlparse(self.path)
+            if url.path == "/api/join":  # the one call that needs no token: an invite code turns into a person
+                return self._guard(lambda: self._json(200, self._join(self._body())))
             if not self._authorized():
                 return self._json(401, {"error": "missing or wrong access token"})
-            self._guard(lambda: self._json(200, self._post(url.path, self._body())))
+            self._guard(lambda: self._json(200, self._post(url.path, self._body())), url.path)
 
-        def _guard(self, action) -> None:
-            """Turn every failure into a JSON error: 400 for bad requests, 500 (and an audit entry) for bugs."""
+        def _known_name(self, name: str) -> None:
+            if not (ws.get_agent(name, missing_ok=True) or ws.team.is_person(name)):
+                raise WorkspaceError(f"'{name}' is not an agent or a person in this workspace")
+
+        def _owns_job(self, job_id: int) -> None:
+            job = next((j for j in ws.list_jobs() if j["id"] == job_id), None)
+            if job is None:
+                raise WorkspaceError("no such job")
+            if not self.who.at_least("admin") and job["owner"] != self.who.name:
+                raise Forbidden("that schedule belongs to someone else")
+
+        def _may_use_room(self, room: str, agent: str) -> None:
+            if not ws.team.can_see_room(self.who, room):
+                raise Forbidden("you are not in that room")
+            if agent not in ws.members(room) and ws._require_room(room)["kind"] != "dm":
+                raise WorkspaceError(f"{agent} is not in that room")
+
+        def _join(self, body: dict) -> dict:
+            """Public endpoint: redeem an invite. Wrong codes count against the same per-client throttle as wrong tokens."""
+            client, now = self._client(), time.time()
+            with failure_lock:
+                recent = [t for t in failures.get(client, []) if now - t < FAILURE_WINDOW]
+                failures[client] = recent
+                if len(recent) >= MAX_FAILURES:
+                    raise Forbidden("too many tries; wait a minute")
             try:
+                return ws.team.join(str(body.get("code", "")), str(body.get("name", "")))
+            except TeamError:
+                with failure_lock:
+                    failures.setdefault(client, []).append(now)
+                raise
+
+        def _guard(self, action, path: str | None = None) -> None:
+            """Turn every failure into a JSON error: 403 when the role is not enough, 400 for bad requests, 500 (and an audit entry) for bugs."""
+            try:
+                if path is not None and not self.who.at_least(required_role(path)):
+                    raise Forbidden(f"your role ({self.who.role}) cannot do this")
                 action()
-            except (WorkspaceError, PathError, ValueError, KeyError, TypeError) as err:  # json errors are ValueErrors
+            except Forbidden as err:
+                self._json(403, {"error": str(err)})
+            except (TeamError, WorkspaceError, PathError, ValueError, KeyError, TypeError) as err:  # json errors are ValueErrors
                 message = f"missing field: {err}" if isinstance(err, KeyError) else str(err)
                 self._json(400, {"error": message})
             except (BrokenPipeError, ConnectionResetError):
@@ -200,23 +246,38 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
         def _get(self, path: str, query: dict):
             if path == "/api/state":
                 # newest message per room, and newest one written by someone other than the reader: that drives "unread"
+                who = self.who
                 latest = {row["room"]: {"last_id": row["last_id"], "last_other": row["last_other"] or 0} for row in ws.db.query(
-                    "SELECT room, MAX(id) AS last_id, MAX(CASE WHEN sender != 'you' THEN id END) AS last_other FROM messages GROUP BY room")}
-                return {"agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools", "model", "provider", "internet", "playbook")},
-                                    "secrets": ws.keychain.names(a["name"]), "apps": _apps(ws, a["name"]), "plugins": ws.plugins.enabled_for(a["name"])}
+                    "SELECT room, MAX(id) AS last_id, MAX(CASE WHEN sender != ? THEN id END) AS last_other FROM messages GROUP BY room", (who.name,))}
+                rooms = [r for r in ws.list_rooms() if ws.team.can_see_room(who, r["name"])]
+                seen = {r["name"] for r in rooms}
+                approvals = [{**a, "can_decide": ws.team.can_decide(who, a)} for a in ws.approvals() if a["room"] in seen or who.at_least("admin")]
+                approvals = [a for a in approvals if a["can_decide"] or a.get("requested_by") == who.name]
+                jobs = ws.list_jobs() if who.at_least("admin") else [j for j in ws.list_jobs() if j["room"] in seen]
+                return {"me": {"name": who.name, "role": who.role}, "approval_policy": ws.team.policy(),
+                        "people": [u["name"] for u in ws.team.users()] if who.at_least("admin") else [],
+                        "agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools", "model", "provider", "internet", "playbook")},
+                                    "secrets": ws.keychain.names(a["name"]) if who.at_least("admin") else [], "apps": _apps(ws, a["name"]), "plugins": ws.plugins.enabled_for(a["name"])}
                                    for a in ws.list_agents()],
-                        "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in ws.list_rooms()],
-                        "approvals": ws.approvals(), "jobs": ws.list_jobs(), "busy": ws.busy(),
+                        "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in rooms],
+                        "approvals": approvals, "jobs": jobs, "busy": ws.busy(),
                         "sandbox": sandbox.status(), "provider": ws.provider(), "search_configured": ws.search_settings()["configured"], "internet_enabled": ws.internet_settings()["enabled"],
-                        "providers": [{"id": p["id"], "label": p["label"], "model": p["model"], "default": p["default"]} for p in ws.providers()["profiles"]],
+                        "providers": [{"id": p["id"], "label": p["label"], "model": p["model"], "default": p["default"]} for p in ws.providers()["profiles"]] if who.at_least("admin") else [],
                         "model_ready": bool(ws.providers()["profiles"]) or ws.providers()["env_fallback"] or ws.model_factory is not core_mod.default_model_factory,
                         "improve": {k: v for k, v in ws.improver.status().items() if k != "last"},
                         "usage": {"calls": ws.calls_today(), "limit": ws.daily_calls}}
             if path == "/api/messages":
                 room = query["room"][0]
+                if not ws.team.can_see_room(self.who, room):
+                    raise Forbidden("you are not in that room")
                 return ws.history(room, after=int((query.get("after") or ["0"])[0]))
             if path == "/api/audit":
                 return ws.audit_log()
+            if path == "/api/me":
+                return {"name": self.who.name, "role": self.who.role}
+            if path == "/api/team":
+                return {"users": ws.team.users(), "invites": ws.team.invites(), "policy": ws.team.policy(),
+                        "rooms": [r["name"] for r in ws.list_rooms() if r["kind"] == "room"]}
             if path == "/api/files":
                 agent = query["agent"][0]
                 ws.get_agent(agent)
@@ -229,7 +290,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/automations":
                 from . import automations
 
-                return {"jobs": automations.listing(ws), "timezone": ws.get_timezone(), "search": ws.search_settings()["configured"],
+                mine = [j for j in automations.listing(ws) if self.who.at_least("admin") or j["owner"] == self.who.name]
+                return {"jobs": mine, "timezone": ws.get_timezone(), "search": ws.search_settings()["configured"],
                         "server_time": ws.local_datetime(ws.clock()).strftime("%Y-%m-%d %H:%M")}
             if path == "/api/timezone":
                 now = ws.local_datetime(ws.clock())
@@ -254,7 +316,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/tone":
                 from .core import TONE_LABELS, TONES
 
-                return {**ws.get_tone("you"), "labels": TONE_LABELS, "examples": TONES}
+                return {**ws.get_tone(self.who.name), "labels": TONE_LABELS, "examples": TONES}
             if path == "/api/improve":
                 imp = ws.improver
                 return {"settings": imp.settings(), "status": imp.status(), "studies": imp.studies(),
@@ -302,16 +364,57 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
         def _post(self, path: str, body: dict):
             if path == "/api/say":
                 room = str(body["room"])
-                sender = str(body.get("as") or "you")
+                if self.who.role == "owner":
+                    sender = str(body.get("as") or "you")
+                else:  # a person can only speak as themselves, and only in rooms they belong to
+                    if not ws.team.can_see_room(self.who, room):
+                        raise Forbidden("you are not in that room")
+                    sender = self.who.name
                 return {"id": ws.post(room, sender, str(body["text"]), human=True)}
             if path == "/api/agents":
                 ws.create_agent(str(body["name"]), str(body.get("persona", "")), str(body.get("tier", "auto")))
                 return {"ok": True}
             if path == "/api/rooms":
-                ws.create_room(str(body["name"]), [str(m) for m in body.get("members", [])])
+                members = [str(m) for m in body.get("members", [])]
+                for m in members + [self.who.name]:
+                    self._known_name(m)
+                ws.create_room(str(body["name"]), list(dict.fromkeys(members + [self.who.name])))
                 return {"ok": True}
+            if path == "/api/team/invite":
+                made = ws.team.create_invite(self.who, str(body.get("role", "member")), body.get("rooms"), float(body.get("days", 7)))
+                return made
+            if path == "/api/team/revoke-invite":
+                ws.team.revoke_invite(str(body["id"]))
+                return {"ok": True}
+            if path == "/api/team/remove":
+                ws.team.remove(self.who, str(body["name"]))
+                return {"ok": True}
+            if path == "/api/team/role":
+                ws.team.set_role(str(body["name"]), str(body["role"]))
+                return {"ok": True}
+            if path == "/api/team/policy":
+                return {"policy": ws.team.set_policy(str(body["policy"]))}
+            if path == "/api/me/token":
+                if self.who.role == "owner":
+                    raise WorkspaceError("the owner's token is changed by setting KINTSUGI_TOKEN, not here")
+                return {"token": ws.team.rotate_token(self.who.name)}
+            if path == "/api/room/members":
+                room = str(body["room"])
+                if ws._require_room(room)["kind"] != "room":
+                    raise WorkspaceError("people are added to shared rooms, not direct chats")
+                for m in body.get("add", []):
+                    self._known_name(str(m))
+                    ws.add_member(room, str(m))
+                for m in body.get("remove", []):
+                    if str(m) == "you":
+                        raise WorkspaceError("the owner stays in every room")
+                    ws.remove_member(room, str(m))
+                ws.audit(None, "room-members", f"{room} +{body.get('add', [])} -{body.get('remove', [])} by {self.who.name}")
+                return {"members": ws.members(room)}
             if path == "/api/dm":
-                return {"room": ws.open_dm(str(body["a"]), str(body["b"]))}
+                a = str(body["a"]) if self.who.role == "owner" else self.who.name  # a person opens only their own direct chats
+                self._known_name(str(body["b"]))
+                return {"room": ws.open_dm(a, str(body["b"]))}
             if path == "/api/persona":
                 ws.set_persona(str(body["agent"]), str(body["persona"]))
                 return {"ok": True}
@@ -337,21 +440,26 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 from . import automations
 
                 when = {"time": body.get("time"), "days": body.get("days", "daily")} if body.get("time") else None
-                return automations.create(ws, str(body["kind"]), str(body["agent"]), str(body["room"]), body, when)
+                self._may_use_room(str(body["room"]), str(body["agent"]))
+                return automations.create(ws, str(body["kind"]), str(body["agent"]), str(body["room"]), body, when, owner=self.who.name)
             if path == "/api/push/subscribe":
-                ws.pusher.subscribe(str(body["endpoint"]))
+                ws.pusher.subscribe(str(body["endpoint"]), self.who.name)
                 return {"devices": ws.pusher.count()}
             if path == "/api/push/unsubscribe":
                 ws.pusher.unsubscribe(str(body["endpoint"]))
                 return {"devices": ws.pusher.count()}
             if path == "/api/push/test":
-                return {"delivered": ws.pusher.notify("test", force=True)}
+                return {"delivered": ws.pusher.notify("test", force=True, users=[self.who.name])}
             if path == "/api/automations/toggle":
+                self._owns_job(int(body["id"]))
                 ws.set_job_enabled(int(body["id"]), bool(body["enabled"]))
                 return {"ok": True}
             if path == "/api/automations/run":
+                self._owns_job(int(body["id"]))
                 return {"message": ws.run_job_now(int(body["id"]))}
             if path == "/api/timezone":
+                if not self.who.at_least("admin"):
+                    raise Forbidden("only an admin can change the workspace time zone")
                 return ws.set_timezone(str(body.get("name", "")), int(body.get("offset_minutes", 0)))
             if path == "/api/search/settings":  # the key is write-only: it is never returned by any endpoint
                 return ws.set_search(str(body["provider"]), str(body.get("key") or "") or None, body.get("daily_cap"))
@@ -406,7 +514,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     raise WorkspaceError("a backup is already running")
                 return {"started": True}
             if path == "/api/tone":
-                return ws.set_tone("you", str(body["style"]), str(body.get("custom", "")))
+                return ws.set_tone(self.who.name, str(body["style"]), str(body.get("custom", "")))
             if path == "/api/improve/settings":
                 return ws.improver.update_settings(body)
             if path == "/api/improve/run":
@@ -437,10 +545,17 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 ws.set_tier(str(body["agent"]), str(body["tier"]))
                 return {"ok": True}
             if path == "/api/approve":
-                return {"output": ws.decide(int(body["id"]), bool(body["approve"]), by="web")}
+                row = ws.db.one("SELECT * FROM approvals WHERE id = ?", (int(body["id"]),))
+                if row is None:
+                    raise WorkspaceError("no such approval")
+                if not ws.team.can_decide(self.who, row):
+                    raise Forbidden("you are not allowed to decide this one (ask an admin, or see the approval policy in Settings > Team)")
+                return {"output": ws.decide(int(body["id"]), bool(body["approve"]), by=self.who.name)}
             if path == "/api/jobs":
-                return {"id": ws.add_job(str(body["agent"]), str(body["room"]), str(body["cron"]), str(body["prompt"]))}
+                self._may_use_room(str(body["room"]), str(body["agent"]))
+                return {"id": ws.add_job(str(body["agent"]), str(body["room"]), str(body["cron"]), str(body["prompt"]), owner=self.who.name)}
             if path == "/api/jobs/delete":
+                self._owns_job(int(body["id"]))
                 ws.remove_job(int(body["id"]))
                 return {"ok": True}
             raise WorkspaceError("unknown endpoint")

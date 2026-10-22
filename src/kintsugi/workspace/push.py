@@ -66,7 +66,7 @@ class Push:
     def __init__(self, ws: "Workspace") -> None:
         self.ws = ws
         self._lock = threading.Lock()
-        self._last_sent = 0.0
+        self._last_sent: dict[str, float] = {}
 
     # --- the workspace's own signing key ---------------------------------------
 
@@ -133,17 +133,21 @@ class Push:
         except (urllib.error.URLError, OSError, TimeoutError):
             return "failed"
 
-    def notify(self, reason: str, force: bool = False) -> int:
-        """Wake every subscribed device (at most once a minute unless `force`). Returns how many accepted it."""
+    def notify(self, reason: str, force: bool = False, users: list[str] | None = None) -> int:
+        """Wake subscribed devices (of `users`, or everyone), each person at most once a minute unless `force`. Returns how many accepted it."""
         if not available() or self.count() == 0:
             return 0
+        rows = [r for r in self.ws.db.query("SELECT endpoint, user FROM push_subs") if users is None or r["user"] in users]
         with self._lock:
             now = time.time()
-            if not force and now - self._last_sent < MIN_SECONDS_BETWEEN_PUSHES:
-                return 0
-            self._last_sent = now
+            due = {u for u in {r["user"] for r in rows} if force or now - self._last_sent.get(u, 0.0) >= MIN_SECONDS_BETWEEN_PUSHES}
+            for u in due:
+                self._last_sent[u] = now
+        rows = [r for r in rows if r["user"] in due]
+        if not rows:
+            return 0
         delivered = 0
-        for row in self.ws.db.query("SELECT endpoint FROM push_subs"):
+        for row in rows:
             result = self.send_one(row["endpoint"])
             if result == "gone":
                 self.ws.db.execute("DELETE FROM push_subs WHERE endpoint = ?", (row["endpoint"],))

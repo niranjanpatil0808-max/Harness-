@@ -159,7 +159,7 @@ class TestSending(Base):
         self.ws.post("r", "alice", "you are here, no ping needed")
         time.sleep(0.3)
         self.assertEqual(FakePushService.seen, [])
-        self.ws.last_active = time.time() - 120  # two minutes ago: away
+        self.ws.activity["you"] = time.time() - 120  # two minutes ago: away
         self.ws.post("r", "alice", "now you are away")
         self.wait_for(1)
         self.assertEqual(len(FakePushService.seen), 1)
@@ -170,7 +170,7 @@ class TestSending(Base):
 
     def test_approvals_and_only_agent_messages_trigger_a_ping(self):
         self.ws.pusher.subscribe(self.endpoint)
-        self.ws.last_active = 0
+        self.ws.activity["you"] = 0
         self.ws.post("r", "you", "my own message")
         self.ws.post_system("r", "a system notice")
         time.sleep(0.3)
@@ -181,7 +181,7 @@ class TestSending(Base):
 
     def test_scheduled_agent_replies_ping_a_phone_that_is_away(self):
         self.ws.pusher.subscribe(self.endpoint)
-        self.ws.last_active = 0
+        self.ws.activity["you"] = 0
         job = self.ws.add_job("alice", "r", "0 8 * * *", "say good morning")
         self.ws.run_job_now(job)
         self.wait_for(1)
@@ -201,7 +201,7 @@ class TestSending(Base):
             self.assertEqual(self.ws.pusher.notify("x", force=True), 0)  # an unreachable service does not raise
 
     def test_nothing_is_sent_with_no_devices_subscribed(self):
-        self.ws.last_active = 0
+        self.ws.activity["you"] = 0
         self.ws.post("r", "alice", "hello")
         time.sleep(0.2)
         self.assertEqual(FakePushService.seen, [])
@@ -243,7 +243,7 @@ class TestPushApi(Base):
         self.assertEqual(self.call("POST", "/api/push/subscribe", {})[0], 400)
 
     def test_a_hidden_tab_does_not_count_as_being_here(self):
-        self.ws.last_active = 0
+        self.ws.activity["you"] = 0
         self.call("GET", "/api/state", headers={"X-Visible": "0"})
         self.assertEqual(self.ws.last_active, 0)
         self.call("GET", "/api/state", headers={"X-Visible": "1"})

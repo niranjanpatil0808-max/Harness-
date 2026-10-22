@@ -37,6 +37,11 @@ CREATE TABLE IF NOT EXISTS studies (
     summary TEXT NOT NULL DEFAULT '', report TEXT NOT NULL DEFAULT '', calls INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS push_subs (
     id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT NOT NULL UNIQUE, user TEXT NOT NULL DEFAULT 'you', created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS users (
+    name TEXT PRIMARY KEY, role TEXT NOT NULL DEFAULT 'member', token_hash TEXT NOT NULL UNIQUE, created REAL NOT NULL, last_seen REAL);
+CREATE TABLE IF NOT EXISTS invites (
+    code_hash TEXT PRIMARY KEY, role TEXT NOT NULL, rooms TEXT NOT NULL DEFAULT '[]', created_by TEXT NOT NULL,
+    created REAL NOT NULL, expires REAL NOT NULL, used_by TEXT);
 CREATE TABLE IF NOT EXISTS usage (day TEXT PRIMARY KEY, calls INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, agent TEXT, event TEXT NOT NULL,
@@ -65,6 +70,9 @@ class Database:
             self.conn.execute("ALTER TABLE agents ADD COLUMN model TEXT")
         if "playbook" not in columns:
             self.conn.execute("ALTER TABLE agents ADD COLUMN playbook TEXT NOT NULL DEFAULT ''")
+        approval_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(approvals)")}
+        if "requested_by" not in approval_columns:
+            self.conn.execute("ALTER TABLE approvals ADD COLUMN requested_by TEXT")
         if "internet" not in columns:
             self.conn.execute("ALTER TABLE agents ADD COLUMN internet TEXT NOT NULL DEFAULT 'ask'")
         if "provider" not in columns:

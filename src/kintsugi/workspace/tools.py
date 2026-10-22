@@ -86,6 +86,10 @@ def send_message(ctx: Ctx, args: dict) -> str:
     text = _text(args, "text", 2000)
     if ctx.agent not in ctx.ws.members(room):
         raise ToolError(f"you are not a member of room '{room}'")
+    if room != ctx.room:  # never carry one person's private chat into a room they are not part of
+        asker = ctx.ws.requester_of(ctx.situation)
+        if asker and asker != "you" and asker not in ctx.ws.members(room):
+            raise ToolError(f"the person who asked ({asker}) is not in '{room}', so you cannot post there for them")
     ctx.ws.post(room, ctx.agent, text, hops=ctx.hops)
     return f"sent to {room}"
 
@@ -381,7 +385,7 @@ def execute(ctx: Ctx, name: str, args: object, approved: bool = False) -> Outcom
         ctx.ws.audit(ctx.agent, "denied", name)
         return Outcome("denied", f"tool '{name}' is not allowed for this agent")
     if decision == perms.ASK:
-        approval_id = ctx.ws.request_approval(ctx.agent, ctx.room, name, args)
+        approval_id = ctx.ws.request_approval(ctx.agent, ctx.room, name, args, ctx.ws.requester_of(ctx.situation))
         ctx.ws.audit(ctx.agent, "approval-requested", f"#{approval_id} {name}")
         return Outcome("pending", f"waiting for a human to approve (approval #{approval_id})", approval_id)
     try:

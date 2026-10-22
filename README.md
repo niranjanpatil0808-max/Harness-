@@ -25,14 +25,14 @@
 | **Agents in parallel:** several agents work at once; `@all` gives everyone the same task; you set how many | **Works** (tested for real overlap) |
 | **Plugins:** skills and web-API tools from a folder or GitHub repo, previewed in full before install ([docs/PLUGINS.md](docs/PLUGINS.md)) | **Works** against fake servers; no plugin code runs; Python-code plugins are **not built** |
 | **Encrypted backup** to your private GitHub repo, restored automatically on an empty free host | **Works** against a fake GitHub in tests; **not yet tried against the real GitHub** ([docs/HOSTING.md](docs/HOSTING.md)) |
-| Teams: separate logins, invite links, roles for approvals, shared rooms plus private chats | **Planned, after Oct 25** |
+| **Teams:** separate logins through single-use invite links, owner/admin/member roles, who may approve, shared rooms plus private chats ([docs/TEAMS.md](docs/TEAMS.md)) | **Works** (permission matrix tests and a two-browser test); not yet used by a real group over a real deployment |
 | Integrations: GitHub, then Slack, then Gmail and Calendar | **Planned, after teams** |
 
 Rows marked planned do not exist yet. This table is updated as each one lands, and it says what has and has not been verified.
 
 ## What it is for
 
-Today it is best for **one person** (a founder, a builder) who wants a few agents they can actually trust: they cannot run harmful code without your approval, they cannot see your other files or the network when they run code, they cannot overspend your model quota, and everything they know and do can be seen and deleted. Startup **teams** are the goal; the features that make it matter for a team (accounts, roles, integrations) are not built yet, and I would not pitch it to a team today.
+It works for **one person** (a founder, a builder) who wants a few agents they can actually trust, and for a **small team**: the owner invites teammates with single-use links, gives them a role, and they get their own logins, private chats and shared rooms. Agents cannot run harmful code without approval, cannot see your other files or the network when they run code, cannot overspend your model quota, and everything they know and do can be seen and deleted. What a team still lacks: integrations (GitHub, Slack, email, calendar), and per-person agent memory (agents share one memory among everyone who talks to them).
 
 ## Quick start
 
@@ -55,7 +55,7 @@ Open the link on your computer or phone. The app opens **Settings > Models** the
 - **Isolation.** On Linux, approved code sees only its own agent's folder: no other files, no keys, no network. Where that is blocked it falls back to a separate unprivileged user, and if nothing works the app says **"not isolated"**.
 - **Cost guard.** A daily limit on model calls protects your free quota from a runaway loop.
 - **Privacy.** Your conversation text goes to your model provider and nothing else leaves your server. Secrets are write-only. You can download or delete everything.
-- **Honest limits** are listed in [SECURITY.md](SECURITY.md): it is not a hardened container, has no accounts yet, and has not been audited.
+- **Honest limits** are listed in [SECURITY.md](SECURITY.md): it is not a hardened container, has no email check or single sign-on for teammates, and has not been audited.
 
 ## How it learns, and how it improves itself
 
@@ -67,7 +67,7 @@ Open the link on your computer or phone. The app opens **Settings > Models** the
 - **Real-model reliability is unproven.** On the first real runs a tiny model (`allam-2-7b`) completed 6 of 15 practice tasks, and made up answers rather than running tools until safeguards were added. Better models should do better, but that has not been measured. No Meta model has been tested yet.
 - **The benefit of lessons and self-improvement is not measured** on real conversations. Tests show the mechanisms work, not that they make an agent better.
 - **Free hosting loses data** when the service restarts unless you turn on the encrypted backup (needs a private GitHub repo and a passphrase you must not lose).
-- **One shared access token, no accounts, no TLS of its own** (hosting platforms provide it).
+- **The owner token is one shared secret; no TLS of its own** (hosting platforms provide it). Teammates get their own logins, but agents share one memory per agent.
 - **The practice suite is small.** A difference of a few points is noise.
 - Everything the measured research showed, and did not show, is in [research/README.md](research/README.md).
 
