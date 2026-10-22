@@ -35,10 +35,10 @@ page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Kintsugi workspace: demo run</title>
 <style>
-:root{{--bg:#faf7f2;--fg:#2a2622;--mut:#7a7066;--card:#fff;--line:#e4dccf;--gold:#b8893b}}
-@media(prefers-color-scheme:dark){{:root{{--bg:#1c1a17;--fg:#ece6dc;--mut:#9c9286;--card:#26231f;--line:#3a352e;--gold:#d4a24f}}}}
+:root{{--bg:#faf9f5;--fg:#141413;--mut:#73726c;--card:#f0eee6;--line:#e5e3da;--gold:#c96442}}
+@media(prefers-color-scheme:dark){{:root{{--bg:#262624;--fg:#faf9f5;--mut:#a09e95;--card:#141413;--line:#3e3e3a;--gold:#d97757}}}}
 body{{margin:0;padding:16px;font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--fg)}}
-main{{max-width:720px;margin:0 auto}}h1{{color:var(--gold);font-size:22px}}h2{{font-size:16px;margin:24px 0 8px}}
+main{{max-width:720px;margin:0 auto}}h1{{color:var(--fg);font:400 28px ui-serif,Georgia,serif}}h2{{font-size:16px;margin:24px 0 8px}}
 .msg,.system{{padding:8px 10px;margin:6px 0;background:var(--card);border:1px solid var(--line);border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere}}
 .system{{color:var(--mut);font-style:italic}}.msg b{{color:var(--gold)}}.note{{color:var(--mut);font-size:14px;margin:4px 0}}
 p.small{{color:var(--mut);font-size:14px}}

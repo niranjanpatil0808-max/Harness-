@@ -1,114 +1,29 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kintsugi workspace</title>
-<style>
-:root{--bg:#faf7f2;--fg:#2a2622;--mut:#7a7066;--card:#fff;--line:#e4dccf;--gold:#b8893b;--bad:#b3402f}
-@media(prefers-color-scheme:dark){:root{--bg:#1c1a17;--fg:#ece6dc;--mut:#9c9286;--card:#26231f;--line:#3a352e;--gold:#d4a24f;--bad:#e0735f}}
-*{box-sizing:border-box}body{margin:0;font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
-header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-h1{font-size:17px;margin:0;color:var(--gold)}
-main{display:grid;grid-template-columns:230px minmax(0,1fr) 300px;min-height:calc(100vh - 52px)}
-aside,section{padding:12px 14px;min-width:0}aside{border-right:1px solid var(--line)}aside.r{border-left:1px solid var(--line);border-right:0}
-@media(max-width:860px){main{grid-template-columns:minmax(0,1fr);min-height:0;align-content:start}#log{max-height:55vh}aside{border:0;border-bottom:1px solid var(--line)}section{order:-1}}
-.room{display:block;padding:6px 8px;border-radius:6px;cursor:pointer}.room.on{background:var(--card);border:1px solid var(--line)}
-.msg{margin:6px 0;padding:8px 10px;background:var(--card);border:1px solid var(--line);border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere}
-.msg b{color:var(--gold)}.msg.system{color:var(--mut);font-style:italic}
-#log{min-height:30vh;max-height:calc(100vh - 230px);overflow-y:auto;padding-right:2px}.typing{color:var(--mut);font-style:italic;min-height:1.4em}
-form.row{display:flex;gap:8px;margin-top:8px}form.stack{display:grid;gap:6px;margin:6px 0}
-input,select,button,textarea{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);min-width:0}
-input[type=text]{flex:1;width:100%}header input{max-width:46vw}button{cursor:pointer}button.go{background:var(--gold);color:#fff;border-color:var(--gold)}button.bad{color:var(--bad)}
-h3{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
-small,.mut{color:var(--mut)}.ap{border:1px solid var(--gold);border-radius:8px;padding:8px;margin:6px 0}
-pre{margin:6px 0;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:auto;max-height:260px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12.5px}
-details summary{cursor:pointer;color:var(--mut)}a{color:var(--gold)}.pill{font-size:11px;border:1px solid var(--line);border-radius:10px;padding:0 6px;margin-left:4px}
-.err{color:var(--bad)}#empty{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px}
-</style></head><body>
-<header><h1>Kintsugi workspace</h1><span class="mut">agents that learn from their mistakes</span>
-<input id="token" type="password" placeholder="access token" size="18"><button id="connect">Connect</button><span id="status" class="mut"></span></header>
-<main>
-<aside>
- <h3>Rooms</h3><div id="rooms"></div>
- <details><summary>+ new room</summary><form class="stack" id="newroom"><input name="name" placeholder="room-name" required><input name="members" placeholder="members, comma separated"><button>Create room</button></form></details>
- <h3>Agents</h3><div id="agents"></div>
- <details><summary>+ new agent</summary><form class="stack" id="newagent"><input name="name" placeholder="agent-name" required><input name="persona" placeholder="persona (optional)"><select name="tier"><option>auto</option><option>strict</option><option>dangerous</option></select><button>Create agent</button></form></details>
-</aside>
-<section>
- <div id="empty" hidden></div>
- <div id="log"></div><div class="typing" id="typing"></div>
- <form class="row" id="say"><input type="text" id="text" placeholder="Message, e.g. @alice write a todo list into todo.txt" autocomplete="off"><button class="go">Send</button></form>
- <small>Tip: in a room, @mention an agent. In a ✉ direct room, every message goes to the agent.</small>
-</section>
-<aside class="r">
- <h3>Waiting for your approval</h3><div id="approvals" class="mut">nothing</div>
- <h3>Agent <select id="agent"></select></h3>
- <div id="agentinfo" class="mut"></div>
- <h3>Lessons it learned</h3><div id="lessons" class="mut"></div>
- <h3>Files</h3><div id="files" class="mut"></div><pre id="fileview" hidden></pre>
- <h3>Web apps</h3><div id="apps" class="mut">none</div>
- <h3>Scheduled jobs</h3><div id="jobs" class="mut">none</div>
- <details><summary>+ schedule a job</summary><form class="stack" id="newjob"><input name="cron" placeholder="0 9 * * 1-5 (min hour day month weekday)" required><input name="prompt" placeholder="what should the agent do?" required><button>Schedule in this room</button></form></details>
-</aside>
-</main>
-<script>
-const $=id=>document.getElementById(id);
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let token="",room=null,agent=null,state=null,last={},busy=false,again=false;
-try{const m=location.hash.match(/token=([^&]+)/);if(m){token=decodeURIComponent(m[1]);sessionStorage.setItem("kt",token);history.replaceState(null,"",location.pathname)}
- else token=sessionStorage.getItem("kt")||""}catch(e){}
-$("token").value=token;
-async function api(path,body){
-  const r=await fetch(path,{method:body?"POST":"GET",headers:{"X-Token":token,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
-  let d={};try{d=await r.json()}catch(e){}
-  if(!r.ok)throw new Error(d.error||("HTTP "+r.status));return d}
-function fail(x){$("status").innerHTML='<span class="err">'+esc(x.message)+'</span>'}
-$("connect").onclick=()=>{token=$("token").value.trim();try{sessionStorage.setItem("kt",token)}catch(e){}refresh()};
-$("say").onsubmit=async e=>{e.preventDefault();const t=$("text").value.trim();if(!t||!room)return;$("text").value="";
-  try{await api("/api/say",{room,text:t})}catch(x){fail(x)}refresh()};
-$("newroom").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);
-  try{await api("/api/rooms",{name:f.get("name"),members:f.get("members").split(",").map(s=>s.trim()).filter(Boolean).concat(["you"])});room=f.get("name");e.target.reset()}catch(x){fail(x)}refresh()};
-$("newagent").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);
-  try{await api("/api/agents",{name:f.get("name"),persona:f.get("persona"),tier:f.get("tier")});agent=f.get("name");e.target.reset()}catch(x){fail(x)}refresh()};
-$("newjob").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);if(!agent||!room)return;
-  try{await api("/api/jobs",{agent,room,cron:f.get("cron"),prompt:f.get("prompt")});e.target.reset()}catch(x){fail(x)}refresh()};
-$("agent").onchange=()=>{agent=$("agent").value;$("fileview").hidden=true;refresh()};
-async function decide(id,approve){try{await api("/api/approve",{id,approve})}catch(x){fail(x)}refresh()}
-async function setTier(sel){try{await api("/api/tier",{agent,tier:sel.value})}catch(x){fail(x)}refresh()}
-async function delJob(id){try{await api("/api/jobs/delete",{id})}catch(x){fail(x)}refresh()}
-async function openDm(){try{const r=await api("/api/dm",{a:"you",b:agent});room=r.room;last[room]=0;$("log").innerHTML=""}catch(x){fail(x)}refresh()}
-async function viewFile(p){try{const r=await api("/api/file?agent="+encodeURIComponent(agent)+"&path="+encodeURIComponent(p));$("fileview").textContent=r.text;$("fileview").hidden=false}catch(x){fail(x)}}
-async function refresh(){
-  if(!token)return;if(busy){again=true;return}busy=true;
-  try{await draw()}catch(x){fail(x)}finally{busy=false;if(again){again=false;refresh()}}}
-async function draw(){
-  state=await api("/api/state");$("status").textContent="connected";
-  if(!room&&state.rooms.length)room=state.rooms[0].name;
-  if(!agent&&state.agents.length)agent=state.agents[0].name;
-  $("empty").hidden=state.agents.length>0;
-  $("empty").innerHTML="<b>No agents yet.</b> Create one under “+ new agent”, then a room with it as a member, then write <code>@name hello</code>.";
-  $("rooms").innerHTML=state.rooms.map(r=>`<a class="room ${r.name===room?"on":""}" data-r="${esc(r.name)}">${r.kind==="dm"?"✉":"#"} ${esc(r.name)}</a>`).join("")||"<small>none yet</small>";
-  document.querySelectorAll(".room").forEach(a=>a.onclick=()=>{room=a.dataset.r;last[room]=0;$("log").innerHTML="";refresh()});
-  $("agents").innerHTML=state.agents.map(a=>`<div>${esc(a.name)} ${state.busy.includes(a.name)?'<span class="pill">working…</span>':""}</div>`).join("")||"<small>none yet</small>";
-  const sel=$("agent");sel.innerHTML=state.agents.map(a=>`<option ${a.name===agent?"selected":""}>${esc(a.name)}</option>`).join("");
-  const me=state.agents.find(a=>a.name===agent);
-  $("approvals").innerHTML=state.approvals.length?state.approvals.map(a=>{let code=a.args;try{const o=JSON.parse(a.args);code=o.code!==undefined?o.code:JSON.stringify(o,null,2)}catch(e){}
-    return `<div class="ap"><b>#${a.id}</b> ${esc(a.agent)} wants to run <b>${esc(a.tool)}</b> <small>in ${esc(a.room)}</small><pre>${esc(code)}</pre><button class="go" onclick="decide(${a.id},true)">Approve</button> <button class="bad" onclick="decide(${a.id},false)">Deny</button></div>`}).join(""):"nothing";
-  if(me){
-    $("agentinfo").innerHTML=`${esc(me.persona||"(no persona)")}<br>Permission: <select onchange="setTier(this)">${["strict","auto","dangerous"].map(t=>`<option ${t===me.tier?"selected":""}>${t}</option>`).join("")}</select>
-      <small>strict = ask for everything · auto = ask for risky tools · dangerous = ask for nothing</small><br>Secrets: ${me.secrets.length?me.secrets.map(esc).join(", "):"none (add with the CLI: kintsugi workspace secret "+esc(me.name)+" NAME)"}<br><button onclick="openDm()">✉ Direct message ${esc(me.name)}</button>`;
-    const ls=await api("/api/lessons?agent="+encodeURIComponent(me.name));
-    $("lessons").innerHTML=ls.length?ls.map(l=>`<div>• ${esc(l.text)} <small>(helped ${l.wins} of ${l.uses} · ${esc(l.status)})</small></div>`).join(""):"none yet. When a tool call fails, the agent writes one here.";
-    const fs=await api("/api/files?agent="+encodeURIComponent(me.name));
-    $("files").innerHTML=fs.length?fs.map(f=>`<div><a href="#" onclick="viewFile(this.dataset.p);return false" data-p="${esc(f)}">${esc(f)}</a></div>`).join(""):"none yet";
-    $("apps").innerHTML=me.apps.length?me.apps.map(n=>`<div><a target="_blank" rel="noopener" href="/apps/${encodeURIComponent(me.name)}/${encodeURIComponent(n)}/?token=${encodeURIComponent(token)}">${esc(n)}</a></div>`).join(""):"none yet";
-  }
-  const jobs=state.jobs.filter(j=>!agent||j.agent===agent);
-  $("jobs").innerHTML=jobs.length?jobs.map(j=>`<div><code>${esc(j.cron)}</code> ${esc(j.prompt)} <small>in ${esc(j.room)} (server time)</small> <button class="bad" onclick="delJob(${j.id})">remove</button></div>`).join(""):"none";
-  if(room){const after=last[room]||0;const ms=await api(`/api/messages?room=${encodeURIComponent(room)}&after=${after}`);
-    for(const m of ms){if(m.id<=(last[room]||0))continue;last[room]=m.id;$("log").insertAdjacentHTML("beforeend",`<div class="msg ${m.sender==="system"?"system":""}"><b>${esc(m.sender)}</b> ${esc(m.text)}</div>`)}
-    if(ms.length)$("log").scrollTop=$("log").scrollHeight}
-  const members=(state.rooms.find(r=>r.name===room)||{members:[]}).members;
-  const working=state.busy.filter(n=>members.includes(n));
-  $("typing").textContent=working.length?working.join(", ")+" is working…":"";
-}
-setInterval(refresh,2000);refresh();
-</script></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Kintsugi</title>
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div id="app">
+  <div id="scrim" hidden></div>
+  <aside id="sidebar" aria-label="Chats and agents"></aside>
+  <main id="main">
+    <header id="topbar"></header>
+    <div id="scroll"><div id="thread" role="log" aria-live="polite"></div><div id="inline"></div></div>
+    <button id="jump" hidden>↓ New messages</button>
+    <footer id="composer-wrap"></footer>
+  </main>
+  <aside id="drawer" hidden aria-label="Agent details"></aside>
+</div>
+<div id="dialog-root"></div>
+<div id="toast" role="status"></div>
+<script src="/static/vendor/marked.min.js"></script>
+<script src="/static/vendor/purify.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

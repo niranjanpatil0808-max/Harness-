@@ -115,6 +115,11 @@ class Workspace:
         self.db.execute("UPDATE agents SET tier = ? WHERE name = ?", (tier, name))
         self.audit(name, "tier-changed", tier)
 
+    def set_persona(self, name: str, persona: str) -> None:
+        self.get_agent(name)
+        self.db.execute("UPDATE agents SET persona = ? WHERE name = ?", (persona[:1000], name))
+        self.audit(name, "persona-changed")
+
     def model_for(self, agent: str) -> Model:
         if agent not in self._models:
             self._models[agent] = self.model_factory(agent)

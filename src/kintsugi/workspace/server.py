@@ -85,6 +85,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             query = parse_qs(url.query)
             if url.path in ("/", "/index.html"):
                 return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8")
+            if url.path.startswith("/static/"):  # the page's own scripts and styles; public, read-only
+                return self._static(url.path[len("/static/"):])
             if not self._authorized(query):
                 return self._json(401, {"error": "missing or wrong access token"})
             self._guard(lambda: self._app(url.path) if url.path.startswith("/apps/")
@@ -154,6 +156,9 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return {"ok": True}
             if path == "/api/dm":
                 return {"room": ws.open_dm(str(body["a"]), str(body["b"]))}
+            if path == "/api/persona":
+                ws.set_persona(str(body["agent"]), str(body["persona"]))
+                return {"ok": True}
             if path == "/api/tier":
                 ws.set_tier(str(body["agent"]), str(body["tier"]))
                 return {"ok": True}
@@ -165,6 +170,17 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 ws.remove_job(int(body["id"]))
                 return {"ok": True}
             raise WorkspaceError("unknown endpoint")
+
+        def _static(self, relative: str) -> None:
+            try:
+                target = safe_path(WEB, relative)
+            except PathError:
+                return self._json(404, {"error": "not found"})
+            if not target.is_file() or target.name == "index.html":
+                return self._json(404, {"error": "not found"})
+            ctype = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml"}.get(
+                target.suffix, "application/octet-stream")
+            self._send(200, target.read_bytes(), ctype + "; charset=utf-8" if ctype.startswith("text") else ctype)
 
         def _app(self, path: str) -> None:
             parts = path.split("/")  # ['', 'apps', agent, app, ...rest]

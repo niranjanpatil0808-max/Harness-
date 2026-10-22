@@ -28,9 +28,13 @@ export GROQ_API_KEY=...                      # or KINTSUGI_API_KEY / KINTSUGI_BA
 kintsugi workspace serve                     # starter team: agents alice and bob, room "team"
 ```
 
-`serve` prints a link like `http://127.0.0.1:8765/#token=...`. Open it: you can chat, create agents and rooms,
-approve or deny risky tool calls (the full code is shown before you approve), see each agent's lessons, files,
-web apps and scheduled jobs, change an agent's permission tier, and open a direct message.
+`serve` prints a link like `http://127.0.0.1:8765/#token=...`. Open it. The interface is a chat app: a sidebar
+of direct messages, rooms and agents; a centered conversation with markdown and copyable code blocks; `@` to
+mention an agent; and permission cards in the conversation that show the full code before you choose Allow
+once or Deny. The Details panel holds each agent's persona, permission tier, secret names, lessons, files,
+schedules, web apps and activity log. It follows your system's light or dark setting (the sun button cycles
+system, light, dark) and works on a phone. It has no build step and needs no network: the two small libraries
+it uses (`marked`, `DOMPurify`) are included in `web/vendor/` with their licenses.
 
 The same things from the command line:
 

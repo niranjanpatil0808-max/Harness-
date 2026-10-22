@@ -124,6 +124,31 @@ class TestServer(unittest.TestCase):
         self.assertNotIn("boom", data.decode())
         self.assertTrue(any(r["event"] == "server-error" for r in self.ws.audit_log()))
 
+    def test_the_page_and_its_assets_are_served_and_cannot_escape(self):
+        for path, kind in (("/static/app.js", "javascript"), ("/static/app.css", "css"), ("/static/logo.svg", "svg"),
+                           ("/static/vendor/marked.min.js", "javascript"), ("/static/vendor/purify.min.js", "javascript")):
+            status, data, resp = self.call("GET", path, token=None)
+            self.assertEqual(status, 200, path)
+            self.assertIn(kind, resp.getheader("Content-Type"))
+            self.assertTrue(data)
+        for bad in ("/static/../server.py", "/static/%2e%2e/core.py", "/static/index.html", "/static/nothing.js", "/static/vendor"):
+            self.assertEqual(self.call("GET", bad, token=None)[0], 404, bad)
+        page = self.call("GET", "/", token=None)[1].decode()
+        for asset in ("/static/app.js", "/static/app.css", "/static/vendor/marked.min.js", "/static/vendor/purify.min.js"):
+            self.assertIn(asset, page)
+
+    def test_vendored_libraries_ship_with_their_licenses(self):
+        from pathlib import Path
+
+        vendor = Path(__file__).resolve().parent.parent / "src" / "kintsugi" / "workspace" / "web" / "vendor"
+        for name in ("marked.LICENSE.md", "purify.LICENSE"):
+            self.assertTrue((vendor / name).is_file(), name)
+
+    def test_persona_can_be_changed_over_http(self):
+        self.assertEqual(self.call("POST", "/api/persona", {"agent": "alice", "persona": "You are terse."})[0], 200)
+        self.assertEqual(self.ws.get_agent("alice")["persona"], "You are terse.")
+        self.assertEqual(self.call("POST", "/api/persona", {"agent": "nobody", "persona": "x"})[0], 400)
+
     def test_token_can_come_from_the_environment(self):
         from unittest import mock
 

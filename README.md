@@ -2,7 +2,7 @@
 
 **A local workspace of AI agents that learn from their mistakes. Each agent has its own files, secrets, permissions, schedule and web apps; they talk in rooms; and every failed tool call becomes a lesson the agent remembers.** Under it sits the Kintsugi harness: a small, from-scratch harness that helps a small open model fix more Python bugs by retrying against real tests, writing lessons from its own mistakes, and seeing only the code that matters.
 
-- **Workspace** (new): see [docs/WORKSPACE.md](docs/WORKSPACE.md) and `python examples/workspace_demo.py`. Tested, runs offline; whether its lessons improve agents is **not yet measured**.
+- **Workspace** (new): a calm chat interface (light and dark, phone friendly; its look is inspired by modern AI assistants and is not affiliated with any of them). See [docs/WORKSPACE.md](docs/WORKSPACE.md) and `python examples/workspace_demo.py`. Tested, runs offline; whether its lessons improve agents is **not yet measured**.
 - **Harness + benchmark**: the measured part, below. The evidence in this README is about the bug-fix harness only.
 
 *Kintsugi* is the Japanese art of repairing broken pottery with gold: the cracks become the strongest part. Here, the model's failures become lessons that guide its next fix.
@@ -155,6 +155,7 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 | [Aider-AI/aider](https://github.com/Aider-AI/aider) (repo map) | Apache-2.0 | A map of definitions and references ranked with PageRank, personalized to the current task, within a size budget | `graph.py`: stdlib PageRank over the `ast` graph, seeded by test names |
 | [ReflexioAI/reflexio](https://github.com/ReflexioAI/reflexio) | Apache-2.0 | Turn repeated corrections into lasting, deduplicated behavior changes | Near-duplicate lessons merge and count how often they recur |
 | [yc-software/qm](https://github.com/yc-software/qm) | MIT | A workspace where agents have durable memory, files and a sandbox, talk in channels, and run under tiered permissions with a keychain and scheduled jobs | `src/kintsugi/workspace/`: a small local reimplementation (no Slack, Postgres or cloud); the mistake-memory is the addition |
+| [markedjs/marked](https://github.com/markedjs/marked) and [cure53/DOMPurify](https://github.com/cure53/DOMPurify) | MIT; Apache-2.0 or MPL-2.0 | Ready-made components used as they are (not reimplemented) | `src/kintsugi/workspace/web/vendor/` renders and sanitises agent replies in the web UI; licenses are included next to the files |
 | [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) | MIT | Harness state (prompts, memories) kept as durable files, updated in small evidence-backed steps | `lessons.json` is plain data; every change records the task and outcome that caused it |
 
 ## Limitations
