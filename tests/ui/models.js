@@ -9,7 +9,7 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8804';
   await p.goto(BASE + '/#token=tok123');
   await p.waitForSelector('#topbar');
   await p.click('#topbar button >> nth=0'); await p.click('button[aria-label="Settings"]');
-  await p.click('.tab:has-text("Models")');
+  await p.click('.set-item:has-text("Models")');
   await p.waitForSelector('text=No model is set up yet');
   // a bad address is refused with a readable message and nothing is saved
   await p.selectOption('select[aria-label="Provider type"]', 'custom');

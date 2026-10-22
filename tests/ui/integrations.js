@@ -7,7 +7,7 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8804';
   p.on('pageerror', e => errs.push('pageerror: ' + e.message));
   await p.goto(BASE + '/#token=tok123');
   await p.waitForSelector('#sidebar .item:has-text("alice")');
-  await p.click('button[aria-label="Settings"]'); await p.click('.tab:has-text("Integrations")');
+  await p.click('button[aria-label="Settings"]'); await p.click('.set-item:has-text("Integrations")');
   await p.waitForSelector('strong:has-text("GitHub")');
   for (const n of ['GitHub', 'Slack', 'Calendar', 'Gmail']) if (!(await p.locator('strong:has-text("' + n + '")').count())) errs.push('missing card ' + n);
   // a bad allow-list is explained; nothing is saved

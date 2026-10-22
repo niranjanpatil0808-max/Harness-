@@ -17,7 +17,7 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8804';
   await p.waitForSelector('[aria-label="Internet access"] button.on:has-text("Allow")');
   await p.waitForSelector('text=may search and read public pages');
   // the workspace switch overrides it and the drawer says so
-  await p.click('button[aria-label="Settings"]'); await p.click('.tab:has-text("Internet")');
+  await p.click('button[aria-label="Settings"]'); await p.click('.set-item:has-text("Internet")');
   await p.waitForSelector('input[aria-label="Let agents use the internet"]');
   await p.uncheck('input[aria-label="Let agents use the internet"]'); await p.fill('input[aria-label="Page fetches per day"]', '5');
   await p.click('.dialog .btn.primary:has-text("Save")'); await p.waitForTimeout(600);

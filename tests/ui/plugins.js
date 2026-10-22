@@ -8,7 +8,7 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8804';
   p.on('pageerror', e => errs.push('pageerror: ' + e.message));
   await p.goto(BASE + '/#token=tok123');
   await p.waitForSelector('#sidebar .item:has-text("alice")');
-  await p.click('button[aria-label="Settings"]'); await p.click('.tab:has-text("Plugins")');
+  await p.click('button[aria-label="Settings"]'); await p.click('.set-item:has-text("Plugins")');
   await p.waitForSelector('text=No plugins yet');
   // preview shows everything: hosts, the full skill text, a fingerprint; nothing is installed yet
   await p.click('.chip:has-text("Weather")');
@@ -29,7 +29,7 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8804';
   await p.click('#drawer .chip:has-text("Weather")');
   await p.waitForSelector('#drawer .chip:not(.on):has-text("Weather")');
   // a broken manifest gives a plain message
-  await p.click('button[aria-label="Settings"]'); await p.click('.tab:has-text("Plugins")');
+  await p.click('button[aria-label="Settings"]'); await p.click('.set-item:has-text("Plugins")');
   await p.click('summary:has-text("paste")'); await p.fill('textarea[aria-label="Plugin manifest"]', '{"id": "xx"}'); await p.click('details >> text=Preview');
   await p.waitForSelector('#toast:has-text("at least one")', { timeout: 5000 }).catch(() => errs.push('no readable error for a bad manifest'));
   await p.click('.btn.danger:has-text("Remove")'); await p.click('.overlay:last-child .btn.primary'); await p.waitForSelector('text=No plugins yet');

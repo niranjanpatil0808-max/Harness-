@@ -34,7 +34,7 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8804';
   // 6. offline: the shell still opens and says so, instead of a browser error page
   await ctx.setOffline(true);
   await p.reload();
-  await p.waitForSelector('#sidebar .brand', { timeout: 10000 });
+  await p.waitForSelector('#sidebar .brand', { state: 'attached', timeout: 10000 });
   await p.waitForSelector('#toast.on', { timeout: 10000 });
   await p.screenshot({ path: SHOTS + '/p2_offline.png' });
   await ctx.setOffline(false);

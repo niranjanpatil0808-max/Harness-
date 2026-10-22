@@ -47,8 +47,8 @@ async function usagePanel() {
   const max = Math.max(1, ...d.days.map((x) => x.calls));
   const fmt = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(n);
   const stat = (label, value, sub) => h("div", {class: "stat"}, h("div", {class: "stat-v"}, value), h("div", {class: "stat-l"}, label), sub ? h("div", {class: "muted", style: "font-size:12px"}, sub) : null);
-  const bars = h("div", {class: "bars", role: "img", "aria-label": "Model calls per day: " + d.days.map((x) => x.name + " " + x.calls).join(", ")},
-    d.days.length ? d.days.map((x) => h("div", {class: "bar", title: x.name + ": " + x.calls + " calls"}, h("div", {class: "bar-fill", style: "height:" + Math.max(4, Math.round(x.calls / max * 100)) + "%"}), h("div", {class: "bar-l"}, x.name.slice(5)))) : h("p", {class: "muted"}, "Nothing yet. Usage appears here after the first reply."));
+  const bars = d.days.length ? h("div", {class: "bars", role: "img", "aria-label": "Model calls per day: " + d.days.map((x) => x.name + " " + x.calls).join(", ")},
+    d.days.map((x) => h("div", {class: "bar", title: x.name + ": " + x.calls + " calls"}, h("div", {class: "bar-fill", style: "height:" + Math.max(4, Math.round(x.calls / max * 100)) + "%"}), h("div", {class: "bar-l"}, x.name.slice(5))))) : h("p", {class: "muted"}, "Nothing yet. Usage appears here after the first reply.");
   const table = (title, rows) => rows.length ? h("div", {}, h("h4", {style: "margin:16px 0 6px"}, title), h("div", {class: "tbl"}, h("div", {class: "tr th"}, h("span", {}, "Name"), h("span", {}, "Calls"), h("span", {}, "Tokens"), h("span", {}, "Cost")),
     rows.map((r) => h("div", {class: "tr"}, h("span", {}, r.name), h("span", {}, r.calls), h("span", {}, d.tokens_known ? fmt(r.prompt_tokens + r.completion_tokens) : "n/a"), h("span", {}, r.priced ? "$" + r.cost.toFixed(4) : "n/a"))))) : null;
   const model = h("input", {type: "text", placeholder: "model name", "aria-label": "Model", autocapitalize: "none", list: "model-names"}), pin = h("input", {type: "number", min: 0, step: "any", placeholder: "$ per 1M input", "aria-label": "Price per million input tokens"}), pout = h("input", {type: "number", min: 0, step: "any", placeholder: "$ per 1M output", "aria-label": "Price per million output tokens"});
@@ -56,9 +56,12 @@ async function usagePanel() {
     stat("Estimated cost", allPriced && total ? "$" + cost.toFixed(2) : "n/a", allPriced ? "from the prices you set" : "set prices below")),
     h("h4", {style: "margin:16px 0 6px"}, "Model calls per day"), bars, table("By agent", d.by_agent), table("By model", d.by_model),
     isOwner() ? h("div", {}, h("h4", {style: "margin:18px 0 6px"}, "Prices (for the cost estimate)"), h("p", {class: "muted", style: "font-size:13px;margin:0 0 8px"}, "Look up your provider's current price per million tokens and enter it. The estimate is only as good as these numbers."),
-      h("datalist", {id: "model-names"}, d.by_model.map((m) => h("option", {value: m.name}))), h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, model, pin, pout,
+      h("datalist", {id: "model-names"}, d.by_model.map((m) => h("option", {value: m.name}))), h("div", {class: "price-row"}, model, pin, pout,
         h("button", {class: "btn", onclick: async () => { if (await act(() => api("/api/usage/price", {model: model.value.trim(), in: +pin.value, out: +pout.value}), "Price saved")) fill($("#settings-body"), await usagePanel()); }}, "Save price")),
       Object.keys(d.prices).length ? h("p", {class: "muted", style: "font-size:13px"}, "Saved: " + Object.entries(d.prices).map(([m, p]) => m + " ($" + p[0] + " in / $" + p[1] + " out)").join("; ")) : null) : null,
+    isOwner() ? h("label", {class: "card", style: "display:flex;gap:10px;align-items:flex-start;font-weight:400;margin-top:16px"},
+      h("input", {type: "checkbox", checked: d.summaries, style: "width:auto;margin-top:3px", "aria-label": "Summarize long chats", onchange: (e) => act(() => api("/api/compaction", {enabled: e.target.checked}), e.target.checked ? "Long chats will be summarized" : "Summaries off and deleted")}),
+      h("span", {}, h("strong", {}, "Remember long chats"), h("br"), h("span", {class: "muted", style: "font-size:13px"}, "Agents see the last 12 messages. With this on, every 16 older messages are folded into a short summary they also see. Costs about one extra model call per 16 messages."))) : null,
     h("p", {class: "muted", style: "font-size:13px;margin-top:16px"}, "Numbers come from this workspace's own records and from what your provider reports. Your provider's dashboard is the final word on billing."));
 }
 
@@ -130,7 +133,9 @@ function openSwitcher() {
     for (const r of rooms()) { const label = roomLabel(r); if (!low || label.toLowerCase().includes(low)) out.push({kind: r.kind === "dm" ? "Chat" : "Room", title: (r.kind === "dm" ? "" : "# ") + label, run: () => openRoom(r.name)}); }
     for (const a of agents()) if (!low || a.name.includes(low)) out.push({kind: "Agent", title: a.name, sub: a.persona.slice(0, 60), run: () => dmWith(a.name)});
     for (const [k, label] of settingsTabs()) if (!low || label.toLowerCase().includes(low) || k.includes(low)) out.push({kind: "Settings", title: label, sub: SETTINGS_BLURB[k], run: () => settingsDialog(k)});
-    return out.slice(0, 12);
+    if (S.room && (!low || "save export download chat markdown".includes(low) || low.split(" ").some((w) => w.length > 2 && "save export download markdown".includes(w)))) out.push({kind: "Action", title: "Save this chat as a file", run: () => exportChat(S.room)});
+    if (isAdmin() && (!low || "starter team template".includes(low))) out.push({kind: "Action", title: "Start from a team", run: startersDialog});
+    return out.slice(0, 14);
   };
   const search = async () => {
     const q = input.value.trim(); items = local(q); idx = 0; draw();
@@ -165,3 +170,19 @@ newChatDialog = function () {
   _newChatDialog();
   if (isAdmin()) { const d = $("#dialog-root .dialog:last-child .actions"); if (d) d.prepend(h("button", {class: "btn", onclick: () => { $("#dialog-root").replaceChildren(); $("#app").inert = false; startersDialog(); }}, "Start from a team")); }
 };
+
+/* ---------- save a chat as a Markdown file (uses the same access checks as reading it) ---------- */
+async function exportChat(room) {
+  try {
+    const all = []; let after = 0;
+    for (let page = 0; page < 400; page++) {  // 50 a page; stops at 20,000 messages
+      const got = await api("/api/messages?room=" + encodeURIComponent(room) + "&after=" + after);
+      all.push(...got); if (got.length < 50) break; after = got[got.length - 1].id;
+    }
+    const r = rooms().find((x) => x.name === room), title = r ? (r.kind === "dm" ? "Chat with " + roomLabel(r) : "#" + room) : room;
+    const md = "# " + title + "\n\n" + all.map((m) => "**" + m.sender + "** · " + new Date(m.ts * 1000).toLocaleString() + "\n\n" + m.text + "\n").join("\n---\n\n");
+    const a = h("a", {href: URL.createObjectURL(new Blob([md], {type: "text/markdown"})), download: (title.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "") || "chat") + ".md"});
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast("Saved " + all.length + " messages");
+  } catch (e) { toast(e.message, true); }
+}

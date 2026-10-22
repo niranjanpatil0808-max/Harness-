@@ -19,13 +19,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import sandbox
+from . import compact, sandbox
 from .core import Workspace, WorkspaceError
 from .keychain import _write_private
 from .sandbox import PathError, safe_path
 from . import core as core_mod
 from .scheduler import Scheduler
-from .team import Identity, TeamError, required_role
 from .team import Identity, TeamError, required_role
 
 MAX_BODY = 64_000
@@ -470,6 +469,11 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 if room is not None and not ws.team.can_see_room(self.who, room):
                     raise Forbidden("that agent is working in a chat you are not part of")
                 return {"stopping": ws.request_stop(agent)}
+            if path == "/api/compaction":  # owner only (not in any role table)
+                ws.set_setting("compaction", "on" if body.get("enabled") else "off")
+                if not body.get("enabled"):
+                    compact.forget(ws)
+                return {"enabled": compact.enabled(ws)}
             if path == "/api/usage/price":
                 return {"prices": ws.set_price(str(body["model"]), float(body["in"]), float(body["out"]))}
             if path == "/api/me/token":

@@ -596,11 +596,18 @@ function inviteLinkDialog(made) {
   dialog("Invite link ready", "Send it privately to one person. It works once, for " + Math.round((made.expires - Date.now() / 1000) / 86400) + " days, and joins them as " + made.role + (made.rooms.length ? " in: " + made.rooms.join(", ") : "") + ". Anyone who has the link can join, so do not post it publicly.",
     h("div", {}, box), (close) => [h("button", {class: "btn", onclick: async () => { try { await navigator.clipboard.writeText(link); toast("Copied"); } catch (e) { box.select(); toast("Press copy on your keyboard"); } }}, "Copy link"), h("button", {class: "btn primary", onclick: close}, "Done")]);
 }
+function signInLinkDialog(name, token) {
+  const link = location.origin + "/#token=" + encodeURIComponent(token);
+  const box = h("input", {type: "text", readonly: true, value: link, "aria-label": "Sign-in link", onfocus: (e) => e.target.select()});
+  dialog("New sign-in for " + name, "Send this link to " + name + " privately. It is shown only once; anyone with it can sign in as them.", box,
+    (c) => [h("button", {class: "btn", onclick: () => copyText(link)}, "Copy link"), h("button", {class: "btn primary", onclick: c}, "Done")]);
+}
 async function teamPanel() {
   const d = await api("/api/team"), refresh = async () => fill($("#settings-body"), await teamPanel());
   const rows = [h("div", {class: "card", style: "display:flex;gap:8px;align-items:center"}, h("strong", {style: "flex:1"}, isOwner() ? "you" : "the owner"), h("span", {class: "muted"}, "owner"))].concat(d.users.map((u) => h("div", {class: "card", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"},
     h("strong", {style: "flex:1"}, u.name), isOwner() ? h("select", {"aria-label": "Role of " + u.name, onchange: async (e) => { await act(() => api("/api/team/role", {name: u.name, role: e.target.value}), u.name + " is now " + e.target.value); await refresh(); }}, ["member", "admin"].map((r) => h("option", {value: r, selected: u.role === r}, r))) : h("span", {class: "muted"}, u.role),
     h("span", {class: "muted", style: "font-size:12px"}, u.last_seen ? "seen " + new Date(u.last_seen * 1000).toLocaleDateString() : "not yet"),
+    (isOwner() || u.role === "member") ? h("button", {class: "btn", onclick: () => confirmDialog("Reset " + u.name + "'s sign-in?", "Their current sign-in stops working at once. You get a new private link to send them.", "Reset", async () => { try { const r = await api("/api/team/reset", {name: u.name}); signInLinkDialog(u.name, r.token); } catch (e) { toast(e.message, true); } })}, "Reset sign-in") : null,
     (isOwner() || u.role === "member") ? h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + u.name + "?", "Their sign-in stops working at once. Their messages stay in the rooms.", "Remove", async () => { await act(() => api("/api/team/remove", {name: u.name}), u.name + " removed"); await refresh(); })}, "Remove") : null)));
   const role = h("select", {"aria-label": "Invite as"}, [["member", "Member"]].concat(isOwner() ? [["admin", "Admin"]] : []).map(([v, l]) => h("option", {value: v}, l)));
   const rooms = d.rooms.map((r) => h("label", {style: "display:flex;gap:8px;align-items:center;font-weight:400"}, h("input", {type: "checkbox", value: r, checked: r === "team", style: "width:auto", "aria-label": "Add to " + r}), r));
@@ -827,6 +834,7 @@ function safetyTab(a) {
     h("h4", {}, "Where your messages go"), h("div", {class: "card"}, "Whenever an agent thinks, the conversation text (and tool results) is sent to ", h("strong", {}, st.provider), ". Files, secrets and your other chats stay on this server."),
     h("h4", {}, "Cost guard"), h("div", {class: "card"}, u.calls + " model calls today" + (u.limit ? " of " + u.limit + " allowed (resets at midnight UTC)." : ", no limit set.")),
     h("h4", {}, "Your data"), h("div", {class: "stack"},
+      S.room ? h("button", {class: "btn", onclick: () => exportChat(S.room)}, "Save this chat (Markdown)") : null,
       !isOwner() ? null : h("button", {class: "btn", onclick: exportData}, "Download everything (JSON)"),
       !isOwner() ? null : h("button", {class: "btn", onclick: () => confirmDialog("Delete old messages?", "Messages and log entries older than 30 days will be deleted for good.", "Delete", () => act(async () => { const r2 = await api("/api/purge", {days: 30}); toast("Deleted " + r2.deleted + " messages"); }))}, "Delete messages older than 30 days"),
       r && r.kind !== "dm" ? h("button", {class: "btn danger", onclick: () => confirmDialog("Delete room " + r.name + "?", "Its messages, schedules and pending approvals are deleted for good.", "Delete room", async () => { await act(() => api("/api/room/delete", {name: r.name}), "Room deleted"); S.room = null; })}, "Delete this room") : null,

@@ -21,7 +21,7 @@ from typing import Callable
 from kintsugi.memory import tokens
 from kintsugi.model import Model, ModelInfraError, ModelRequestError, OpenAIAdapter, QuotaExhausted
 
-from . import perms, providers
+from . import compact, perms, providers
 from .db import Database
 from .keychain import Keychain
 
@@ -640,7 +640,7 @@ class Workspace:
             return [{"name": k, **v, "cost": round(v["cost"], 4)} for k, v in sorted(out.items(), key=lambda kv: -kv[1]["calls"])]
 
         return {"days": fold("day"), "by_agent": fold("agent"), "by_model": fold("model"), "prices": prices, "today_calls": self.calls_today(),
-                "daily_limit": self.daily_calls, "tokens_known": any(r["prompt_tokens"] or r["completion_tokens"] for r in rows)}
+                "daily_limit": self.daily_calls, "summaries": compact.enabled(self), "tokens_known": any(r["prompt_tokens"] or r["completion_tokens"] for r in rows)}
 
     # --- agents working at the same time ---
 
@@ -732,6 +732,7 @@ class Workspace:
             self.db.execute(f"DELETE FROM {table} WHERE agent = ?", (name,))
         self._clear_agent_grants(name)
         self.db.execute("DELETE FROM messages WHERE sender = ?", (name,))
+        compact.forget(self)  # summaries may quote what it wrote
         self.db.execute("DELETE FROM members WHERE member = ?", (name,))
         self.db.execute("DELETE FROM audit WHERE agent = ?", (name,))
         self.db.execute("DELETE FROM agents WHERE name = ?", (name,))
@@ -756,6 +757,7 @@ class Workspace:
         for table in ("messages", "members", "jobs", "approvals"):
             self.db.execute(f"DELETE FROM {table} WHERE room = ?", (room,))
         self.db.execute("DELETE FROM rooms WHERE name = ?", (room,))
+        compact.forget(self, room)
         self.audit(None, "room-deleted", room)
 
     def purge_messages(self, older_than_days: float) -> int:
@@ -764,6 +766,8 @@ class Workspace:
         count = self.db.one("SELECT COUNT(*) AS n FROM messages WHERE ts < ?", (cutoff,))["n"]
         self.db.execute("DELETE FROM messages WHERE ts < ?", (cutoff,))
         self.db.execute("DELETE FROM audit WHERE ts < ?", (cutoff,))
+        if count:
+            compact.forget(self)  # a summary must not outlive the messages it came from
         self.audit(None, "purged", f"{count} messages older than {older_than_days:g} days")
         return count
 
