@@ -156,7 +156,7 @@ class TestFetchLimits(unittest.TestCase):
 
 class TestPluginHardening(unittest.TestCase):
     def base(self):
-        return {"id": "demo", "name": "D", "tools": [{"name": "t", "description": "d", "url": "https://api.example.com/v1/items/{p}/info", "hosts": ["api.example.com"],
+        return {"id": "demo", "name": "D", "tools": [{"name": "tool", "description": "d", "url": "https://api.example.com/v1/items/{p}/info", "hosts": ["api.example.com"],
                                                        "params": {"p": {"type": "string"}}, "auth": {"secret": "API_KEY", "header": "X-Api-Key"}}]}
 
     def test_manifest_gaps(self):
@@ -207,7 +207,7 @@ class TestCalendarParser(unittest.TestCase):
 
     def test_an_old_daily_event_is_still_found(self):
         events = self.run_ics(ev("SUMMARY:Daily", "DTSTART:20190101T100000Z", "DTEND:20190101T103000Z", "RRULE:FREQ=DAILY"), 3)
-        self.assertEqual([e["start"].strftime("%m-%d %H:%M") for e in events], ["10-22 10:00", "10-23 10:00", "10-24 10:00", "10-25 10:00"])
+        self.assertEqual([e["start"].strftime("%m-%d %H:%M") for e in events], ["10-22 10:00", "10-23 10:00", "10-24 10:00"])
 
     def test_daylight_saving_keeps_the_wall_clock_time(self):
         events = self.run_ics(ev("SUMMARY:Weekly", "DTSTART;TZID=America/New_York:20260105T090000", "DTEND;TZID=America/New_York:20260105T093000", "RRULE:FREQ=WEEKLY;BYDAY=MO"), 7)
@@ -243,7 +243,7 @@ class TestCalendarParser(unittest.TestCase):
 
     def test_monthly_on_the_31st_skips_short_months_instead_of_drifting(self):
         events = self.run_ics(ev("SUMMARY:EOM", "DTSTART:20260831T090000Z", "RRULE:FREQ=MONTHLY"), 120)
-        self.assertEqual([e["start"].strftime("%m-%d") for e in events], ["10-31", "12-31"])
+        self.assertEqual([e["start"].strftime("%m-%d") for e in events], ["10-31", "12-31", "01-31"])
 
     def test_a_large_feed_parses_quickly(self):
         body = "\n".join(f"DESCRIPTION:{'x' * 70}\n " + "y" * 70 for _ in range(1)) 

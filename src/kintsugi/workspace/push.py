@@ -105,7 +105,7 @@ class Push:
             raise WorkspaceError("push notifications are not available on this server (it needs the 'cryptography' package)")
         if not endpoint_ok(str(endpoint)):
             raise WorkspaceError("that is not a push address from a known push service")
-        if self.ws.db.one("SELECT COUNT(*) AS n FROM push_subs")["n"] >= MAX_SUBSCRIPTIONS and not self.ws.db.one("SELECT 1 FROM push_subs WHERE endpoint = ?", (endpoint,)):
+        if self.ws.db.one("SELECT COUNT(*) AS n FROM push_subs WHERE user = ?", (user,))["n"] >= MAX_SUBSCRIPTIONS and not self.ws.db.one("SELECT 1 FROM push_subs WHERE endpoint = ?", (endpoint,)):
             raise WorkspaceError(f"at most {MAX_SUBSCRIPTIONS} devices can receive notifications")
         self.ws.db.execute("INSERT INTO push_subs (endpoint, user, created) VALUES (?, ?, ?) ON CONFLICT(endpoint) DO NOTHING", (endpoint, user, self.ws.clock()))
         self.ws.audit(None, "push-subscribed", urllib.parse.urlparse(endpoint).hostname or "")

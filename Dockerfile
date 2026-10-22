@@ -14,8 +14,7 @@ RUN pip install --no-cache-dir ".[push]"
 # to listen on a network address with a short or missing KINTSUGI_TOKEN.
 ENV KINTSUGI_WORKSPACE=/data \
     KINTSUGI_HOST=0.0.0.0 \
-    PORT=8765 \
-    KINTSUGI_TRUST_PROXY=1
+    PORT=8765
 VOLUME /data
 EXPOSE 8765
 

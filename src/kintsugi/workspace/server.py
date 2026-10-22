@@ -131,20 +131,19 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
         def _authorized(self, query: dict = None) -> bool:
             """Check the access token (header only, never the URL). Clients with many wrong tries are turned away."""
             client, now = self._client(), time.time()
-            with failure_lock:
-                recent = [t for t in failures.get(client, []) if now - t < FAILURE_WINDOW]
-                failures[client] = recent
-                if len(recent) >= MAX_FAILURES:
-                    return False
             given = self.headers.get("X-Token") or ""
-            who = ws.team.identify(given, token)
+            who = ws.team.identify(given, token)  # a RIGHT token always works: guessing is throttled, not logging in
             if who is not None:
                 self.who = who
                 if self.headers.get("X-Visible", "1") == "1":  # a hidden tab does not count as "looking at it"
                     ws.touch(who.name)
                 return True
             with failure_lock:
-                failures.setdefault(client, []).append(now)
+                recent = [t for t in failures.get(client, []) if now - t < FAILURE_WINDOW]
+                failures[client] = recent
+                if len(recent) >= MAX_FAILURES:
+                    return False
+                failures[client].append(now)
                 if len(failures) > 5000:  # never let the table itself grow without bound
                     failures.clear()
             return False
@@ -156,7 +155,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             except ValueError:
                 return False
             return (len(parts) >= 4 and expires > time.time()
-                    and hmac.compare_digest(signature, sign(parts[2], parts[3], expires)))
+                    and hmac.compare_digest(signature.encode(), sign(parts[2], parts[3], expires).encode()))  # bytes: a non-ASCII signature must not crash
 
         def _body(self) -> dict:
             length = int(self.headers.get("Content-Length") or 0)
@@ -218,6 +217,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             job = next((j for j in ws.list_jobs() if j["id"] == job_id), None)
             if job is None:
                 raise WorkspaceError("no such job")
+            if not ws.team.can_see_room(self.who, job["room"]):
+                raise Forbidden("you are not in that room")
             if not self.who.at_least("admin") and job["owner"] != self.who.name:
                 raise Forbidden("that schedule belongs to someone else")
 
@@ -269,7 +270,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     "SELECT room, MAX(id) AS last_id, MAX(CASE WHEN sender != ? THEN id END) AS last_other FROM messages GROUP BY room", (who.name,))}
                 rooms = [r for r in ws.list_rooms() if ws.team.can_see_room(who, r["name"])]
                 seen = {r["name"] for r in rooms}
-                approvals = [{**a, "can_decide": ws.team.can_decide(who, a)} for a in ws.approvals() if a["room"] in seen or who.at_least("admin")]
+                approvals = [{**a, "can_decide": ws.team.can_decide(who, a)} for a in ws.approvals() if a["room"] in seen or who.role == "owner"]
                 approvals = [a for a in approvals if a["can_decide"] or a.get("requested_by") == who.name]
                 jobs = ws.list_jobs() if who.at_least("admin") else [j for j in ws.list_jobs() if j["room"] in seen]
                 return {"me": {"name": who.name, "role": who.role}, "approval_policy": ws.team.policy(),
@@ -291,7 +292,10 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     raise Forbidden("you are not in that room")
                 return ws.history(room, after=int((query.get("after") or ["0"])[0]))
             if path == "/api/audit":
-                return ws.audit_log()
+                rows = ws.audit_log()
+                if self.who.role != "owner":  # tool arguments can hold private chat content: admins see what happened, not the content
+                    rows = [{**r, "detail": (r["detail"] or "").split(" ", 1)[0] if r["event"] in ("tool-ok", "tool-error", "approval-granted", "approval-requested", "approval-denied") else r["detail"]} for r in rows]
+                return rows
             if path == "/api/me":
                 return {"name": self.who.name, "role": self.who.role}
             if path == "/api/team":
@@ -358,7 +362,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     raise WorkspaceError(f"could not reach the provider: {err}")
             if path == "/api/applink":
                 agent, app = query["agent"][0], query["app"][0]
-                if app not in _apps(ws, agent):
+                if ws.get_agent(agent, missing_ok=True) is None or app not in _apps(ws, agent):
                     raise WorkspaceError("no such app")
                 expires = int(time.time()) + APP_LINK_SECONDS
                 return {"url": f"/apps/{agent}/{app}/?exp={expires}&sig={sign(agent, app, expires)}"}
@@ -456,6 +460,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 ws.delete_agent(str(body["name"]))
                 return {"ok": True}
             if path == "/api/room/delete":
+                if ws._require_room(str(body["name"]))["kind"] == "dm" and self.who.role != "owner":
+                    raise Forbidden("only the owner can delete a private chat")
                 ws.delete_room(str(body["name"]))
                 return {"ok": True}
             if path == "/api/purge":
@@ -561,6 +567,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/tone":
                 return ws.set_tone(self.who.name, str(body["style"]), str(body.get("custom", "")))
             if path == "/api/improve/settings":
+                if (body.get("share_lessons") or body.get("auto_apply")) and self.who.role != "owner":
+                    raise Forbidden("only the owner can turn on sharing lessons with the provider or applying changes automatically")
                 return ws.improver.update_settings(body)
             if path == "/api/improve/run":
                 kind = str(body.get("kind", "all"))

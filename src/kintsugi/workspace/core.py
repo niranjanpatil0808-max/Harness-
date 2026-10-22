@@ -143,6 +143,8 @@ class Workspace:
             raise WorkspaceError("names are lowercase letters, digits, '-' and '_', start with a letter, and cannot be 'system'")
         if self.team.is_person(name):
             raise WorkspaceError("that name belongs to a person in this workspace")
+        if name.startswith(("cron-", "dm-")) or name in ("owner", "admin", "member"):
+            raise WorkspaceError("that name is reserved")
         if name in ("all", "everyone"):
             raise WorkspaceError("'all' and 'everyone' are reserved: @all wakes every agent in a room")
         if tier not in perms.TIERS:
@@ -678,8 +680,15 @@ class Workspace:
         """The direct-message room between two names (people or agents); created on first use."""
         if a == b:
             raise WorkspaceError("a direct message needs two different names")
-        name = "dm-" + "-".join(sorted([a, b]))
-        if not self.db.one("SELECT 1 FROM rooms WHERE name = ?", (name,)):
+        pair = sorted([a, b])
+        name = "dm-" + "-".join(pair)
+        existing = self.db.one("SELECT 1 FROM rooms WHERE name = ?", (name,))
+        if existing and set(self.members(name)) != set(pair):  # ('xa-yb','zc') and ('xa','yb-zc') would both be 'dm-xa-yb-zc'
+            import hashlib
+
+            name += "~" + hashlib.sha1("|".join(pair).encode()).hexdigest()[:6]
+            existing = self.db.one("SELECT 1 FROM rooms WHERE name = ?", (name,))
+        if not existing:
             self.db.execute("INSERT INTO rooms (name, kind, created) VALUES (?, 'dm', ?)", (name, self.clock()))
             self.db.execute("INSERT OR IGNORE INTO members (room, member) VALUES (?, ?)", (name, a))
             self.db.execute("INSERT OR IGNORE INTO members (room, member) VALUES (?, ?)", (name, b))
@@ -694,6 +703,7 @@ class Workspace:
     def remove_member(self, room: str, member: str) -> None:
         self._require_room(room)
         self.db.execute("DELETE FROM members WHERE room = ? AND member = ?", (room, member))
+        self.db.execute("DELETE FROM jobs WHERE room = ? AND owner = ?", (room, member))  # schedules set up by someone who left stop with them
 
     def members(self, room: str) -> list[str]:
         return [r["member"] for r in self.db.query("SELECT member FROM members WHERE room = ? ORDER BY member", (room,))]
@@ -929,6 +939,9 @@ class Workspace:
         self.get_agent(agent)
         self._require_room(room)
         parse_cron(cron)
+        mine = self.db.one("SELECT COUNT(*) AS n FROM jobs WHERE owner = ?", (owner,))["n"]
+        if mine >= 20 or self.db.one("SELECT COUNT(*) AS n FROM jobs")["n"] >= 100:
+            raise WorkspaceError("too many schedules (20 per person, 100 in all): delete some first")
         return self.db.execute("INSERT INTO jobs (agent, room, cron, prompt, kind, title, owner) VALUES (?, ?, ?, ?, ?, ?, ?)",
                                (agent, room, cron, prompt, kind, title[:120], owner))
 

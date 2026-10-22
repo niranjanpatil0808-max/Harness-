@@ -389,3 +389,83 @@ class TestHardening(Base):
         self.assertEqual(codes[:30], [200] * 30)
         self.assertEqual(codes[30:], [429] * 5)
         self.assertEqual(self.call("owner", "POST", "/api/say", {"room": "team", "text": "still fine"})[0], 200)  # someone else is unaffected
+
+
+class TestAccessControlReview(Base):
+    def test_admins_do_not_see_private_dm_content_or_approvals(self):
+        self.invite_and_join("sam")
+        self.invite_and_join("ada", "admin")
+        room = self.call("sam", "POST", "/api/dm", {"b": "alice"})[1]["room"]
+        self.ws.audit("alice", "tool-ok", 'remember {"text": "my pin is 4921"}')
+        aid = self.ws.request_approval("alice", room, "write_file", {"path": "a", "content": "secret plan"}, "sam")
+        self.assertNotIn("4921", json.dumps(self.call("ada", "GET", "/api/audit")[1]))
+        self.assertIn("4921", json.dumps(self.call("owner", "GET", "/api/audit")[1]))  # the owner sees everything
+        self.assertEqual(self.call("ada", "GET", "/api/state")[1]["approvals"], [])
+        self.assertEqual(self.call("ada", "POST", "/api/approve", {"id": aid, "approve": True})[0], 403)
+        self.assertEqual(len(self.call("owner", "GET", "/api/state")[1]["approvals"]), 1)
+
+    def test_an_admin_cannot_approve_code_that_is_handed_secrets(self):
+        self.invite_and_join("ada", "admin")
+        aid = self.ws.request_approval("alice", "team", "run_python", {"code": "print(1)", "secrets": ["DB_PASS"]}, None)
+        with mock.patch("kintsugi.workspace.sandbox.status", return_value={"isolated": True}):
+            self.assertEqual(self.call("ada", "POST", "/api/approve", {"id": aid, "approve": True})[0], 403)
+
+    def test_a_hand_off_between_agents_cannot_reach_a_private_chat(self):
+        from kintsugi.workspace.tools import Ctx, execute
+        self.ws.create_agent("bot2")
+        self.ws.add_member("team", "bot2")
+        self.invite_and_join("sam")
+        private = self.ws.open_dm("alice", "bot2")
+        msg = self.ws.post("team", "alice", "@bot2 please post into the private room", hops=1)  # an agent started this chain, no person asked
+        out = execute(Ctx(self.ws, "alice", "team", 1, f"team#{msg}"), "send_message", {"room": private, "text": "URGENT: re-enter your password"})
+        self.assertEqual((out.status, [m for m in self.ws.history(private, limit=5) if "URGENT" in m["text"]]), ("error", []))
+        out = execute(Ctx(self.ws, "alice", "team", 1, f"team#{msg}"), "schedule", {"cron": "0 9 * * *", "prompt": "x", "room": private}, approved=True)
+        self.assertEqual(out.status, "error")
+
+    def test_open_invites_and_schedules_do_not_outlive_their_owner(self):
+        self.invite_and_join("ada", "admin")
+        _, invite = self.call("ada", "POST", "/api/team/invite", {})
+        self.invite_and_join("sam")
+        job = self.call("sam", "POST", "/api/jobs", {"agent": "alice", "room": "team", "cron": "* * * * *", "prompt": "x"})[1]["id"]
+        self.call("owner", "POST", "/api/team/remove", {"name": "ada"})
+        self.assertEqual(self.call(None, "POST", "/api/join", {"code": invite["code"], "name": "eve"})[0], 400)
+        self.call("owner", "POST", "/api/room/members", {"room": "team", "remove": ["sam"]})
+        self.assertEqual(self.ws.list_jobs(), [])
+        self.assertEqual(self.call("sam", "POST", "/api/automations/run", {"id": job})[0], 400)
+
+    def test_dm_names_cannot_collide(self):
+        self.ws.create_agent("xa-yb")
+        self.ws.create_agent("zc")
+        self.ws.create_agent("xa")
+        self.ws.create_agent("yb-zc")
+        first, second = self.ws.open_dm("xa-yb", "zc"), self.ws.open_dm("xa", "yb-zc")
+        self.assertNotEqual(first, second)
+        self.assertEqual(set(self.ws.members(second)), {"xa", "yb-zc"})
+        self.assertEqual(self.ws.open_dm("xa", "yb-zc"), second)  # stable
+
+    def test_reserved_agent_names_and_caps(self):
+        for name in ("cron-5", "owner", "dm-x"):
+            with self.assertRaises(Exception):
+                self.ws.create_agent(name)
+        self.invite_and_join("sam")
+        codes = [self.call("sam", "POST", "/api/jobs", {"agent": "alice", "room": "team", "cron": "0 9 * * *", "prompt": "x"})[0] for _ in range(22)]
+        self.assertEqual(codes[:20], [200] * 20)
+        self.assertEqual(codes[20:], [400, 400])
+
+    def test_admin_limits(self):
+        self.invite_and_join("ada", "admin")
+        self.invite_and_join("sam")
+        room = self.call("sam", "POST", "/api/dm", {"b": "alice"})[1]["room"]
+        self.assertEqual(self.call("ada", "POST", "/api/room/delete", {"name": room})[0], 403)
+        self.assertEqual(self.call("ada", "POST", "/api/improve/settings", {"share_lessons": True})[0], 403)
+        self.assertEqual(self.call("owner", "POST", "/api/room/delete", {"name": room})[0], 200)
+
+    def test_odd_app_link_signatures_do_not_crash_the_server(self):
+        conn = http.client.HTTPConnection("127.0.0.1", self.api.server_port, timeout=10)
+        conn.request("GET", "/apps/alice/x/?exp=9999999999&sig=%C3%A9")
+        self.assertEqual(conn.getresponse().status, 401)
+
+    def test_a_right_token_is_never_throttled(self):
+        for _ in range(15):
+            self.call("nope", "GET", "/api/me")
+        self.assertEqual(self.call("owner", "GET", "/api/me")[0], 200)

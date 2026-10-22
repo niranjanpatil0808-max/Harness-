@@ -192,6 +192,7 @@ class Team:
         for room in self.ws.list_rooms():  # their private chats go with them: a new person must never inherit them
             if room["kind"] == "dm" and name in self.ws.members(room["name"]):
                 self.ws.delete_room(room["name"])
+        self.ws.db.execute("DELETE FROM invites WHERE created_by = ? AND used_by IS NULL", (name,))  # their open invites must not outlive them
         self.ws.db.execute("DELETE FROM users WHERE name = ?", (name,))
         self.ws.db.execute("DELETE FROM members WHERE member = ?", (name,))
         self.ws.db.execute("DELETE FROM push_subs WHERE user = ?", (name,))
@@ -206,6 +207,8 @@ class Team:
         if self.get(name) is None:
             raise TeamError("no such person")
         self.ws.db.execute("UPDATE users SET role = ? WHERE name = ?", (role, name))
+        if role == "member":
+            self.ws.db.execute("DELETE FROM invites WHERE created_by = ? AND used_by IS NULL", (name,))  # a demoted admin's open invites (some for admins) go too
         self.ws.audit(None, "role-changed", f"{name} -> {role}")
 
     def rotate_token(self, name: str) -> str:
@@ -230,22 +233,28 @@ class Team:
         return policy
 
     @staticmethod
-    def owner_only_tool(tool: str) -> bool:
+    def owner_only_tool(tool: str, args: str | dict | None = None) -> bool:
         """Code that could run with the server's own rights (fix_code always; run_python when it is not isolated) can only be approved
         by the owner: otherwise an admin could read the keychain and the owner token and take over the workspace."""
         from . import sandbox
 
-        return tool == "fix_code" or (tool == "run_python" and not sandbox.status()["isolated"])
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except json.JSONDecodeError:
+                args = {}
+        handed_secrets = tool == "run_python" and bool((args or {}).get("secrets"))  # code that is given secret values could print them in a form redaction misses
+        return tool == "fix_code" or handed_secrets or (tool == "run_python" and not sandbox.status()["isolated"])
 
     def can_decide(self, who: Identity, approval: dict) -> bool:
         """Owners can always decide, admins too (except for code that would run unisolated). Members only when the policy says so AND
         they belong to the room it came from."""
-        if self.owner_only_tool(approval["tool"]) and who.role != "owner":
+        if self.owner_only_tool(approval["tool"], approval.get("args")) and who.role != "owner":
             return False
+        if who.role != "owner" and who.name not in self.ws.members(approval["room"]):
+            return False  # nobody but the owner decides (or sees) approvals from chats they are not part of
         if who.at_least("admin"):
             return True
-        if who.name not in self.ws.members(approval["room"]):
-            return False
         policy = self.policy()
         if policy == "everyone":
             return True

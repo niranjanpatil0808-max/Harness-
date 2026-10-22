@@ -82,15 +82,25 @@ def _path(ctx: Ctx, value: str) -> Path:
 
 # --- safe tools -------------------------------------------------------------
 
+def _may_cross_rooms(ctx: Ctx, room: str) -> None:
+    """An agent acts in another room only for someone who is in it. If the chain started with another agent or the system (nobody
+    accountable asked), it fails closed: otherwise a member could route a message into someone else's private chat by hand-off."""
+    asker = ctx.ws.requester_of(ctx.situation)
+    if asker == "you":
+        return  # the owner is in every room
+    if asker is None:
+        raise ToolError("nobody who is part of that room asked for this, so you cannot post there")
+    if asker not in ctx.ws.members(room):
+        raise ToolError(f"the person who asked ({asker}) is not in '{room}', so you cannot post there for them")
+
+
 def send_message(ctx: Ctx, args: dict) -> str:
     room = _text(args, "room", 60, required=False) or ctx.room
     text = _text(args, "text", 2000)
     if ctx.agent not in ctx.ws.members(room):
         raise ToolError(f"you are not a member of room '{room}'")
-    if room != ctx.room:  # never carry one person's private chat into a room they are not part of
-        asker = ctx.ws.requester_of(ctx.situation)
-        if asker and asker != "you" and asker not in ctx.ws.members(room):
-            raise ToolError(f"the person who asked ({asker}) is not in '{room}', so you cannot post there for them")
+    if room != ctx.room:
+        _may_cross_rooms(ctx, room)
     ctx.ws.post(room, ctx.agent, text, hops=ctx.hops)
     return f"sent to {room}"
 
@@ -288,6 +298,8 @@ def schedule(ctx: Ctx, args: dict) -> str:
     room = _text(args, "room", 60, required=False) or ctx.room
     if ctx.agent not in ctx.ws.members(room):
         raise ToolError(f"you are not a member of room '{room}'")
+    if room != ctx.room:
+        _may_cross_rooms(ctx, room)
     job_id = ctx.ws.add_job(ctx.agent, room, cron, prompt)
     return f"scheduled job {job_id}: '{cron}' in {room}"
 

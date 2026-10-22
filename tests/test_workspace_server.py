@@ -211,10 +211,10 @@ class TestServer(unittest.TestCase):
         status, data, _ = self.call("GET", "/healthz", token=None)
         self.assertEqual((status, json.loads(data)), (200, {"ok": True}))
 
-    def test_many_wrong_tokens_get_a_client_turned_away_even_with_the_right_one(self):
-        for _ in range(10):
+    def test_guessing_is_throttled_but_the_right_token_always_works(self):
+        for _ in range(12):
             self.assertEqual(self.call("GET", "/api/state", token="guess")[0], 401)
-        self.assertEqual(self.call("GET", "/api/state")[0], 401)  # throttled: even the real token is refused for a while
+        self.assertEqual(self.call("GET", "/api/state")[0], 200)  # a typo-storm or an attacker on a shared address cannot lock the real owner out
 
     def test_a_weak_token_is_refused_when_listening_on_a_network(self):
         with self.assertRaises(SystemExit) as caught:

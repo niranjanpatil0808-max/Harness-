@@ -26,6 +26,7 @@ import os
 import re
 import socket
 import ssl
+import threading
 import time
 import urllib.parse
 from html.parser import HTMLParser
@@ -94,6 +95,15 @@ def check_url(url: str) -> urllib.parse.SplitResult:
     if port not in PORTS and not _allow_local():
         raise FetchError("that port is not allowed (use the normal web ports)")
     return parts
+
+
+def _cut(conn: http.client.HTTPConnection) -> None:
+    """Called by the watchdog when time is up: shutting the socket down wakes a read that is waiting on a slow server."""
+    try:
+        if conn.sock is not None:
+            conn.sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
 
 
 class _Pinned(http.client.HTTPConnection):
@@ -184,6 +194,9 @@ def roundtrip(url: str, method: str = "GET", headers: dict | None = None, body: 
             raise FetchError("that host name is not valid") from None
         sent = {"Host": host_header, "User-Agent": USER_AGENT, "Accept": "text/html,text/plain,application/json;q=0.9,*/*;q=0.1",
                 "Accept-Encoding": "identity", "Connection": "close", **extra}
+        timer = threading.Timer(remaining, _cut, args=(conn,))  # a watchdog: per-read timeouts reset on every dripped byte, this does not
+        timer.daemon = True
+        timer.start()
         try:
             conn.request(method, path, body=body, headers=sent)
             response = conn.getresponse()
@@ -220,8 +233,11 @@ def roundtrip(url: str, method: str = "GET", headers: dict | None = None, body: 
             raw = b"".join(chunks)
             charset_header = response.getheader("Content-Type") or ""
         except (OSError, http.client.HTTPException, ssl.SSLError) as err:
+            if time.monotonic() - started >= TOTAL_SECONDS - 0.05:
+                raise FetchError("the site was too slow to answer") from None
             raise FetchError(f"could not read the page ({type(err).__name__})") from None
         finally:
+            timer.cancel()
             conn.close()
         return url, content_type + (";" + charset_header.split(";", 1)[1] if ";" in charset_header else ""), raw[:max_bytes], len(raw) > max_bytes
     raise FetchError("too many redirects")
