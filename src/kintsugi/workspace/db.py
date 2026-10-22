@@ -87,6 +87,8 @@ class Database:
             self.conn.execute("ALTER TABLE agents ADD COLUMN internet TEXT NOT NULL DEFAULT 'ask'")
         if "provider" not in columns:
             self.conn.execute("ALTER TABLE agents ADD COLUMN provider TEXT")
+        if "room" not in {row["name"] for row in self.conn.execute("PRAGMA table_info(notes)")}:
+            self.conn.execute("ALTER TABLE notes ADD COLUMN room TEXT")  # NULL: an older note, seen in every chat
         job_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(jobs)")}
         for column, ddl in (("kind", "TEXT NOT NULL DEFAULT 'custom'"), ("title", "TEXT NOT NULL DEFAULT ''"), ("last_run_ts", "REAL"),
                             ("runs", "INTEGER NOT NULL DEFAULT 0"), ("owner", "TEXT NOT NULL DEFAULT 'you'")):

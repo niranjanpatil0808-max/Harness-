@@ -196,3 +196,21 @@ class TestReviewC(Base):
             templates.apply(self.ws, "founder", "you")
         if before is not None:
             self.assertEqual({a["name"] for a in self.ws.list_agents()}, before)
+
+
+class TestNotesPerChat(Base):
+    def test_a_note_made_in_a_private_chat_is_not_recalled_in_the_team_room(self):
+        from kintsugi.workspace.agents import build_context
+        from kintsugi.workspace.tools import Ctx, execute
+
+        dm = self.ws.open_dm("you", "alice")
+        execute(Ctx(self.ws, "alice", dm, 0, dm + "#1"), "remember", {"text": "my salary is 123k"})
+        execute(Ctx(self.ws, "alice", "team", 0, "team#1"), "remember", {"text": "launch is on friday"})
+        self.ws.add_note("alice", "old salary note from before notes had rooms")
+        team = execute(Ctx(self.ws, "alice", "team", 0, "team#1"), "search_memory", {"query": "salary"}).output
+        self.assertNotIn("123k", team)
+        self.assertIn("old salary note", team)  # older notes stay visible everywhere, as before
+        self.assertIn("123k", execute(Ctx(self.ws, "alice", dm, 0, dm + "#1"), "search_memory", {"query": "salary"}).output)
+        self.assertNotIn("friday", execute(Ctx(self.ws, "alice", dm, 0, dm + "#1"), "search_memory", {"query": "launch friday"}).output)
+        self.ws.delete_room(dm)
+        self.assertIsNone(self.ws.db.one("SELECT 1 FROM notes WHERE text LIKE '%123k%'"))

@@ -763,7 +763,7 @@ class Workspace:
 
     def delete_room(self, room: str) -> None:
         self._require_room(room)
-        for table in ("messages", "members", "jobs", "approvals"):
+        for table in ("messages", "members", "jobs", "approvals", "notes"):
             self.db.execute(f"DELETE FROM {table} WHERE room = ?", (room,))
         self.db.execute("DELETE FROM rooms WHERE name = ?", (room,))
         compact.forget(self, room)
@@ -1112,13 +1112,14 @@ class Workspace:
 
     # --- notes (an agent's own scratch memory) --------------------------
 
-    def add_note(self, agent: str, text: str) -> int:
-        return self.db.execute("INSERT INTO notes (agent, text, ts) VALUES (?, ?, ?)", (agent, text, self.clock()))
+    def add_note(self, agent: str, text: str, room: str | None = None) -> int:
+        """A note belongs to the chat it was made in, so what someone says in a private chat is not recalled in a team room."""
+        return self.db.execute("INSERT INTO notes (agent, text, ts, room) VALUES (?, ?, ?, ?)", (agent, text, self.clock(), room))
 
-    def search_notes(self, agent: str, query: str, limit: int = 5) -> list[dict]:
+    def search_notes(self, agent: str, query: str, limit: int = 5, room: str | None = None) -> list[dict]:
         wanted = tokens(query)
         scored = []
-        for note in self.db.query("SELECT * FROM notes WHERE agent = ? ORDER BY id DESC LIMIT 500", (agent,)):
+        for note in self.db.query("SELECT * FROM notes WHERE agent = ? AND (room IS NULL OR room = ?) ORDER BY id DESC LIMIT 500", (agent, room)):
             overlap = len(wanted & tokens(note["text"]))
             if overlap:
                 scored.append((overlap, note["id"], note))

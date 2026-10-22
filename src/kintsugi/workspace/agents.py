@@ -239,7 +239,7 @@ def run_agent(ws: "Workspace", name: str, room: str, message_id: int, hops: int)
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": build_context(ws, room, message_id, memory.format(lessons),
-                                                  ws.search_notes(name, trigger["text"], limit=3))},
+                                                  ws.search_notes(name, trigger["text"], limit=3, room=room))},
     ]
     try:
         _loop(ws, name, room, hops, model, ctx, memory, situation, messages, shown)

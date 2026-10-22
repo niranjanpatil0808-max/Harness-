@@ -68,8 +68,11 @@ recorded with the name of whoever decided.
 
 ## Honest limits
 
-- **Agents have one memory and one folder each**, shared by everyone who can talk to them. Something a person tells an agent in a
-  private chat can come up later when a teammate talks to that agent. Use separate agents for things that must stay separate.
+- **What stays in its chat:** files you attach, notes an agent saves with `remember`, and the long-chat summary. These are only
+  available to the agent while it works in that chat, and are deleted with it.
+- **What an agent shares across chats:** its own folder of files it wrote, its published apps and its lessons from mistakes. If an agent
+  writes something into its folder during a private chat, a teammate in another room could ask it to read that file. Use separate agents
+  for work that must stay separate.
 - The owner can read everything, including other people's private chats.
 - Tokens and invite links travel through the browser: use HTTPS (hosting platforms provide it). There is no email check, password
   reset or single sign-on; losing a sign-in means asking the owner for a new link.

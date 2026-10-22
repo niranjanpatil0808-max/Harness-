@@ -186,3 +186,4 @@ Done and pushed:
 Last full run before the task-board UI: 542 unit OK, 17 browser suites OK. (Re-run after UI: see git log.)
 Remaining known: per-person agent memory (agents still share one memory/folder across chats — documented); DST skipped hour; backup
 rollback (needs passphrase); look-alike markdown links; tokens in sign-in links are long-lived (one-time codes would be better).
+- Notes (remember/search_memory) now scoped per chat: notes.room column (NULL = legacy, visible everywhere); deleted with the room.

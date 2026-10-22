@@ -148,12 +148,12 @@ def write_file(ctx: Ctx, args: dict) -> str:
 
 def remember(ctx: Ctx, args: dict) -> str:
     text = _text(args, "text", 500)
-    note_id = ctx.ws.add_note(ctx.agent, text)
+    note_id = ctx.ws.add_note(ctx.agent, text, ctx.room)
     return f"remembered as note {note_id}"
 
 
 def search_memory(ctx: Ctx, args: dict) -> str:
-    hits = ctx.ws.search_notes(ctx.agent, _text(args, "query", 300))
+    hits = ctx.ws.search_notes(ctx.agent, _text(args, "query", 300), room=ctx.room)
     return "\n".join(f"note {h['id']}: {h['text']}" for h in hits) or "nothing found"
 
 
