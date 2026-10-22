@@ -2,7 +2,7 @@
    It NEVER caches /api/* or /apps/* (they carry your data) and never stores the access token. */
 const VERSION = "__VERSION__";
 const CACHE = "kintsugi-shell-" + VERSION;
-const SHELL = ["/", "/static/app.css", "/static/app.js", "/static/logo.svg", "/static/vendor/marked.min.js",
+const SHELL = ["/", "/static/app.css", "/static/app.js", "/static/extras.js", "/static/logo.svg", "/static/vendor/marked.min.js",
                "/static/vendor/purify.min.js", "/static/icons/icon-192.png", "/static/icons/icon-512.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

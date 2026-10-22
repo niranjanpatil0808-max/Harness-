@@ -10,6 +10,7 @@ const S = {loadedRooms: {}, installEvent: null, token: "", state: null, room: nu
 function h(tag, attrs, ...kids) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
+    if (k.startsWith("aria-") && typeof v === "boolean") { e.setAttribute(k, String(v)); continue; }  // "true"/"false", so screen readers announce the state
     if (v == null || v === false) continue;
     if (k === "class") e.className = v;
     else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
@@ -27,7 +28,7 @@ const ICONS = {
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', side: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15"/>',
   panel: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M14.5 4.5v15"/>', send: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   theme: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
-  close: '<path d="M6 6l12 12M18 6 6 18"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', speaker: '<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/>', gear: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>', plus: '<path d="M12 5v14M5 12h14"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>', clip: '<path d="M20 11.5l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.5 17.5a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', speaker: '<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/>', gear: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>', plus: '<path d="M12 5v14M5 12h14"/>',
 };
 function icon(name, size = 18) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -57,7 +58,7 @@ async function api(path, body) {
   const r = await fetch(path, {method: body ? "POST" : "GET", headers: {"X-Token": S.token, "Content-Type": "application/json", "X-Visible": document.visibilityState === "visible" ? "1" : "0"},
                                body: body ? JSON.stringify(body) : undefined});
   let d = {}; try { d = await r.json(); } catch (e) { /* empty */ }
-  if (r.status === 401) { connectDialog(); throw new Error("Enter your access token"); }
+  if (r.status === 401) { connectDialog(!!S.token); throw new Error("Enter your access token"); }
   if (!r.ok) throw new Error(d.error || "Request failed (" + r.status + ")");
   return d;
 }
@@ -112,6 +113,7 @@ function renderSidebar() {
     h("div", {class: "brand"}, h("img", {src: "/static/logo.svg", alt: ""}), "Kintsugi", h("span", {class: "sp"}),
       h("button", {class: "icon-btn", "aria-label": "Close sidebar", onclick: toggleSidebar}, icon("side"))),
     h("button", {class: "newchat", onclick: newChatDialog}, h("span", {class: "plus"}, "+"), "New chat"),
+    h("button", {class: "item muted find-btn", onclick: () => openSwitcher(), "aria-label": "Search chats and messages"}, h("span", {style: "width:24px;display:grid;place-items:center"}, icon("search", 16)), "Search", h("kbd", {}, /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘K" : "Ctrl K")),
     h("nav", {class: "nav"},
       dms.length ? [h("h4", {}, "Direct messages"), dms.map(roomItem)] : null,
       grp.length ? [h("h4", {}, "Rooms"), grp.map(roomItem)] : null,
@@ -203,7 +205,9 @@ function bodyOf(m) {
   return h("div", {class: "row"}, avatar(m.sender, true),
     h("div", {class: "body-wrap", style: "flex:1;min-width:0"},
       h("div", {class: "who-line"}, m.sender, h("time", {}, clock(m.ts))),
-      agent ? md(m.text) : h("div", {class: "body", style: "white-space:pre-wrap"}, m.text)));
+      agent ? md(m.text) : h("div", {class: "body", style: "white-space:pre-wrap"}, m.text),
+      h("div", {class: "msg-actions"}, h("button", {class: "mini", "aria-label": "Copy this message", onclick: (e) => copyText(m.text, e.currentTarget)}, "Copy"),
+        agent ? h("button", {class: "mini", "aria-label": "Ask again", title: "Send your last message to " + m.sender + " again", onclick: () => askAgain(m.sender)}, "Ask again") : null)));
 }
 function emptyState() {
   const r = curRoom(), ra = roomAgents(r), first = ra[0] || (agents()[0] || {}).name;
@@ -226,6 +230,31 @@ function renderThread(msgs) {
   if (!th.children.length || (only && sigChanged("hello", [S.room, agents().map((a) => a.name)]))) th.replaceChildren(emptyState());
   if (msgs.length) { if (wasNear) { sc.scrollTop = sc.scrollHeight; $("#jump").hidden = true; } else $("#jump").hidden = false; }
   S.stick = false;
+}
+function attachTarget() { const r = curRoom(); return !r ? null : r.kind === "dm" ? roomLabel(r) : recipient(); }
+async function attachFile(file, input) {
+  if (input) input.value = "";
+  const agent = attachTarget();
+  if (!file || !agent) { toast("Open a chat with an agent first", true); return; }
+  if (file.size > 1_500_000) { toast("That file is larger than 1.5 MB", true); return; }
+  try {
+    const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result).split(",")[1] || ""); fr.onerror = reject; fr.readAsDataURL(file); });
+    const r = await api("/api/upload", {agent, name: file.name, data});
+    const ta = $("#msg"); ta.value = ((curRoom() || {}).kind === "dm" ? "" : "@" + agent + " ") + "I gave you the file " + r.path + ". " + ta.value; ta.dispatchEvent(new Event("input")); ta.focus();
+    toast("Saved as " + r.path + " in " + agent + "'s files");
+  } catch (e) { toast(e.message, true); }
+}
+async function askAgain(agent) {
+  const text = (S.lastSent || {})[S.room];
+  if (!text) { toast("Nothing to repeat yet", true); return; }
+  try { await api("/api/say", {room: S.room, text: /(^|\s)@[a-z]/.test(text) || (curRoom() || {}).kind === "dm" ? text : "@" + agent + " " + text}); S.fast = 12; await poll(true); } catch (e) { toast(e.message, true); }
+}
+async function stopAgents(names) {
+  for (const n of names) { try { await api("/api/stop", {agent: n}); } catch (e) { toast(e.message, true); return; } }
+  toast("Stopping. It will stop after its current step.");
+}
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); if (btn) { const old = btn.textContent; btn.textContent = "Copied"; setTimeout(() => (btn.textContent = old), 1200); } } catch (e) { toast("Copy is not available here", true); }
 }
 function sandboxLine(tool) {
   const sb = S.state && S.state.sandbox;
@@ -252,7 +281,8 @@ function renderInline() {
         : h("div", {class: "actions"}, h("button", {class: "btn primary", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: true})); }}, "Allow once"),
           h("button", {class: "btn danger", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: false})); }}, "Deny")));
     }),
-    busy.length ? h("div", {class: "working", "aria-live": "polite"}, SPARK(), busy.join(", ") + (busy.length > 1 ? " are" : " is") + " working…") : null);
+    busy.length ? h("div", {class: "working", "aria-live": "polite"}, SPARK(), h("span", {class: "wk"}, busy.map((n) => n + " is " + ((S.state.activity || {})[n] || "working") + "…").join(" · ")),
+      h("button", {class: "stop", "aria-label": "Stop " + busy.join(", "), onclick: () => stopAgents(busy)}, "Stop")) : null);
   if (near) s.scrollTop = s.scrollHeight;
 }
 
@@ -265,7 +295,9 @@ function buildComposer() {
   const pop = h("div", {class: "mentions", id: "mentions", role: "listbox", hidden: true});
   const spk = CAN_SPEAK ? h("button", {class: "icon-btn", id: "spk", "aria-label": "Read replies aloud", "aria-pressed": "false", title: "Read replies aloud", onclick: toggleSpeakSetting}, icon("speaker")) : null;
   const mic = SR ? h("button", {class: "icon-btn", id: "mic", "aria-label": "Speak your message", title: "Speak your message", onclick: toggleListening}, icon("mic")) : null;
-  fill(wrap, h("div", {class: "composer"}, pop, h("div", {id: "starters", class: "strip"}), h("div", {id: "to", class: "strip"}), h("div", {class: "box"}, ta, spk, mic, send)),
+  const fileInput = h("input", {type: "file", id: "file-input", hidden: true, accept: ".txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.yaml,.yml,.xml,.html,.css,.js,.ts,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.sh,.sql,.toml,.ini,.log,.tex", onchange: (e) => attachFile(e.target.files[0], e.target)});
+  const clip = h("button", {class: "icon-btn", id: "attach", "aria-label": "Give a text file to the agent", title: "Give a text file to the agent", onclick: () => fileInput.click()}, icon("clip"));
+  fill(wrap, h("div", {class: "composer"}, pop, h("div", {id: "starters", class: "strip"}), h("div", {id: "to", class: "strip"}), h("div", {class: "box"}, ta, clip, fileInput, spk, mic, send)),
     h("div", {class: "hint", id: "hint"}, "Enter to send · Shift+Enter for a new line · @ to mention an agent"));
   ta.addEventListener("input", () => {
     ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 220) + "px";
@@ -301,6 +333,7 @@ async function sendMsg() {
   const target = recipient(); if (target && !/(^|\s)@[a-z]/.test(text)) text = "@" + target + " " + text;  // no need to type @ in a room
   stopSpeaking(); S.sending = true; S.stick = true; ta.value = ""; ta.dispatchEvent(new Event("input"));
   (S.talked = S.talked || {})[S.room] = true; updateComposer();
+  (S.lastSent = S.lastSent || {})[S.room] = text;
   try { await api("/api/say", {room: S.room, text}); S.fast = 12; await poll(true); }
   catch (e) { toast(e.message, true); ta.value = text; ta.dispatchEvent(new Event("input")); }
   finally { S.sending = false; ta.focus(); }
@@ -320,7 +353,9 @@ function starterIdeas() {
 function updateComposer() {
   const r = curRoom(), ta = $("#msg"); if (!ta) return;
   ta.placeholder = !agents().length ? "Create an agent first" : r ? (r.kind === "dm" ? "Message " + roomLabel(r) : "Message " + (recipient() ? "@" + recipient() : "#" + r.name)) : "Pick a chat";
-  ta.disabled = !r;
+  const noAgents = !!r && r.kind !== "dm" && roomAgents(r).length === 0;
+  ta.disabled = !r || noAgents;
+  if (noAgents) ta.placeholder = isAdmin() ? "This room has no agents yet. Add one in the room's members." : "This room has no agents yet.";
   const to = $("#to"), st = $("#starters"); if (!to) return;
   const ra = r && r.kind !== "dm" ? roomAgents(r) : [];
   if (sigChanged("to", [r && r.name, ra, recipient()])) fill(to, ra.length > 1 ? [h("span", {class: "muted", style: "font-size:13px"}, "To"), ...ra.map((n) => h("button", {class: "chip" + (n === recipient() ? " on" : ""), "aria-pressed": n === recipient(), onclick: () => { (S.to = S.to || {})[r.name] = n; S.sig.to = null; updateComposer(); $("#msg").focus(); }}, "@" + n))] : []);
@@ -563,7 +598,7 @@ function inviteLinkDialog(made) {
 }
 async function teamPanel() {
   const d = await api("/api/team"), refresh = async () => fill($("#settings-body"), await teamPanel());
-  const rows = [h("div", {class: "card", style: "display:flex;gap:8px;align-items:center"}, h("strong", {style: "flex:1"}, "you"), h("span", {class: "muted"}, "owner"))].concat(d.users.map((u) => h("div", {class: "card", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"},
+  const rows = [h("div", {class: "card", style: "display:flex;gap:8px;align-items:center"}, h("strong", {style: "flex:1"}, isOwner() ? "you" : "the owner"), h("span", {class: "muted"}, "owner"))].concat(d.users.map((u) => h("div", {class: "card", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"},
     h("strong", {style: "flex:1"}, u.name), isOwner() ? h("select", {"aria-label": "Role of " + u.name, onchange: async (e) => { await act(() => api("/api/team/role", {name: u.name, role: e.target.value}), u.name + " is now " + e.target.value); await refresh(); }}, ["member", "admin"].map((r) => h("option", {value: r, selected: u.role === r}, r))) : h("span", {class: "muted"}, u.role),
     h("span", {class: "muted", style: "font-size:12px"}, u.last_seen ? "seen " + new Date(u.last_seen * 1000).toLocaleDateString() : "not yet"),
     (isOwner() || u.role === "member") ? h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + u.name + "?", "Their sign-in stops working at once. Their messages stay in the rooms.", "Remove", async () => { await act(() => api("/api/team/remove", {name: u.name}), u.name + " removed"); await refresh(); })}, "Remove") : null)));
@@ -668,11 +703,11 @@ async function modelsPanel() {
   const kind = h("select", {"aria-label": "Kind"}, [["openai", "OpenAI-style API"], ["anthropic", "Anthropic (Claude)"], ["gemini", "Google Gemini"]].map(([v, l]) => h("option", {value: v}, l)));
   const note = h("small", {class: "muted", style: "display:block;margin-top:4px"});
   const fillPreset = () => { const p = d.presets[preset.value]; url.value = p.base_url; model.value = p.model; kind.value = p.kind; key.placeholder = p.keyless ? "No key needed for a model on this computer" : "Paste your API key";
-    note.replaceChildren(p.signup ? h("span", {}, "Get a key at ", h("a", {href: p.signup, target: "_blank", rel: "noopener"}, p.signup.replace("https://", ""))) : "", " The model name is only a suggestion: use Test to see what your key can use."); };
+    note.replaceChildren(p.signup ? h("span", {}, "Get a key at ", h("a", {href: p.signup, target: "_blank", rel: "noopener"}, p.signup.replace("https://", "")), ".") : "", " The model name is only a suggestion: use Test to see what your key can use."); };
   preset.onchange = fillPreset; fillPreset();
   const save = async () => { const p = d.presets[preset.value], id = preset.value === "custom" ? "custom-" + Math.random().toString(36).slice(2, 6) : preset.value;
     const ok = await act(() => api("/api/providers/save", {id, label: p.label, kind: kind.value, base_url: url.value, model: model.value, key: key.value, keyless: !!p.keyless, make_default: !d.profiles.length}), "Saved");
-    if (ok) { key.value = ""; fill($("#settings-body"), await modelsPanel()); try { fill($("#model-test"), h("div", {class: "card"}, "Testing your key…")); fill($("#model-test"), testResult(await api("/api/providers/test", {id}))); } catch (e) { toast(e.message, true); } } };
+    if (ok) { key.value = ""; fill($("#settings-body"), await modelsPanel()); try { $("#model-test").scrollIntoView({block: "nearest"}); fill($("#model-test"), h("div", {class: "card"}, "Testing your key…")); fill($("#model-test"), testResult(await api("/api/providers/test", {id}))); } catch (e) { toast(e.message, true); } } };
   const row = (label, el) => h("div", {style: "margin:10px 0"}, h("label", {style: "margin:0 0 4px"}, label), el);
   return h("div", {}, h("p", {style: "margin-top:0"}, "This app runs on your own API key. Add any provider; agents use the default one unless you pick another for an agent. Your key is stored in your keychain, never shown again, and only ever sent to the address you enter here."),
     d.profiles.length ? rows : h("div", {class: "card"}, d.env_fallback ? "Using the key from this server's settings. Add a provider here to override it." : "No model is set up yet. Add one below to start."), out,
@@ -715,7 +750,7 @@ function toggleDrawer(force) {
 async function loadTab() {
   const a = focusAgent(); if (!a || !S.drawer) return;
   const q = encodeURIComponent(a);
-  if (S.tab === "agent") S.cache.plugins = (await api("/api/plugins")).plugins;
+  if (S.tab === "agent") { try { S.cache.plugins = isOwner() ? (await api("/api/plugins")).plugins : []; } catch (e) { S.cache.plugins = []; } }
   if (S.tab === "lessons") S.cache.lessons = await api("/api/lessons?agent=" + q);
   if (S.tab === "files") S.cache.files = await api("/api/files?agent=" + q);
   if (S.tab === "improve") S.cache.improve = await api("/api/improve");
@@ -792,8 +827,8 @@ function safetyTab(a) {
     h("h4", {}, "Where your messages go"), h("div", {class: "card"}, "Whenever an agent thinks, the conversation text (and tool results) is sent to ", h("strong", {}, st.provider), ". Files, secrets and your other chats stay on this server."),
     h("h4", {}, "Cost guard"), h("div", {class: "card"}, u.calls + " model calls today" + (u.limit ? " of " + u.limit + " allowed (resets at midnight UTC)." : ", no limit set.")),
     h("h4", {}, "Your data"), h("div", {class: "stack"},
-      h("button", {class: "btn", onclick: exportData}, "Download everything (JSON)"),
-      h("button", {class: "btn", onclick: () => confirmDialog("Delete old messages?", "Messages and log entries older than 30 days will be deleted for good.", "Delete", () => act(async () => { const r2 = await api("/api/purge", {days: 30}); toast("Deleted " + r2.deleted + " messages"); }))}, "Delete messages older than 30 days"),
+      !isOwner() ? null : h("button", {class: "btn", onclick: exportData}, "Download everything (JSON)"),
+      !isOwner() ? null : h("button", {class: "btn", onclick: () => confirmDialog("Delete old messages?", "Messages and log entries older than 30 days will be deleted for good.", "Delete", () => act(async () => { const r2 = await api("/api/purge", {days: 30}); toast("Deleted " + r2.deleted + " messages"); }))}, "Delete messages older than 30 days"),
       r && r.kind !== "dm" ? h("button", {class: "btn danger", onclick: () => confirmDialog("Delete room " + r.name + "?", "Its messages, schedules and pending approvals are deleted for good.", "Delete room", async () => { await act(() => api("/api/room/delete", {name: r.name}), "Room deleted"); S.room = null; })}, "Delete this room") : null,
       h("button", {class: "btn danger", onclick: () => confirmDialog("Delete " + a.name + "?", "Its files, apps, lessons, notes, secrets, schedules and chats are deleted for good. This cannot be undone.", "Delete " + a.name, async () => { await act(() => api("/api/agent/delete", {name: a.name}), "Agent deleted"); S.agent = null; S.room = null; })}, "Delete agent " + a.name))];
 }
@@ -874,6 +909,7 @@ const settingsTabs = () => SETTINGS_TAB_LIST.filter((t) => RANKS[me().role] >= R
 const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel(), team: () => teamPanel(), integrations: () => integrationsPanel(), models: () => modelsPanel(), internet: () => internetPanel(), plugins: () => pluginsPanel()};
 async function settingsDialog(tab) {
   if (typeof tab !== "string") tab = S.settingsTab || "general";
+  closeSidebarMobile();
   S.settingsOpen = true;
   const body = h("div", {id: "settings-body"}), bar = h("div", {class: "tabs", role: "tablist", style: "padding:0;margin:0 0 12px"});
   const show = async (key) => {
@@ -900,26 +936,39 @@ function renderImproveSections(d) {
 async function viewFile(agent, path) { try { S.file = await api("/api/file?agent=" + encodeURIComponent(agent) + "&path=" + encodeURIComponent(path)); S.sig.drawer = null; renderDrawer(); } catch (e) { toast(e.message, true); } }
 
 /* ---------- dialogs ---------- */
-function dialog(title, desc, content, actions, onClose) {
-  const root = $("#dialog-root");
-  const close = () => { overlay.remove(); document.removeEventListener("keydown", esc); if (onClose) onClose(); };
-  const esc = (e) => { if (e.key === "Escape" && root.lastElementChild === overlay) close(); };  // only the top dialog
-  const overlay = h("div", {class: "overlay", onmousedown: (e) => { if (e.target === overlay) close(); }},
+function dialog(title, desc, content, actions, onClose, opts = {}) {
+  const root = $("#dialog-root"), opener = document.activeElement;
+  const close = () => { overlay.remove(); document.removeEventListener("keydown", esc); if (!root.children.length) $("#app").inert = false;
+    if (opener && opener.focus && document.contains(opener) && opener !== document.body) opener.focus(); if (onClose) onClose(); };
+  const esc = (e) => {
+    if (root.lastElementChild !== overlay) return;  // only the top dialog
+    if (e.key === "Escape" && !opts.locked) close();
+    if (e.key === "Tab") {  // keep focus inside the dialog
+      const f = [...overlay.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter((el) => el.offsetParent !== null);
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { f[f.length - 1].focus(); e.preventDefault(); } else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { f[0].focus(); e.preventDefault(); }
+    }
+  };
+  const overlay = h("div", {class: "overlay", onmousedown: (e) => { if (e.target === overlay && !opts.locked) close(); }},
     h("div", {class: "dialog", role: "dialog", "aria-modal": "true", "aria-label": title}, h("h3", {}, title), desc ? h("p", {}, desc) : null, content,
       actions ? h("div", {class: "actions"}, actions(close)) : null));
   document.addEventListener("keydown", esc);
-  root.append(overlay);
+  root.append(overlay); $("#app").inert = true;  // nothing behind a dialog can be reached by keyboard or screen reader
   const first = overlay.querySelector("input,textarea,select"); if (first) first.focus();
   close.dialog = overlay.querySelector(".dialog");
   return close;
 }
-function connectDialog() {
-  if ($("#dialog-root .dialog")) return;
+function connectDialog(failed) {
+  const existing = $("#dialog-root .dialog[aria-label='Sign in']");
+  if (existing) return;
+  if (failed) { $("#dialog-root").replaceChildren(); $("#app").inert = false; }  // a sign-in that stopped working matters more than whatever was open
+  else if ($("#dialog-root .dialog")) return;
   const input = h("input", {type: "password", placeholder: "Access token", autocomplete: "off", "aria-label": "Access token"});
   const go = (close) => { S.token = input.value.trim(); store.set("kt-token", S.token); try { sessionStorage.setItem("kt", S.token); } catch (e) { /* ok */ } close(); poll(true); };
-  dialog("Connect to your workspace", "Paste the access token printed by `kintsugi workspace serve` (or the KINTSUGI_TOKEN you set). It stays in this browser.",
+  dialog("Sign in", failed ? "That sign-in did not work. It may have been changed or removed. Paste your access token (the owner's) or the personal token from your invite, or ask whoever runs this workspace for a new link."
+    : "Paste your access token: the owner's token, or the personal token from your invite. It stays in this browser.",
     h("form", {onsubmit: (e) => e.preventDefault()}, input),
-    (close) => [h("button", {class: "btn primary", onclick: () => go(close)}, "Connect")]);
+    (close) => [h("button", {class: "btn primary", onclick: () => go(close)}, "Sign in")]);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#dialog-root .btn.primary").click(); });
 }
 function newChatDialog() {
@@ -930,7 +979,7 @@ function newChatDialog() {
     (c) => [h("button", {class: "btn", onclick: c}, "Close")]);
 }
 function newAgentDialog() {
-  const name = h("input", {type: "text", placeholder: "alice", "aria-label": "Name", autocapitalize: "none"}), persona = h("textarea", {rows: 3, placeholder: "You are a careful research assistant."});
+  const name = h("input", {type: "text", placeholder: "alice", "aria-label": "Name", autocapitalize: "none", oninput: lowerName}), persona = h("textarea", {rows: 3, placeholder: "You are a careful research assistant."});
   const tier = h("select", {}, h("option", {value: "auto"}, "auto: ask before risky tools"), h("option", {value: "strict"}, "strict: ask before everything"), h("option", {value: "dangerous"}, "dangerous: never ask"));
   dialog("New agent", "Lowercase letters, digits, - and _. It gets its own folder, memory and permissions.", h("div", {},
     h("label", {}, "Name"), name, h("label", {}, "Persona (optional)"), persona, h("label", {}, "Permissions"), tier),
@@ -939,7 +988,7 @@ function newAgentDialog() {
       if (ok) { close(); dmWith(name.value.trim()); } }}, "Create")]);
 }
 function newRoomDialog() {
-  const name = h("input", {type: "text", placeholder: "project-x", "aria-label": "Room name", autocapitalize: "none"});
+  const name = h("input", {type: "text", placeholder: "project-x", "aria-label": "Room name", autocapitalize: "none", oninput: lowerName});
   const box = (n) => h("label", {style: "display:flex;gap:8px;align-items:center;font-weight:400"}, h("input", {type: "checkbox", value: n, style: "width:auto"}), n);
   const boxes = agents().map((a) => box(a.name)), people = ((S.state && S.state.people) || []).map(box);
   dialog("New group room", "Agents answer when you @mention them (or use @all). Agents can also mention each other, up to 4 replies in a row.", h("div", {}, h("label", {}, "Name"), name, h("label", {}, "Agents"), boxes, people.length ? [h("label", {}, "People"), people] : null),
@@ -959,7 +1008,7 @@ async function poll(now) {
     S.state = await api("/api/state");
     if (!S.room || !curRoom()) { const first = rooms().find((r) => r.kind !== "dm") || rooms()[0]; if (first) { S.room = first.name; S.last[S.room] = 0; S.stick = true; const ta = $("#msg"); if (ta) ta.value = store.get("kt-draft-" + S.room) || ""; } }
     focusAgent(); syncUnread(); renderSidebar(); renderTopbar(); updateComposer();
-    if (S.state.model_ready === false && !S.askedModel && !S.settingsOpen && !$("#dialog-root .dialog")) { S.askedModel = true; settingsDialog("models"); }
+    if (S.state.model_ready === false && !S.askedModel && !S.settingsOpen && !$("#dialog-root .dialog")) { S.askedModel = true; if (isOwner()) setupWizard(); else noModelNotice(); }
     if (S.room) {
       const after = S.last[S.room] || 0, fresh = await api("/api/messages?room=" + encodeURIComponent(S.room) + "&after=" + after);
       const msgs = fresh.filter((m) => m.id > after);
@@ -1019,8 +1068,9 @@ async function confirmSignIn(incoming) {
     (close) => [h("button", {class: "btn", onclick: () => { close(); poll(true); }}, "Keep my current sign-in"), h("button", {class: "btn primary", onclick: () => { S.token = incoming; store.set("kt-token", incoming); try { sessionStorage.setItem("kt", incoming); } catch (e) { /* ok */ } close(); poll(true); }}, "Sign in as " + who)],
     () => poll(true));
 }
+const lowerName = (e) => { e.target.value = e.target.value.toLowerCase().replace(/\s+/g, "-"); };  // names are lowercase everywhere: fix it as people type
 function joinDialog(code) {
-  const name = h("input", {type: "text", placeholder: "your name, e.g. sam", "aria-label": "Your name", autocapitalize: "none", autocomplete: "off"});
+  const name = h("input", {type: "text", placeholder: "your name, e.g. sam", "aria-label": "Your name", autocapitalize: "none", autocomplete: "off", oninput: lowerName});
   const note = h("p", {class: "muted", style: "min-height:20px;margin:6px 0 0"});
   const go = async (close) => {
     note.textContent = "Joining…";
@@ -1033,7 +1083,7 @@ function joinDialog(code) {
     } catch (e) { note.textContent = "Could not reach the server."; }
   };
   dialog("You are invited", "Choose the name your teammates will see. Lowercase letters, digits, - and _. This browser will stay signed in as you.", h("div", {}, h("label", {}, "Name"), name, note),
-    (close) => [h("button", {class: "btn primary", onclick: () => go(close)}, "Join")]);
+    (close) => [h("button", {class: "btn", onclick: () => { close(); connectDialog(false); }}, "I already have an account"), h("button", {class: "btn primary", onclick: () => go(close)}, "Join")], undefined, {locked: true});
 }
 function init() {
   applyTheme();
