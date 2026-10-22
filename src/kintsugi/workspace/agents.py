@@ -263,7 +263,7 @@ def _loop(ws, name, room, hops, model, ctx, memory, situation, messages, shown) 
             ws.post_system(room, f"{name} was stopped.")
             break
         ws.set_activity(name, "thinking")
-        reply = model.complete(messages)
+        reply = (getattr(model, "complete_live", None) or model.complete)(messages)
         if ws.stop_requested(name):  # the person pressed Stop while the model was answering: drop the answer
             stopped = True
             ws.post_system(room, f"{name} was stopped.")

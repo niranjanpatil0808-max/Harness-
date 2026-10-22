@@ -60,7 +60,7 @@ class Identity:
 MEMBER_PATHS = {
     "/api/state", "/api/messages", "/api/say", "/api/dm", "/api/me", "/api/me/token", "/api/tone", "/api/push", "/api/push/subscribe",
     "/api/push/unsubscribe", "/api/push/test", "/api/approve", "/api/timezone", "/api/applink", "/api/automations",
-    "/api/automations/toggle", "/api/automations/run", "/api/jobs", "/api/jobs/delete", "/api/stop", "/api/find", "/api/upload", "/api/tasks", "/api/tasks/create", "/api/tasks/update", "/api/share", "/api/download", "/api/me/profile", "/api/me/profile/save", "/api/feedback",
+    "/api/automations/toggle", "/api/automations/run", "/api/jobs", "/api/jobs/delete", "/api/stop", "/api/find", "/api/upload", "/api/tasks", "/api/tasks/create", "/api/tasks/update", "/api/share", "/api/message/delete", "/api/download", "/api/me/profile", "/api/me/profile/save", "/api/feedback",
 }
 ADMIN_PATHS = {
     "/api/agents", "/api/persona", "/api/secret", "/api/secret/delete", "/api/agent/delete", "/api/agent/model", "/api/agent/playbook",

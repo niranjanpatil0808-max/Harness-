@@ -116,7 +116,7 @@ function sigChanged(key, data) { const s = JSON.stringify(data); if (S.sig[key] 
 function renderSidebar() {
   const st = S.state; if (!st) return;
   const pend = {}; st.approvals.forEach((a) => (pend[a.room] = (pend[a.room] || 0) + 1));
-  if (!sigChanged("side", [st.rooms, st.agents.map((a) => a.name), st.busy, pend, S.room, st.improve, !!S.installEvent, IS_STANDALONE(), st.jobs.map((j) => [j.id, j.enabled]), st.open_tasks, seen(), st.rooms.map((r) => r.last_other)])) return;
+  if (!sigChanged("side", [st.rooms, st.agents.map((a) => a.name), st.busy, pend, S.room, st.improve, !!S.installEvent, IS_STANDALONE(), st.jobs.map((j) => [j.id, j.enabled]), st.open_tasks, st.onboarding, !!store.get("kt-onboard-off"), seen(), st.rooms.map((r) => r.last_other)])) return;
   const roomItem = (r) => h("button", {class: "item" + (r.name === S.room ? " on" : ""), onclick: () => openRoom(r.name)},
     r.kind === "dm" ? avatar(roomLabel(r)) : h("span", {class: "muted", style: "width:24px;text-align:center"}, "#"),
     h("span", {class: "t", style: isUnread(r) && r.name !== S.room ? "font-weight:700" : ""}, roomLabel(r)), busyIn(r).length ? h("span", {class: "dot", title: "working"}) : (isUnread(r) && r.name !== S.room ? h("span", {class: "dot", title: "new", style: "animation:none"}) : null),
@@ -134,6 +134,7 @@ function renderSidebar() {
       st.agents.map((a) => h("button", {class: "item", title: a.persona || a.name, onclick: () => dmWith(a.name)},
         avatar(a.name), h("span", {class: "t"}, a.name), st.busy.includes(a.name) ? h("span", {class: "dot"}) : h("span", {class: "muted", style: "font-size:12px"}, a.tier))),
       isAdmin() ? h("button", {class: "item muted", onclick: newAgentDialog}, h("span", {style: "width:24px;text-align:center"}, "+"), "New agent") : null,
+      st.onboarding && !onboardingDone() ? h("button", {class: "item start-btn", onclick: () => onboardingDialog()}, h("span", {style: "width:24px;text-align:center"}, "★"), "Get started", h("span", {class: "badge"}, onboardingProgress()[0] + "/" + onboardingProgress()[1])) : null,
       h("button", {class: "item muted", onclick: () => tasksDialog()}, h("span", {style: "width:24px;text-align:center"}, "✓"), "Tasks", st.open_tasks ? h("span", {class: "badge", "aria-label": st.open_tasks + " open"}, st.open_tasks) : null),
       h("button", {class: "item muted", onclick: () => automationsDialog()}, h("span", {style: "width:24px;text-align:center"}, "⏰"), "Automations", jobBadge()),
       canInstall() ? h("button", {class: "item muted", onclick: installApp}, h("span", {style: "width:24px;text-align:center"}, "⤓"), "Install the app") : null),
@@ -209,14 +210,17 @@ function bodyOf(m) {
       return h("div", {class: "sys"}, (ok ? "✓ " : "✕ ") + "Approval #" + id + ": " + who + (ok ? " ran " : " was not allowed to run ") + tool,
         out ? h("details", {style: "margin-top:4px"}, h("summary", {style: "cursor:pointer"}, "Output"), h("pre", {class: "view", style: "text-align:left"}, out)) : null);
     }
-    return h("div", {class: "sys"}, m.text);
+    const failed = m.text.match(/^([a-z][a-z0-9_-]*) (could not answer|hit an internal error|was stopped)/);
+    return h("div", {class: "sys"}, m.text, failed && S.lastSent && S.lastSent[S.room] ? h("button", {class: "mini retry", onclick: () => askAgain(failed[1])}, "Try again") : null);
   }
   if (/^cron-\d+$/.test(m.sender)) {
     const job = S.state && S.state.jobs.find((j) => "cron-" + j.id === m.sender), body = m.text.replace(/^@\S+\s*/, "");
     return h("div", {class: "sys cron"}, "⏰ " + (job && job.title ? job.title : "Scheduled: " + body.slice(0, 90)));
   }
   const shared = /^Shared by \S+ from .{1,80} \(\S+ wrote\):\n/.test(m.text);  // a shared answer keeps its formatting (sanitised like any agent reply)
-  if (m.sender === me().name) return h("div", {class: "row me", title: clock(m.ts), "data-mid": m.id}, h("div", {class: "bubble" + (shared ? " shared" : "")}, shared ? md(m.text) : m.text));
+  if (m.sender === me().name) return h("div", {class: "row me", title: clock(m.ts), "data-mid": m.id}, h("div", {class: "bubble" + (shared ? " shared" : ""), tabindex: "0", role: "button", "aria-label": "Your message: options", onclick: (e) => e.currentTarget.parentElement.classList.toggle("open"),
+      onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.parentElement.classList.toggle("open"); } }}, shared ? md(m.text) : m.text),
+    h("div", {class: "me-actions"}, h("button", {class: "mini", onclick: (e) => copyText(m.text, e.currentTarget)}, "Copy"), h("button", {class: "mini", "aria-label": "Delete my message", onclick: () => deleteMessage(m)}, "Delete")));
   const agent = isAgent(m.sender);
   return h("div", {class: "row", "data-mid": m.id}, avatar(m.sender, true),
     h("div", {class: "body-wrap", style: "flex:1;min-width:0"},
@@ -225,6 +229,7 @@ function bodyOf(m) {
       h("div", {class: "msg-actions"}, h("button", {class: "mini", "aria-label": "Copy this message", onclick: (e) => copyText(m.text, e.currentTarget)}, "Copy"),
         agent ? h("button", {class: "mini", "aria-label": "Ask again", title: "Send your last message to " + m.sender + " again", onclick: () => askAgain(m.sender)}, "Ask again") : null,
         h("button", {class: "mini", "aria-label": "Share this message to a room", onclick: () => shareDialog(m)}, "Share"),
+        isAdmin() ? h("button", {class: "mini", "aria-label": "Delete this message", onclick: () => deleteMessage(m)}, "Delete") : null,
         agent ? [h("button", {class: "mini rate" + ((S.rated || {})[m.id] === true ? " on" : ""), "data-good": "1", "aria-label": "Helpful", title: "Helpful: agents learn what works for you", onclick: (e) => rate(m, true, e.currentTarget)}, "👍"),
           h("button", {class: "mini rate" + ((S.rated || {})[m.id] === false ? " on" : ""), "data-good": "0", "aria-label": "Not helpful", title: "Not helpful: agents adjust to you", onclick: (e) => rate(m, false, e.currentTarget)}, "👎")] : null)));
 }
@@ -284,7 +289,7 @@ function sandboxLine(tool) {
 }
 function renderInline() {
   const r = curRoom(), pend = pendingFor(S.room), busy = busyIn(r);
-  if (!sigChanged("inline", [S.room, pend, busy])) return;
+  if (!sigChanged("inline", [S.room, pend, busy, (S.state.activity || {}), (S.state.drafts || {})])) return;
   const s = $("#scroll"), near = s.scrollHeight - s.scrollTop - s.clientHeight < 90;
   fill($("#inline"),
     pend.map((a) => {
@@ -305,7 +310,8 @@ function renderInline() {
           h("button", {class: "btn danger", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: false})); }}, "Deny")));
     }),
     busy.length ? h("div", {class: "working", "aria-live": "polite"}, SPARK(), h("span", {class: "wk"}, busy.map((n) => n + " is " + ((S.state.activity || {})[n] || "working") + "…").join(" · ")),
-      h("button", {class: "stop", "aria-label": "Stop " + busy.join(", "), onclick: () => stopAgents(busy)}, "Stop")) : null);
+      h("button", {class: "stop", "aria-label": "Stop " + busy.join(", "), onclick: () => stopAgents(busy)}, "Stop")) : null,
+    busy.filter((n) => (S.state.drafts || {})[n]).map((n) => h("div", {class: "draft", "aria-hidden": "true"}, h("strong", {}, n + ": "), S.state.drafts[n])));
   if (near) s.scrollTop = s.scrollHeight;
 }
 
@@ -1039,6 +1045,7 @@ async function poll(now) {
     S.state = await api("/api/state");
     if (!S.room || !curRoom()) { const first = rooms().find((r) => r.kind !== "dm") || rooms()[0]; if (first) { S.room = first.name; S.last[S.room] = 0; S.stick = true; const ta = $("#msg"); if (ta) ta.value = store.get("kt-draft-" + S.room) || ""; } }
     focusAgent(); syncUnread(); renderSidebar(); renderTopbar(); updateComposer();
+    if (!S.awayChecked && typeof awayDigest === "function") { S.awayChecked = true; setTimeout(awayDigest, 1200); }
     if (S.state.model_ready === false && !S.askedModel && !S.settingsOpen && !$("#dialog-root .dialog")) { S.askedModel = true; if (isOwner()) setupWizard(); else noModelNotice(); }
     if (S.room) {
       const after = S.last[S.room] || 0, fresh = await api("/api/messages?room=" + encodeURIComponent(S.room) + "&after=" + after);

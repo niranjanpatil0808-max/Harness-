@@ -277,3 +277,10 @@ kbd{margin-left:auto;font:600 11px var(--sans);color:var(--muted);border:1px sol
 @media(max-width:700px){.set-title,.set-title+p{display:none}}  /* the selected chip already says which section this is */
 @media(hover:none){kbd{display:none}}
 .tips{display:flex;flex-direction:column;gap:10px;max-height:56vh;overflow:auto}.tip strong{display:block}
+.start-btn{color:var(--accent);font-weight:600}
+.checklist{display:flex;flex-direction:column;gap:10px}
+.check{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line,rgba(127,127,127,.3));border-radius:12px;padding:10px 12px}
+.check .tick{width:22px;height:22px;border-radius:50%;border:2px solid var(--accent);display:grid;place-items:center;flex:none;margin-top:2px;font-size:13px;font-weight:700}
+.check.done{opacity:.65}.check.done .tick{background:var(--accent);color:var(--accent-ink,#fff)}
+.row.me{flex-wrap:wrap}.me-actions{display:none;width:100%;justify-content:flex-end;gap:4px}.row.me.open .me-actions{display:flex}.row.me .bubble{cursor:pointer}.retry{margin-left:8px}.away p{margin:6px 0}
+.draft{margin:2px 0 6px 28px;padding:6px 10px;border-left:3px solid var(--accent);color:var(--muted);font-size:14px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere}

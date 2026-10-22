@@ -64,6 +64,10 @@ class Model:
     def complete(self, messages: list[dict]) -> str:
         raise NotImplementedError
 
+    def complete_stream(self, messages: list[dict], on_text: Callable[[str], None]) -> str:
+        """Like complete(), but calls on_text(text_so_far) while the answer is being written. A model that cannot stream just answers."""
+        return self.complete(messages)
+
 
 def request_json(request: urllib.request.Request, timeout: float, max_retries: int) -> dict:
     """Send a prepared request and return the parsed JSON reply, with the retry and error rules every adapter shares:
@@ -106,7 +110,59 @@ def request_json(request: urllib.request.Request, timeout: float, max_retries: i
     raise ModelInfraError("Model API gave no answer")  # unreachable; keeps the type checker happy
 
 
-class OpenAIAdapter(Model):
+STREAM_DEADLINE = 300.0  # a streamed answer that is still going after this long is cut off (the normal request then takes over)
+
+
+def read_sse(response, deadline: float):
+    """Yield the data of each server-sent event ('data: ...' lines), until the stream ends or the deadline passes."""
+    end = time.time() + deadline
+    for raw in response:
+        if time.time() > end:
+            raise TimeoutError("the answer took too long to stream")
+        line = raw.decode("utf-8", "replace").strip()
+        if line.startswith("data:"):
+            yield line[5:].strip()
+
+
+class Streamer:
+    """Shared plumbing for streaming: open the request, hand back the events, and fall back to a normal request when anything about
+    streaming does not work (the provider refuses it, answers with plain JSON, or the stream breaks before an answer is complete)."""
+
+    def _stream(self, request, messages, on_text, handle, finish):
+        if getattr(self, "_no_stream", False):
+            return self.complete(messages)
+        shown = ""
+        last = 0.0
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                kind = (response.headers.get("Content-Type") or "").lower()
+                if "event-stream" not in kind:  # a provider that ignored the stream request and sent the whole answer as JSON
+                    data = json.loads(response.read(8_000_000))
+                    return finish(data, None)
+                for payload in read_sse(response, STREAM_DEADLINE):
+                    if payload == "[DONE]":
+                        break
+                    try:
+                        event = json.loads(payload)
+                    except ValueError:
+                        continue
+                    piece = handle(event)
+                    if piece:
+                        shown += piece
+                        if time.time() - last > 0.15:
+                            last = time.time()
+                            on_text(shown)
+                on_text(shown)
+                return finish(None, shown)
+        except urllib.error.HTTPError as err:
+            if err.code in (400, 404, 405, 422, 501):  # this provider does not do streaming the way we ask: stop asking
+                self._no_stream = True
+            return self.complete(messages)  # the normal request has the full retry and error rules
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+            return self.complete(messages)
+
+
+class OpenAIAdapter(Streamer, Model):
     def __init__(
         self,
         base_url: str | None = None,
@@ -140,17 +196,13 @@ class OpenAIAdapter(Model):
         with urllib.request.urlopen(request, timeout=self.timeout) as response:
             return sorted(item["id"] for item in json.load(response)["data"])
 
-    def complete(self, messages: list[dict]) -> str:
-        body = json.dumps({
-            "model": self.name,
-            "messages": messages,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-            **self.extra,
-        }).encode()
-        request = urllib.request.Request(
+    def _request(self, messages: list[dict], stream: bool = False) -> urllib.request.Request:
+        payload = {"model": self.name, "messages": messages, "temperature": self.temperature, "max_tokens": self.max_tokens, **self.extra}
+        if stream:
+            payload.update(stream=True, stream_options={"include_usage": True})
+        return urllib.request.Request(
             f"{self.base_url}/chat/completions",
-            data=body,
+            data=json.dumps(payload).encode(),
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.api_key}",
@@ -158,13 +210,40 @@ class OpenAIAdapter(Model):
                 "User-Agent": USER_AGENT,
             },
         )
-        data = request_json(request, self.timeout, self.max_retries)
+
+    def _read(self, data: dict) -> str:
         self.usage.calls += 1
         usage = data.get("usage") or {}
         self.usage.prompt_tokens += usage.get("prompt_tokens", 0)
         self.usage.completion_tokens += usage.get("completion_tokens", 0)
         text = data["choices"][0]["message"].get("content") or ""
         return THINK_RE.sub("", text).strip()  # drop <think> blocks some models put inline
+
+    def complete(self, messages: list[dict]) -> str:
+        return self._read(request_json(self._request(messages), self.timeout, self.max_retries))
+
+    def complete_stream(self, messages: list[dict], on_text: Callable[[str], None]) -> str:
+        seen_usage: dict = {}
+
+        def handle(event: dict) -> str:
+            usage = event.get("usage") or (event.get("x_groq") or {}).get("usage")
+            if usage:
+                seen_usage.update(usage)
+            choices = event.get("choices") or []
+            return ((choices[0].get("delta") or {}).get("content") or "") if choices else ""
+
+        def finish(data, text):
+            if data is not None:
+                return self._read(data)
+            self.usage.calls += 1
+            self.usage.prompt_tokens += seen_usage.get("prompt_tokens", 0)
+            self.usage.completion_tokens += seen_usage.get("completion_tokens", 0)
+            if not text:  # a stream with no words (an error event, or a model that only used its token budget thinking): ask normally
+                self.usage.calls -= 1
+                return self.complete(messages)
+            return THINK_RE.sub("", text).strip()
+
+        return self._stream(self._request(messages, stream=True), messages, on_text, handle, finish)
 
 
 @dataclass

@@ -198,12 +198,13 @@ async function tasksDialog(room) {
   const agentSel = h("select", {"aria-label": "Agent"});
   const fillAgents = () => { const r = rooms().find((x) => x.name === roomSel.value); fill(agentSel, (r ? roomAgents(r) : []).map((a) => h("option", {value: a}, a))); };
   roomSel.onchange = fillAgents; fillAgents();
+  const repeat = h("select", {"aria-label": "Repeat"}, [["", "Just once"], ["weekdays", "Repeat every weekday at 9:00"], ["weekly", "Repeat every Monday at 9:00"], ["daily", "Repeat every day at 9:00"]].map(([v, l]) => h("option", {value: v}, l)));
   const what = h("textarea", {rows: 2, placeholder: "What should the agent do? e.g. Draft the launch email for Friday", "aria-label": "Task", maxlength: 600});
   const give = h("button", {class: "btn primary"}, "Give task");
   give.onclick = async () => {
     if (!what.value.trim()) { what.focus(); return; }
     give.disabled = true;
-    try { await api("/api/tasks/create", {room: roomSel.value, agent: agentSel.value, title: what.value}); what.value = ""; toast("Task given. Everyone in the room can follow it here."); S.fast = 12; await refresh(); }
+    try { await api("/api/tasks/create", {room: roomSel.value, agent: agentSel.value, title: what.value, repeat: repeat.value}); if (repeat.value) toast("It will also repeat. See Automations to change that."); what.value = ""; toast("Task given. Everyone in the room can follow it here."); S.fast = 12; await refresh(); }
     catch (e) { toast(e.message, true); }
     give.disabled = false;
   };
@@ -229,7 +230,7 @@ async function tasksDialog(room) {
   };
   const refresh = async () => { try { list = await api("/api/tasks"); draw(); } catch (e) { /* the poll reports connection problems */ } };
   const tick = async () => { if (closed) return; await refresh(); timer = setTimeout(tick, 3000); };
-  const form = mine().length ? h("div", {class: "task-form"}, h("div", {class: "task-row"}, roomSel, agentSel), what, give)
+  const form = mine().length ? h("div", {class: "task-form"}, h("div", {class: "task-row"}, roomSel, agentSel), what, repeat, give)
     : h("p", {class: "muted"}, isAdmin() ? "Add an agent to a room first (New agent, or Start from a team)." : "You are not in a room with an agent yet. Ask an admin to add you.");
   what.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); give.click(); } });
   const close = dialog("Team tasks", "Hand work to an agent in a shared room. Everyone in that room can follow it.", h("div", {}, form, board), (c) => [h("button", {class: "btn primary", onclick: c}, "Done")], () => { closed = true; clearTimeout(timer); });
@@ -301,3 +302,67 @@ function helpDialog() {
     isOwner() ? tip("Bring your team", "Settings > Team > Create invite link. Each link works once; send it privately.") : null),
     (c) => [h("button", {class: "btn primary", onclick: c}, "Got it")]);
 }
+
+/* ---------- "Get started": a checklist for a new owner ---------- */
+function onboardingSteps() {
+  const o = (S.state && S.state.onboarding) || {};
+  return [
+    {done: S.state.model_ready !== false, title: "Connect your AI", text: "Paste your own API key so agents can answer.", go: "Open Models", run: () => settingsDialog("models")},
+    {done: !!o.messaged, title: "Say hello to an agent", text: "Type a message. Try: @alice write a short todo list.", go: "Start typing", run: () => { const t = $("#msg"); if (t) { t.focus(); } closeSidebarMobile(); }},
+    {done: !!o.tasked, title: "Give your team a task", text: "Hand an agent a job and follow it to done.", go: "Open Tasks", run: () => tasksDialog()},
+    {done: !!o.invited, title: "Invite a teammate", text: "Each link works once, and each person gets their own login.", go: "Open Team", run: () => settingsDialog("team")},
+    {done: IS_STANDALONE() || matchMedia("(hover: hover)").matches, title: "Put it on your home screen", text: "Android Chrome: menu, Install app. iPhone Safari: Share, Add to Home Screen.", go: null, run: null},
+  ];
+}
+const onboardingProgress = () => { const st = onboardingSteps(); return [st.filter((x) => x.done).length, st.length]; };
+const onboardingDone = () => !!store.get("kt-onboard-off") || onboardingProgress()[0] >= onboardingProgress()[1];
+function onboardingDialog() {
+  const steps = onboardingSteps(), [done, total] = onboardingProgress();
+  const close = dialog("Get started", done + " of " + total + " done", h("div", {class: "checklist"}, steps.map((s) => h("div", {class: "check" + (s.done ? " done" : "")},
+    h("span", {class: "tick", "aria-hidden": "true"}, s.done ? "✓" : ""), h("div", {style: "flex:1"}, h("strong", {}, s.title), h("p", {class: "muted", style: "margin:2px 0 0;font-size:13px"}, s.text)),
+    !s.done && s.go ? h("button", {class: "btn", onclick: () => { close(); s.run(); }}, s.go) : null))),
+    (c) => [h("button", {class: "btn", onclick: () => { store.set("kt-onboard-off", "1"); c(); renderSidebarNow(); toast("Hidden. Find it again in the ? guide."); }}, "Hide this"), h("button", {class: "btn primary", onclick: c}, "Close")]);
+}
+function renderSidebarNow() { try { S.sig.side = null; renderSidebar(); } catch (e) { /* the next poll redraws */ } }
+
+/* ---------- delete a message ---------- */
+function deleteMessage(m) {
+  confirmDialog("Delete this message?", "It disappears for everyone in this chat. Messages other people already shared from it stay where they were shared.", "Delete", async () => {
+    await act(() => api("/api/message/delete", {id: m.id}), "Deleted");
+    S.last[S.room] = 0; const t = $("#thread"); if (t) t.replaceChildren(); S.loadedRooms[S.room] = false; await poll(true);
+  });
+}
+
+/* ---------- "while you were away": one short summary after a long absence ---------- */
+async function awayDigest() {
+  let last = 0; try { last = +(localStorage.getItem("kt-lastseen") || 0); } catch (e) { /* no storage */ }
+  const now = Date.now() / 1000;
+  const remember = () => { try { localStorage.setItem("kt-lastseen", String(Date.now() / 1000)); } catch (e) { /* ok */ } };
+  window.addEventListener("pagehide", remember); document.addEventListener("visibilitychange", () => { if (document.hidden) remember(); });
+  if (!last || now - last < 20 * 60 || !S.state) { remember(); return; }
+  try {
+    const tasks = await api("/api/tasks");
+    const finished = tasks.filter((t) => t.updated > last && ["done", "failed"].includes(t.status)), waiting = S.state.approvals.filter((a) => a.can_decide !== false);
+    const unread = rooms().filter((r) => isUnread(r)).length;
+    if (!finished.length && !waiting.length && !unread) { remember(); return; }
+    const hours = Math.round((now - last) / 360) / 10, since = hours >= 24 ? Math.round(hours / 24) + " day(s)" : hours + " hour(s)";
+    dialog("While you were away", "Since about " + since + " ago:", h("div", {class: "away"},
+      finished.length ? h("p", {}, "✓ " + finished.length + " task" + (finished.length === 1 ? "" : "s") + " finished: " + finished.slice(0, 3).map((t) => t.title.slice(0, 40)).join("; ")) : null,
+      waiting.length ? h("p", {}, "⏳ " + waiting.length + " waiting for your approval") : null,
+      unread ? h("p", {}, "💬 " + unread + " chat" + (unread === 1 ? " has" : "s have") + " new messages") : null),
+      (c) => [finished.length ? h("button", {class: "btn", onclick: () => { c(); tasksDialog(); }}, "See tasks") : null, h("button", {class: "btn primary", onclick: c}, "OK")]);
+  } catch (e) { /* the summary is a nicety */ }
+  remember();
+}
+
+/* ---------- Models panel: show answers as they are written ---------- */
+const _modelsPanel = SETTINGS_PANELS.models;
+SETTINGS_PANELS.models = async () => {
+  const base = await _modelsPanel();
+  let on = true; try { on = (await api("/api/usage?days=1")).streaming !== false; } catch (e) { /* keep the default */ }
+  const box = h("label", {class: "card", style: "display:flex;gap:10px;align-items:flex-start;font-weight:400;margin-top:14px"},
+    h("input", {type: "checkbox", checked: on, style: "width:auto;margin-top:3px", "aria-label": "Show answers as they are written",
+      onchange: (e) => act(() => api("/api/streaming", {enabled: e.target.checked}), e.target.checked ? "Answers will appear as they are written" : "Answers will appear when finished")}),
+    h("span", {}, h("strong", {}, "Show answers as they are written"), h("br"), h("span", {class: "muted", style: "font-size:13px"}, "You see the words appear while the AI is still answering. If your provider does not support it, the app quietly asks the normal way.")));
+  return h("div", {}, base, box);
+};

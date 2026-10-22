@@ -84,6 +84,22 @@ class _Budgeted:
             self._ws.record_usage(self._agent, str(getattr(self._model, "name", "model")), getattr(usage, "prompt_tokens", 0) - before[0],
                                   getattr(usage, "completion_tokens", 0) - before[1])
 
+    def complete_live(self, messages: list[dict]) -> str:
+        """The main chat call: the same as complete(), but the words are shown as a draft while the model writes them."""
+        stream = getattr(self._model, "complete_stream", None)
+        if stream is None or self._ws.get_setting("streaming", "on") == "off":
+            return self.complete(messages)
+        self._ws.spend_call()
+        usage = getattr(self._model, "usage", None)
+        before = (getattr(usage, "prompt_tokens", 0), getattr(usage, "completion_tokens", 0))
+        try:
+            return stream(messages, lambda text: self._ws.set_draft(self._agent, text))
+        finally:
+            self._ws.set_draft(self._agent, None)
+            usage = getattr(self._model, "usage", None)
+            self._ws.record_usage(self._agent, str(getattr(self._model, "name", "model")), getattr(usage, "prompt_tokens", 0) - before[0],
+                                  getattr(usage, "completion_tokens", 0) - before[1])
+
     def __getattr__(self, name: str):
         return getattr(self._model, name)
 
@@ -127,6 +143,7 @@ class Workspace:
         self._recent_runs: dict[str, deque] = defaultdict(deque)
         self._lock = threading.Lock()  # guards the rate limiter and the busy set
         self._busy: set[str] = set()
+        self._drafts: dict[str, str] = {}
         self._stop: set[str] = set()  # agents asked to stop
         self._activity: dict[str, str] = {}  # what each working agent is doing right now
         self._busy_room: dict[str, str] = {}
@@ -579,6 +596,30 @@ class Workspace:
         with self._lock:
             return agent in self._stop
 
+    _TOOL_FENCE = re.compile(r"```(?:tool|json)?\s*\n?\s*\{.*?(?:```|\Z)", re.S)
+
+    def set_draft(self, agent: str, text: str | None) -> None:
+        """What an agent has written so far in the answer it is still writing (for the live preview). Tool-call blocks, hidden reasoning
+        and secrets are left out; only the last few hundred characters are kept."""
+        if text is None:
+            with self._lock:
+                self._drafts.pop(agent, None)
+            return
+        shown = self._TOOL_FENCE.sub("", text)
+        shown = re.sub(r"<think>.*?(?:</think>|\Z)", "", shown, flags=re.S)
+        if shown.lstrip().startswith('{"tool"') or shown.lstrip().startswith("{ \"tool\""):
+            shown = ""
+        shown = self._scrub(agent, shown).strip()[-600:]
+        with self._lock:
+            if shown:
+                self._drafts[agent] = shown
+            else:
+                self._drafts.pop(agent, None)
+
+    def agent_drafts(self) -> dict[str, str]:
+        with self._lock:
+            return {a: t for a, t in self._drafts.items() if a in self._busy}
+
     def set_activity(self, agent: str, text: str) -> None:
         with self._lock:
             self._activity[agent] = text[:60]
@@ -647,7 +688,7 @@ class Workspace:
             return [{"name": k, **v, "cost": round(v["cost"], 4)} for k, v in sorted(out.items(), key=lambda kv: -kv[1]["calls"])]
 
         return {"days": fold("day"), "by_agent": fold("agent"), "by_model": fold("model"), "prices": prices, "today_calls": self.calls_today(),
-                "daily_limit": self.daily_calls, "summaries": compact.enabled(self), "tokens_known": any(r["prompt_tokens"] or r["completion_tokens"] for r in rows)}
+                "daily_limit": self.daily_calls, "summaries": compact.enabled(self), "streaming": self.get_setting("streaming", "on") != "off", "tokens_known": any(r["prompt_tokens"] or r["completion_tokens"] for r in rows)}
 
     # --- agents working at the same time ---
 
@@ -771,6 +812,22 @@ class Workspace:
         uploads.forget_room(self, room)
         origins.forget_room(self, room)
         self.audit(None, "room-deleted", room)
+
+    def delete_message(self, message_id: int, who: str, can_moderate: bool) -> None:
+        """Remove one message. People can delete their own; admins and the owner (`can_moderate`) can delete anyone's in rooms they can see.
+        Summaries made from the room are dropped (they may quote it), and a task that pointed at the message is detached."""
+        row = self.db.one("SELECT * FROM messages WHERE id = ?", (int(message_id),))
+        if row is None:
+            raise WorkspaceError("no such message")
+        if row["sender"] == "system" and not can_moderate:
+            raise WorkspaceError("only an admin can remove a notice from the workspace")
+        if row["sender"] != who and not can_moderate:
+            raise WorkspaceError("you can only delete your own messages")
+        self.db.execute("DELETE FROM messages WHERE id = ?", (row["id"],))
+        self.db.execute("UPDATE tasks SET result_id = NULL WHERE result_id = ?", (row["id"],))
+        self.db.execute("DELETE FROM feedback WHERE message_id = ?", (row["id"],))
+        compact.forget(self, row["room"])
+        self.audit(None, "message-deleted", f"#{row['id']} in {row['room']} by {who}")
 
     def purge_messages(self, older_than_days: float) -> int:
         """Delete messages older than the given number of days (and old audit entries). Returns how many messages."""
@@ -1007,6 +1064,7 @@ class Workspace:
                         self._stop.discard(agent)
                         self._activity.pop(agent, None)
                         self._busy_room.pop(agent, None)
+                        self._drafts.pop(agent, None)
 
     def _run_async(self, agent: str, room: str, message_id: int, hops: int) -> None:
         try:

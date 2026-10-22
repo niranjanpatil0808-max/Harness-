@@ -115,5 +115,42 @@ class TestSharing(Base):
         self.assertIn(("mention", ["sam"]), seen)
 
 
+class TestRepeatAndDelete(Base):
+    def test_a_repeating_task_also_makes_a_schedule_that_goes_with_the_person(self):
+        self.invite_and_join("sam", rooms=["team"])
+        status, task = self.call("sam", "POST", "/api/tasks/create", {"room": "team", "agent": "alice", "title": "weekly status note", "repeat": "weekdays"})
+        self.assertEqual(status, 200, task)
+        job = self.ws.db.one("SELECT * FROM jobs")
+        self.assertEqual((job["cron"], job["owner"], job["agent"], job["room"]), ("0 9 * * 1-5", "sam", "alice", "team"))
+        self.assertEqual(job["prompt"], "weekly status note")
+        self.assertEqual(self.call("sam", "POST", "/api/tasks/create", {"room": "team", "agent": "alice", "title": "x", "repeat": "hourly"})[0], 400)
+        self.call("owner", "POST", "/api/team/remove", {"name": "sam"})
+        self.assertIsNone(self.ws.db.one("SELECT 1 FROM jobs"))
+
+    def test_deleting_messages_own_vs_others(self):
+        self.invite_and_join("sam", rooms=["team"])
+        self.invite_and_join("kim", rooms=["team"])
+        self.invite_and_join("ada", role="admin", rooms=["team"])
+        mine = self.call("sam", "POST", "/api/say", {"room": "team", "text": "oops wrong channel"})[1]["id"]
+        theirs = self.call("kim", "POST", "/api/say", {"room": "team", "text": "kim's message"})[1]["id"]
+        self.assertTrue(self.ws.wait_idle())
+        self.assertEqual(self.call("sam", "POST", "/api/message/delete", {"id": theirs})[0], 400)  # not yours
+        self.assertEqual(self.call("sam", "POST", "/api/message/delete", {"id": mine})[0], 200)
+        self.assertIsNone(self.ws.db.one("SELECT 1 FROM messages WHERE id = ?", (mine,)))
+        self.assertEqual(self.call("ada", "POST", "/api/message/delete", {"id": theirs})[0], 200)  # an admin can moderate
+        secret = self.ws.post("secret-room", "you", "owner only", human=True, wake=False)
+        self.assertEqual(self.call("ada", "POST", "/api/message/delete", {"id": secret})[0], 400)  # a room the admin is not in: "no such message"
+        notice = self.ws.db.one("SELECT id FROM messages WHERE sender = 'system' AND room = 'team'")
+        if notice:
+            self.assertEqual(self.call("sam", "POST", "/api/message/delete", {"id": notice["id"]})[0], 400)
+        # a summary that may have quoted it is dropped, and a task result link is detached
+        from kintsugi.workspace import compact
+        self.ws.set_setting("room-summary:team", '{"upto": 1, "text": "sam said oops"}')
+        again = self.call("sam", "POST", "/api/say", {"room": "team", "text": "another"})[1]["id"]
+        self.assertTrue(self.ws.wait_idle())
+        self.call("sam", "POST", "/api/message/delete", {"id": again})
+        self.assertEqual(compact.summary(self.ws, "team"), "")
+
+
 if __name__ == "__main__":
     unittest.main()

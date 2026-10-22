@@ -23,8 +23,13 @@ class TaskError(ValueError):
     pass
 
 
-def create(ws: "Workspace", who: "Identity", sender: str, room: str, agent: str, title: str) -> dict:
+REPEATS = {"weekdays": "0 9 * * 1-5", "daily": "0 9 * * *", "weekly": "0 9 * * 1"}  # all at 09:00 in the workspace time zone
+
+
+def create(ws: "Workspace", who: "Identity", sender: str, room: str, agent: str, title: str, repeat: str = "") -> dict:
     title = " ".join(str(title).split())[:MAX_TITLE]
+    if repeat and repeat not in REPEATS:
+        raise TaskError("repeat is weekdays, daily or weekly")
     if not title:
         raise TaskError("say what the agent should do")
     if not ws.team.can_see_room(who, room) or sender not in ws.members(room):
@@ -39,7 +44,12 @@ def create(ws: "Workspace", who: "Identity", sender: str, room: str, agent: str,
     message_id = ws.post(room, sender, f"@{agent} Task #{task_id}: {title}", human=True)
     # the agent may already have claimed this message (a synchronous workspace runs it inside post())
     ws.db.execute("UPDATE tasks SET message_id = ? WHERE id = ? AND message_id IS NULL", (message_id, task_id))
-    ws.audit(None, "task-created", f"#{task_id} {agent} in {room} by {sender}")
+    if repeat:  # also do it again on a schedule: it shows under Automations, belongs to the person who asked and goes with them
+        try:
+            ws.add_job(agent, room, REPEATS[repeat], title, kind="custom", title=f"Repeating task: {title}", owner=sender)
+        except Exception as err:  # the task itself was given: only say the repeat did not work
+            ws.post_system(room, f"Task #{task_id} was given, but it could not be set to repeat: {err}")
+    ws.audit(None, "task-created", f"#{task_id} {agent} in {room} by {sender}" + (f" repeating {repeat}" if repeat else ""))
     return get(ws, task_id)
 
 

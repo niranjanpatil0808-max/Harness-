@@ -47,6 +47,8 @@ Remove a person (Settings > Team) and their token stops working at once. Anyone 
   wakes that agent; `@all` wakes every agent in the room.
 - **Files**: a file you attach is given to the agent *in that chat only*. The agent reads it as `uploads/<name>` while working in that
   chat; in other rooms it cannot see it, and only people in that chat can download it. (Agent code run with run_python cannot see uploads.)
+- **Repeating tasks**: when you give a task you can choose to repeat it every weekday, every Monday or daily at 9:00. It is given now and also appears under Automations, belongs to you, and goes if you are removed.
+- **Delete a message**: tap your own message and choose Delete. Admins can delete anyone's message in rooms they can see. Summaries made from the room are dropped.
 - **Long chats**: agents see the last 12 messages and a short summary of older ones, so a team can come back to a room days later.
 
 ## Agents get to know each person

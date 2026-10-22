@@ -202,6 +202,15 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return self._json(401, {"error": "missing or wrong access token"})
             self._guard(lambda: self._json(200, self._post(url.path, self._body(2_200_000 if url.path == "/api/upload" else MAX_BODY))), url.path)
 
+        def _onboarding(self):
+            """What a new owner has done so far (owner only; each check stops at the first match, so it stays cheap)."""
+            if self.who.role != "owner":
+                return None
+            db = ws.db
+            return {"messaged": db.one("SELECT 1 FROM messages WHERE sender = 'you' AND hops = 0 LIMIT 1") is not None,
+                    "tasked": db.one("SELECT 1 FROM tasks LIMIT 1") is not None, "invited": db.one("SELECT 1 FROM users LIMIT 1") is not None
+                    or db.one("SELECT 1 FROM invites LIMIT 1") is not None}
+
         def _sees_run(self, agent: str) -> bool:
             """Whether this person may know that an agent is working right now (and on what): only in chats they can see."""
             room = ws.busy_room(agent)
@@ -331,7 +340,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                                     "integrations": ws.integrations.enabled_for(a["name"])}
                                    for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in rooms],
-                        "approvals": approvals, "jobs": jobs, "busy": [a for a in ws.busy() if self._sees_run(a)], "activity": {a: t for a, t in ws.agent_activity().items() if self._sees_run(a)}, "open_tasks": tasks.open_counts(ws, self.who),
+                        "approvals": approvals, "jobs": jobs, "onboarding": self._onboarding(), "busy": [a for a in ws.busy() if self._sees_run(a)], "activity": {a: t for a, t in ws.agent_activity().items() if self._sees_run(a)}, "drafts": {a: t for a, t in ws.agent_drafts().items() if self._sees_run(a)}, "open_tasks": tasks.open_counts(ws, self.who),
                         "sandbox": sandbox.status(), "provider": ws.provider(), "search_configured": ws.search_settings()["configured"], "internet_enabled": ws.internet_settings()["enabled"],
                         "providers": [{"id": p["id"], "label": p["label"], "model": p["model"], "default": p["default"]} for p in ws.providers()["profiles"]] if who.at_least("admin") else [],
                         "model_ready": bool(ws.providers()["profiles"]) or ws.providers()["env_fallback"] or ws.model_factory is not core_mod.default_model_factory,
@@ -529,6 +538,12 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 good = body.get("good")
                 personal.record_feedback(ws, "you" if self.who.role == "owner" else self.who.name, int(body["id"]), None if good is None else bool(good))
                 return {"ok": True}
+            if path == "/api/message/delete":
+                msg = ws.db.one("SELECT room FROM messages WHERE id = ?", (int(body["id"]),))
+                if msg is None or not ws.team.can_see_room(self.who, msg["room"]):
+                    raise WorkspaceError("no such message")
+                ws.delete_message(int(body["id"]), "you" if self.who.role == "owner" else self.who.name, self.who.at_least("admin"))
+                return {"ok": True}
             if path == "/api/share":
                 self._rate_limit(self.who.name)
                 src = ws.db.one("SELECT room FROM messages WHERE id = ?", (int(body["id"]),))
@@ -542,7 +557,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/tasks/create":
                 self._rate_limit(self.who.name)
                 sender = "you" if self.who.role == "owner" else self.who.name
-                return tasks.create(ws, self.who, sender, str(body["room"]), str(body["agent"]), str(body.get("title") or ""))
+                return tasks.create(ws, self.who, sender, str(body["room"]), str(body["agent"]), str(body.get("title") or ""), str(body.get("repeat") or ""))
             if path == "/api/tasks/update":
                 sender = "you" if self.who.role == "owner" else self.who.name
                 return {"task": tasks.update(ws, self.who, sender, int(body["id"]), str(body["action"]))}
@@ -552,6 +567,9 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 if not ws.team.can_use_agent(self.who, agent) or (room is not None and not ws.team.can_see_room(self.who, room)):
                     raise Forbidden("that agent is working in a chat you are not part of")
                 return {"stopping": ws.request_stop(agent)}
+            if path == "/api/streaming":  # owner only (not in any role table)
+                ws.set_setting("streaming", "on" if body.get("enabled") else "off")
+                return {"enabled": ws.get_setting("streaming", "on") != "off"}
             if path == "/api/compaction":  # owner only (not in any role table)
                 ws.set_setting("compaction", "on" if body.get("enabled") else "off")
                 if not body.get("enabled"):

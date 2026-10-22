@@ -20,7 +20,7 @@ import re
 import urllib.parse
 import urllib.request
 
-from kintsugi.model import USER_AGENT, Model, OpenAIAdapter, request_json
+from kintsugi.model import USER_AGENT, Model, OpenAIAdapter, Streamer, request_json
 
 KINDS = ("openai", "anthropic", "gemini")
 ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,23}$")
@@ -70,7 +70,7 @@ def clean_model(model: str) -> str:
     return model
 
 
-class AnthropicAdapter(Model):
+class AnthropicAdapter(Streamer, Model):
     VERSION = "2023-06-01"
 
     def __init__(self, base_url: str, model: str, api_key: str, max_tokens: int = 2048, temperature: float = 0.0,
@@ -86,7 +86,7 @@ class AnthropicAdapter(Model):
         request = urllib.request.Request(f"{self.base_url}/v1/models?limit=100", headers=self._headers())
         return sorted(item["id"] for item in request_json(request, 20.0, 0).get("data", []))
 
-    def complete(self, messages: list[dict]) -> str:
+    def _body(self, messages: list[dict]) -> dict:
         system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
         turns: list[dict] = []
         for m in messages:
@@ -102,16 +102,51 @@ class AnthropicAdapter(Model):
         body = {"model": self.name, "max_tokens": self.max_tokens, "temperature": self.temperature, "messages": turns}
         if system:
             body["system"] = system
-        request = urllib.request.Request(f"{self.base_url}/v1/messages", data=json.dumps(body).encode(), headers=self._headers())
-        data = request_json(request, self.timeout, self.max_retries)
+        return body
+
+    def _make(self, messages: list[dict], stream: bool = False) -> urllib.request.Request:
+        body = self._body(messages)
+        if stream:
+            body["stream"] = True
+        return urllib.request.Request(f"{self.base_url}/v1/messages", data=json.dumps(body).encode(), headers=self._headers())
+
+    def _read(self, data: dict) -> str:
         self.usage.calls += 1
         usage = data.get("usage") or {}
         self.usage.prompt_tokens += usage.get("input_tokens", 0)
         self.usage.completion_tokens += usage.get("output_tokens", 0)
         return "".join(block.get("text", "") for block in data.get("content", []) if block.get("type") == "text").strip()
 
+    def complete(self, messages: list[dict]) -> str:
+        return self._read(request_json(self._make(messages), self.timeout, self.max_retries))
 
-class GeminiAdapter(Model):
+    def complete_stream(self, messages: list[dict], on_text) -> str:
+        seen = {"in": 0, "out": 0}
+
+        def handle(event: dict) -> str:
+            kind = event.get("type")
+            if kind == "message_start":
+                seen["in"] = ((event.get("message") or {}).get("usage") or {}).get("input_tokens", 0)
+            elif kind == "message_delta":
+                seen["out"] = (event.get("usage") or {}).get("output_tokens", seen["out"])
+            elif kind == "content_block_delta" and (event.get("delta") or {}).get("type") == "text_delta":
+                return event["delta"].get("text", "")
+            return ""
+
+        def finish(data, text):
+            if data is not None:
+                return self._read(data)
+            if not text:
+                return self.complete(messages)
+            self.usage.calls += 1
+            self.usage.prompt_tokens += seen["in"]
+            self.usage.completion_tokens += seen["out"]
+            return text.strip()
+
+        return self._stream(self._make(messages, stream=True), messages, on_text, handle, finish)
+
+
+class GeminiAdapter(Streamer, Model):
     def __init__(self, base_url: str, model: str, api_key: str, max_tokens: int = 2048, temperature: float = 0.0,
                  timeout: float = 90.0, max_retries: int = 4) -> None:
         super().__init__()
@@ -126,7 +161,7 @@ class GeminiAdapter(Model):
         data = request_json(request, 20.0, 0)
         return sorted(m["name"].split("/", 1)[-1] for m in data.get("models", []) if "generateContent" in m.get("supportedGenerationMethods", []))
 
-    def complete(self, messages: list[dict]) -> str:
+    def _body(self, messages: list[dict]) -> dict:
         system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
         contents: list[dict] = []
         for m in messages:
@@ -141,15 +176,49 @@ class GeminiAdapter(Model):
                 "generationConfig": {"temperature": self.temperature, "maxOutputTokens": self.max_tokens}}
         if system:
             body["systemInstruction"] = {"parts": [{"text": system}]}
-        url = f"{self.base_url}/v1beta/models/{urllib.parse.quote(self.name, safe='')}:generateContent"
-        data = request_json(urllib.request.Request(url, data=json.dumps(body).encode(), headers=self._headers()), self.timeout, self.max_retries)
+        return body
+
+    def _make(self, messages: list[dict], stream: bool = False) -> urllib.request.Request:
+        method = ("streamGenerateContent?alt=sse" if stream else "generateContent")
+        url = f"{self.base_url}/v1beta/models/{urllib.parse.quote(self.name, safe='')}:{method}"
+        return urllib.request.Request(url, data=json.dumps(self._body(messages)).encode(), headers=self._headers())
+
+    @staticmethod
+    def _text_of(data: dict) -> str:
+        candidates = data.get("candidates") or []
+        parts = (candidates[0].get("content") or {}).get("parts", []) if candidates else []
+        return "".join(p.get("text", "") for p in parts if not p.get("thought"))
+
+    def _read(self, data: dict) -> str:
         self.usage.calls += 1
         usage = data.get("usageMetadata") or {}
         self.usage.prompt_tokens += usage.get("promptTokenCount", 0)
         self.usage.completion_tokens += usage.get("candidatesTokenCount", 0)
-        candidates = data.get("candidates") or []
-        parts = (candidates[0].get("content") or {}).get("parts", []) if candidates else []
-        return "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+        return self._text_of(data).strip()
+
+    def complete(self, messages: list[dict]) -> str:
+        return self._read(request_json(self._make(messages), self.timeout, self.max_retries))
+
+    def complete_stream(self, messages: list[dict], on_text) -> str:
+        seen = {"in": 0, "out": 0}
+
+        def handle(event: dict) -> str:
+            usage = event.get("usageMetadata") or {}
+            seen["in"] = usage.get("promptTokenCount", seen["in"])
+            seen["out"] = usage.get("candidatesTokenCount", seen["out"])
+            return self._text_of(event)
+
+        def finish(data, text):
+            if data is not None:
+                return self._read(data)
+            if not text:
+                return self.complete(messages)
+            self.usage.calls += 1
+            self.usage.prompt_tokens += seen["in"]
+            self.usage.completion_tokens += seen["out"]
+            return text.strip()
+
+        return self._stream(self._make(messages, stream=True), messages, on_text, handle, finish)
 
 
 def build(profile: dict, key: str | None, model: str | None = None) -> Model:
