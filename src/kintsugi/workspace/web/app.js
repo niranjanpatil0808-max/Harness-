@@ -1165,7 +1165,14 @@ function joinDialog(code) {
   dialog("You are invited", "Choose the name your teammates will see. Lowercase letters, digits, - and _. This browser will stay signed in as you.", h("div", {}, h("label", {}, "Name"), name, note),
     (close) => [h("button", {class: "btn", onclick: () => { close(); connectDialog(false); }}, "I already have an account"), h("button", {class: "btn primary", onclick: () => go(close)}, "Join")], undefined, {locked: true});
 }
+function trackVisibleArea() {  // the part of the screen not covered by the on-screen keyboard: dialogs stay inside it
+  const vv = window.visualViewport; if (!vv) return;
+  const set = () => { const root = document.documentElement.style; root.setProperty("--vvh", Math.round(vv.height) + "px"); root.setProperty("--vvt", Math.round(vv.offsetTop) + "px"); };
+  vv.addEventListener("resize", set); vv.addEventListener("scroll", set); set();
+  document.addEventListener("focusin", (e) => { if (e.target.matches && e.target.matches("input,textarea,select")) setTimeout(() => e.target.scrollIntoView({block: "center", behavior: "smooth"}), 300); });
+}
 function init() {
+  trackVisibleArea();
   applyTheme();
   setupMobile();
   const inv = location.hash.match(/invite=([^&]+)/);

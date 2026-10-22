@@ -291,3 +291,10 @@ kbd{margin-left:auto;font:600 11px var(--sans);color:var(--muted);border:1px sol
 @media(pointer:coarse){.mini{min-height:38px;min-width:36px;padding:4px 6px;font-size:13px}.msg-actions{gap:2px}.row.me .me-actions{gap:2px}}
 .rate-group{display:inline-flex;gap:2px}
 @media(min-width:701px){.set-nav{max-height:68vh}.set-item{padding:7px 12px;min-height:34px}.set-group{margin-bottom:6px}.set-h{padding:4px 10px}}
+/* Phones: a dialog with a text box sits at the TOP, so the on-screen keyboard can never cover the box or the button (found on a real iPhone:
+   the sign-in box was hidden behind the keyboard and could not be scrolled into view). --vvh/--vvt follow the visible area (see app.js). */
+@media(max-width:860px){
+  .overlay{top:var(--vvt,0px);bottom:auto;height:var(--vvh,100%);overflow-y:auto;overscroll-behavior:contain}
+  .overlay:has(.dialog input:not([type=checkbox]):not([type=radio]):not([type=file]),.dialog textarea,.dialog select){align-items:start;padding:max(12px,env(safe-area-inset-top)) 12px 12px}
+  .overlay:has(.dialog input:not([type=checkbox]):not([type=radio]):not([type=file]),.dialog textarea,.dialog select) .dialog{border-radius:16px!important;width:100%!important;max-height:calc(var(--vvh,100dvh) - 24px)}
+}
