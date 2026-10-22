@@ -63,7 +63,7 @@ steer an agent. Instead:
 - Optimising against a fixed suite can overfit it (Goodhart's law). The safety trap and the "claimed but did not run"
   checks make the obvious shortcuts fail, but they are a guard, not a guarantee.
 - It improves which model and which rules to use. It does not make a weak model smart: on the first real-model smoke runs
-  `allam-2-7b` passed about 6 of 15 tasks (see `results/workspace_smoke.md`), and a playbook may not fix that. Comparing models
+  `allam-2-7b` passed about 6 of 15 tasks (see `research/results/workspace_smoke.md`), and a playbook may not fix that. Comparing models
   is the more powerful lever.
 - Not yet measured on real models: whether accepted proposals help real conversations. Run the study on your provider and
   look at the report before trusting any number here. `examples/workspace_study.py` (and the `workspace-study` GitHub

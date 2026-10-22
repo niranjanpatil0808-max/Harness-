@@ -1,12 +1,12 @@
 # Runs the real-model benchmark on GitHub's servers.
 # Needs one repository secret: KINTSUGI_API_KEY (Settings > Secrets and variables > Actions).
-# Starts when benchmark/run.config is pushed to this branch (or by hand from the Actions tab).
+# Starts when research/benchmark/run.config is pushed to this branch (or by hand from the Actions tab).
 name: benchmark
 
 on:
   push:
     branches: [claude/ecstatic-cray-g930so]
-    paths: [benchmark/run.config]
+    paths: [research/benchmark/run.config]
   workflow_dispatch:
 
 permissions:
@@ -27,14 +27,14 @@ jobs:
         run: |
           pip install -e .
           python -m unittest discover -s tests
-          python benchmark/check_tasks.py
+          python research/benchmark/check_tasks.py
 
       - name: List the models this key can use
         continue-on-error: true
         env:
           KINTSUGI_API_KEY: ${{ secrets.KINTSUGI_API_KEY }}
         run: |
-          set -a; . benchmark/run.config; set +a
+          set -a; . research/benchmark/run.config; set +a
           kintsugi models
 
       - name: Run the benchmark on the real model(s)
@@ -45,7 +45,7 @@ jobs:
             echo "Secret KINTSUGI_API_KEY is not set. Add it under Settings > Secrets and variables > Actions." >&2
             exit 1
           fi
-          set -a; . benchmark/run.config; set +a
+          set -a; . research/benchmark/run.config; set +a
           status=0
           # One run per "model|max_tokens|repeats|modes|temperature|extra_json|split" entry in RUNS, one after
           # the other (shared rate limit). Everything after max_tokens is optional (leave it empty to skip it).
@@ -56,7 +56,7 @@ jobs:
             modes="${modes:-${MODES:-baseline loop loop+memory full}}"
             echo "=== $model (max_tokens $tokens, repeats ${repeats:-${REPEATS:-1}}, modes ${modes//,/ }, temperature ${temperature:-0}, extra ${extra:-none}, split ${split:-split.json}) ==="
             KINTSUGI_MODEL="$model" KINTSUGI_MAX_TOKENS="$tokens" KINTSUGI_TEMPERATURE="${temperature:-0}" KINTSUGI_EXTRA="$extra" \
-              python benchmark/run_benchmark.py --model openai --repeats "${repeats:-${REPEATS:-1}}" --sleep "${SLEEP:-0}" \
+              python research/benchmark/run_benchmark.py --model openai --repeats "${repeats:-${REPEATS:-1}}" --sleep "${SLEEP:-0}" \
                 --split "${split:-split.json}" --modes ${modes//,/ } || status=1
           done
           exit $status
@@ -66,7 +66,7 @@ jobs:
         run: |
           git config user.name "kintsugi-benchmark"
           git config user.email "actions@users.noreply.github.com"
-          git add results
+          git add research/results
           git commit -m "Add benchmark results from GitHub Actions run ${{ github.run_id }}" || exit 0
           git pull --rebase origin "${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"
@@ -75,4 +75,4 @@ jobs:
         if: always()
         with:
           name: results
-          path: results/
+          path: research/results/

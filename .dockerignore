@@ -3,8 +3,7 @@
 .venv
 __pycache__
 *.pyc
-results
-benchmark
+research
 memory
 workspace
 docs

@@ -9,7 +9,7 @@ fast-forward with no conflicts. CI is green on the branch head. No API keys or t
       This is the biggest gap: every test so far used scripted models and an emulated phone.
 - [ ] Decide the **final name** ("Kintsugi" is a working name). Changing it later touches `pyproject.toml`, `README.md`, the manifest and icons.
 - [ ] Read the README status table once and strike anything you would not say out loud to a stranger.
-- [ ] Decide the research archive move (`benchmark/`, `results/`, `RESULTS.md` into `research/`): yes or no. It is not done; it reshuffles paths in scripts, workflows and tests.
+- [x] Research archive move done: `research/benchmark/`, `research/results/`, `research/RESULTS.md` (paths fixed in scripts, workflows, docs and tests).
 
 ## 2. Merge (pick one; I have not done either)
 - Simplest, keeps the 93 commits: on GitHub open a pull request from `claude/ecstatic-cray-g930so` into `main`, wait for CI, choose *Merge* (a fast-forward-style merge).

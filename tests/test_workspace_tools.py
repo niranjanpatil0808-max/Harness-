@@ -18,14 +18,14 @@ class TestToolsThatWrapKintsugi(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.tmp = tempfile.TemporaryDirectory()
-        fixed = (ROOT / "benchmark" / "solutions" / TASK / "search.py").read_text()
+        fixed = (ROOT / "research" / "benchmark" / "solutions" / TASK / "search.py").read_text()
         self.fixed_reply = f"```python\n# file: search.py\n{fixed}```"
         self.model = MockModel([self.fixed_reply])
         self.ws = Workspace(self.tmp.name, model_factory=lambda n: self.model, encrypt_keychain=False)
         self.ws.create_agent("alice", tier="dangerous")
         self.ws.create_room("general", ["alice", "you"])
         self.project = self.ws.files_dir("alice") / "proj"
-        shutil.copytree(ROOT / "benchmark" / "tasks" / TASK, self.project)
+        shutil.copytree(ROOT / "research" / "benchmark" / "tasks" / TASK, self.project)
 
     def tearDown(self):
         self.ws.close()
@@ -50,7 +50,7 @@ class TestToolsThatWrapKintsugi(unittest.TestCase):
         self.assertNotEqual((self.project / "search.py").read_text(), before)
         # the tests were not touched
         self.assertEqual((self.project / "test_search.py").read_text(),
-                         (ROOT / "benchmark" / "tasks" / TASK / "test_search.py").read_text())
+                         (ROOT / "research" / "benchmark" / "tasks" / TASK / "test_search.py").read_text())
 
     def test_fix_code_reports_failure_and_leaves_files_alone(self):
         self.model.script = ["```python\n# file: search.py\ndef binary_search(items, target):\n    return -1\n```"]

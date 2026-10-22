@@ -32,7 +32,7 @@ work and are measured.
 | Context | Files ≥ 30% of top file's score in full (8000-char budget), up to 4 read-only snippets ≥ 5% of top node, signature map for the rest | Small prompt, still navigable |
 | Editing in graph mode | Only files shown in full may be edited | Prevents overwriting a file the model never saw |
 | Benchmark | 32 tasks: 16 single-function, 8 multi-file with 2 distractor files each, 8 hard (added after the first results showed the other 24 were saturated) | Measurable for all three modules |
-| Split | 11 warmup / 21 held-out (5 hard), fixed in `benchmark/split.json` | No scoring on tasks the memory trained on |
+| Split | 11 warmup / 21 held-out (5 hard), fixed in `research/benchmark/split.json` | No scoring on tasks the memory trained on |
 | Reporting | Pass rate over held-out tasks only; calls and tokens counted for scored tasks only; incomplete modes get no number | Modes must be comparable and no number may be invented |
 | Modes | baseline, loop, loop+memory, full | Ablation shows which module helps |
 

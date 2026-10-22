@@ -238,3 +238,7 @@ Not fixed (documented): sign-in code redemption is refused while an address is t
 dialog when the browser has no token (a person with their own reset code could sign a victim browser into their account: consider a confirm dialog);
 history LIMIT 50 skips older messages after a very long offline; repeating-task label uses the server clock unless the time zone is set; any website can
 prefill the composer via /?share_text= (never auto-sent).
+
+## Update: research archive move done (user said yes)
+benchmark/ -> research/benchmark/, results/ -> research/results/ (also workspace_smoke/study outputs), RESULTS.md -> research/RESULTS.md. Paths fixed in benchmark scripts,
+.github/workflows (benchmark paths trigger is now research/benchmark/run.config), examples, docs, SPEC, .gitignore, .dockerignore, tests. 602 unit tests OK; check_tasks 42/42.

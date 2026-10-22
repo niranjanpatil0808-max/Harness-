@@ -33,13 +33,13 @@ jobs:
             exit 1
           fi
           set -a; . examples/smoke.config; set +a
-          SMOKE_UNATTENDED_OK=1 python examples/workspace_smoke.py --out results/workspace_smoke.md || true
+          SMOKE_UNATTENDED_OK=1 python examples/workspace_smoke.py --out research/results/workspace_smoke.md || true
       - name: Save the report to the branch
         if: always()
         run: |
           git config user.name "kintsugi-smoke"
           git config user.email "actions@users.noreply.github.com"
-          git add -f results/workspace_smoke.md
+          git add -f research/results/workspace_smoke.md
           git commit -m "Add workspace smoke test report from run ${{ github.run_id }}" || exit 0
           git pull --rebase origin "${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"

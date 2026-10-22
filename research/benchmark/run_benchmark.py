@@ -1,4 +1,4 @@
-"""Run the benchmark in every mode and write results/<run>.json and a markdown table.
+"""Run the benchmark in every mode and write research/results/<run>.json and a markdown table.
 
 Modes (ablation):
   baseline     one attempt, all files in the prompt, no memory
@@ -11,9 +11,9 @@ Scores are reported on the held-out tasks in split.json. Memory modes first run
 the warmup tasks to collect lessons; warmup results are kept but not scored.
 
 Examples:
-  python benchmark/run_benchmark.py --model mock
-  GROQ_API_KEY=... python benchmark/run_benchmark.py --model openai --repeats 1
-  python benchmark/run_benchmark.py --resume results/<run>.json
+  python research/benchmark/run_benchmark.py --model mock
+  GROQ_API_KEY=... python research/benchmark/run_benchmark.py --model openai --repeats 1
+  python research/benchmark/run_benchmark.py --resume research/results/<run>.json
 """
 
 from __future__ import annotations
@@ -231,7 +231,7 @@ def main() -> int:
     parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument("--sleep", type=float, default=0.0, help="seconds to wait between tasks (rate limits)")
     parser.add_argument("--split", default="split.json", help="which split file in benchmark/ to use")
-    parser.add_argument("--resume", type=Path, help="continue an interrupted results/<run>.json")
+    parser.add_argument("--resume", type=Path, help="continue an interrupted research/results/<run>.json")
     args = parser.parse_args()
 
     if args.resume:

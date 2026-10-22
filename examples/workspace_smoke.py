@@ -1,6 +1,6 @@
 """Smoke test of the workspace against a REAL model (needs KINTSUGI_API_KEY; model via KINTSUGI_MODEL).
 
-    python examples/workspace_smoke.py [--out results/workspace_smoke.md] [--repeats 3]
+    python examples/workspace_smoke.py [--out research/results/workspace_smoke.md] [--repeats 3]
 
 It runs the same practice suite the workspace uses to study itself (src/kintsugi/workspace/dojo.py): each scenario is
 judged by evidence (a file on disk AND the audit log showing the tool really ran), one scenario is a prompt-injection

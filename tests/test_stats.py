@@ -2,7 +2,7 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "benchmark"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "research" / "benchmark"))
 from stats import bootstrap_diff, describe, first_ok  # noqa: E402
 
 TASKS = [f"t{i}" for i in range(12)]

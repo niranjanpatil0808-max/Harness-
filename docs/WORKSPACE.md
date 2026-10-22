@@ -14,7 +14,7 @@ not a port and not a clone: no Slack, no Postgres, no cloud deploy, roughly 2k l
 
 - The workspace is **tested** (see `tests/test_workspace_*.py`) and runs offline on a mock model. Whether real models can follow its plain-text tool protocol is checked by `examples/workspace_smoke.py` (run by the `workspace-smoke` GitHub Action; the report lands in `results/workspace_smoke.md`). Until that report exists, nothing here has been seen working with a real model.
 - Whether agent lessons **improve** agent behaviour is **not measured**. The only measured result in this repo
-  is on the bug-fix benchmark (see [RESULTS.md](../RESULTS.md)), where the retry loop helped a little and
+  is on the bug-fix benchmark (see [RESULTS.md](../research/RESULTS.md)), where the retry loop helped a little and
   memory and the graph showed no measurable effect yet. Do not read the workspace as evidence for memory.
 - The sandbox is **not a security sandbox** (below).
 

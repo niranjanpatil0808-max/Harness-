@@ -1,6 +1,6 @@
 """Compare models on the workspace's practice suite, with a REAL provider (needs KINTSUGI_API_KEY).
 
-    STUDY_MODELS="allam-2-7b qwen/qwen3.8-27b" python examples/workspace_study.py --out results/workspace_models.md
+    STUDY_MODELS="allam-2-7b qwen/qwen3.8-27b" python examples/workspace_study.py --out research/results/workspace_models.md
 
 Prints one table so you can see which model uses tools most reliably before choosing it for an agent. It spends real
 model calls (STUDY_MAX_CALLS is the hard limit). The suite is small: treat differences of a few points as noise.

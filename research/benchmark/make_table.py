@@ -1,6 +1,6 @@
 """Rebuild the markdown table of a results file from its JSON (e.g. after the table format changed).
 
-  python benchmark/make_table.py results/<run>.json [more.json ...]
+  python research/benchmark/make_table.py research/results/<run>.json [more.json ...]
 """
 
 import json

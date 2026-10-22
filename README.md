@@ -113,7 +113,7 @@ It works for **one person** (a founder, a builder) who wants a few agents they c
 
 ## Research: the harness for weak models
 
-The repository started as an experiment: can a small open model fix more bugs if it retries against tests, learns from its mistakes and sees only the relevant code? The honest answer so far is "a little": retrying repaired every first-attempt failure we saw (8 of 8 on two models, a small number), the context graph cut prompt size by about 45% on large projects without hurting the tasks that were solved, and memory still has no measured effect. That work is kept as research, and parts of it (memory, the code verifier, the context graph, the model adapter) power the product. See [research/README.md](research/README.md) and [RESULTS.md](RESULTS.md).
+The repository started as an experiment: can a small open model fix more bugs if it retries against tests, learns from its mistakes and sees only the relevant code? The honest answer so far is "a little": retrying repaired every first-attempt failure we saw (8 of 8 on two models, a small number), the context graph cut prompt size by about 45% on large projects without hurting the tasks that were solved, and memory still has no measured effect. That work is kept as research, and parts of it (memory, the code verifier, the context graph, the model adapter) power the product. See [research/README.md](research/README.md) and [research/RESULTS.md](research/RESULTS.md).
 
 ## Credits and inspirations
 
@@ -142,7 +142,7 @@ src/kintsugi/             engine modules the product reuses: model.py memory.py 
 SECURITY.md  CONTRIBUTING.md  Dockerfile  render.yaml  .devcontainer/  docs/ (TEAMS, PHONE, PLUGINS, INTEGRATIONS, HOSTING, STATUS...)
 examples/                 workspace_demo.py, smoke and model-comparison scripts
 tests/                    ~550 offline tests (python -m unittest discover -s tests) and tests/ui (19 browser suites)
-research/                 the original weak-model experiment (write-up); benchmark/, results/ and RESULTS.md move here soon
+research/                 the original weak-model experiment: write-up, benchmark/, results/ and RESULTS.md
 ```
 
 Tests use the standard library's `unittest`, so a fresh clone needs no installs to run them.
