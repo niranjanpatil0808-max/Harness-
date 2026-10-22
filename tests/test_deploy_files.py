@@ -25,7 +25,7 @@ class TestDeploymentFiles(unittest.TestCase):
         self.assertRegex(render, r"key: KINTSUGI_API_KEY\s+sync: false")  # the key is never in the repository
 
     def test_no_secrets_are_committed_in_deployment_files(self):
-        for name in ("Dockerfile", "render.yaml", ".devcontainer/devcontainer.json", "examples/smoke.config"):
+        for name in ("Dockerfile", "render.yaml", ".devcontainer/devcontainer.json", "examples/smoke.config", "examples/study.config"):
             self.assertNotRegex(self.read(name), r"(sk-|gsk_|ghp_)[A-Za-z0-9]{10,}", name)
 
     def test_every_test_that_security_md_cites_exists(self):
@@ -38,6 +38,14 @@ class TestDeploymentFiles(unittest.TestCase):
         code = "".join(p.read_text() for p in (ROOT / "src" / "kintsugi").rglob("*.py"))
         for variable in re.findall(r"\| `(KINTSUGI_[A-Z_]+)`", self.read("docs/HOSTING.md")):
             self.assertIn(variable, code, variable)
+
+    def test_the_model_study_workflow_spends_nothing_until_models_are_listed(self):
+        config = self.read("examples/study.config")
+        self.assertRegex(config, r"(?m)^STUDY_MODELS=\s*$")  # a push of this file must not burn quota
+        self.assertIn("STUDY_MAX_CALLS", config)
+        workflow = self.read(".github/workflows/workspace_study.yml")
+        self.assertIn("examples/study.config", workflow)
+        self.assertNotIn("sk-", workflow)
 
     def test_the_package_ships_its_web_files_and_licenses(self):
         pyproject = self.read("pyproject.toml")

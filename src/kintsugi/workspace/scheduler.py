@@ -81,6 +81,10 @@ class Scheduler:
         minute_number = int(now // 60)
         when = datetime.fromtimestamp(now)
         fired = 0
+        try:
+            self.ws.improver.maybe_start(now)  # a scheduled self-improvement study, if one is due and switched on
+        except Exception as err:  # never let that stop the jobs
+            self.ws.audit(None, "improve-error", f"{type(err).__name__}: {str(err)[:200]}")
         for job in self.ws.list_jobs():
             if not job["enabled"] or job["last_run_minute"] == minute_number:
                 continue

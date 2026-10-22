@@ -241,7 +241,8 @@ class TestSmallModelHygiene(unittest.TestCase):
             ws.create_room("r", ["alice", "you"])
             ws.post("r", "you", "@alice go")
             self.assertEqual(len(model.prompts), 2)  # the original call plus a single nudge
-            self.assertEqual(ws.history("r")[-1]["text"], "I will do that. Please wait.")
+            self.assertIn("Not verified", ws.history("r")[-1]["text"])
+            self.assertTrue(ws.history("r")[-1]["text"].endswith("I will do that. Please wait."))
             ws.close()
 
     def test_the_prompt_uses_message_tags_and_forbids_inventing_results(self):

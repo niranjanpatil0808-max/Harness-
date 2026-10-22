@@ -33,7 +33,7 @@ jobs:
             exit 1
           fi
           set -a; . examples/smoke.config; set +a
-          python examples/workspace_smoke.py --out results/workspace_smoke.md || true
+          SMOKE_UNATTENDED_OK=1 python examples/workspace_smoke.py --out results/workspace_smoke.md || true
       - name: Save the report to the branch
         if: always()
         run: |

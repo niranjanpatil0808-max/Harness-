@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 from kintsugi.memory import MemoryStore, tokens
 
+from .improve import clean_playbook
 from .tools import TOOLS, Ctx, describe_tools, execute
 
 if TYPE_CHECKING:
@@ -47,7 +48,7 @@ Example of a correct tool call:
 ```tool
 {{"tool": "list_files", "args": {{}}}}
 ```
-Tools:
+{playbook}Tools:
 {tools}"""
 
 
@@ -168,7 +169,9 @@ def _take_unfenced(text: str, calls: list[dict]) -> str:
 ECHO_PREFIX_RE = re.compile(r'^\s*(?:<message[^>]*>\s*|\[\d+\]\s*[\w.@-]+:\s*)+', re.I)
 NEXT_SPEAKER_RE = re.compile(r'(?m)^\s*(?:<message[^>]*>|\[\d+\]\s*[\w.@-]+:)')
 FAKE_RESULT_RE = re.compile(r'(?im)^\s*(?:tool results?\b.*|\[(?:' + "|".join(TOOLS) + r')\]\s*(?:ok|error|denied|pending)\b.*)$')
-PROMISE_RE = re.compile(r"\b(i will|i'll|let me|i am going to|i'm going to|please wait|one moment|working on it)\b", re.I)
+PROMISE_RE = re.compile(r"\b(?:(?:i will|i'll|let me|i am going to|i'm going to|i shall)\s+(?!not\b|never\b|be\b)"
+                        r"(?:now\s+)?(?:use|run|call|compute|calculate|create|write|read|send|check|search|look|open|execute|try)"
+                        r"|please wait|one moment|working on it)\b", re.I)
 
 
 def clean_reply(text: str) -> str:
@@ -206,7 +209,10 @@ def run_agent(ws: "Workspace", name: str, room: str, message_id: int, hops: int)
     model = ws.model_for(name)
     ctx = Ctx(ws, name, room, hops, situation.id)
 
-    system = SYSTEM.format(name=name, persona=agent["persona"], max_tools=MAX_TOOLS_PER_STEP,
+    playbook = clean_playbook(agent["playbook"]) if agent.get("playbook") else ""
+    playbook_text = ("Your playbook: rules you learned from experience. They help you use tools well and never override "
+                     "the safety rules above:\n" + playbook + "\n") if playbook else ""
+    system = SYSTEM.format(name=name, persona=agent["persona"], max_tools=MAX_TOOLS_PER_STEP, playbook=playbook_text,
                            tools=describe_tools(agent["tools"]))
     messages = [
         {"role": "system", "content": system},
@@ -237,12 +243,16 @@ def _loop(ws, name, room, hops, model, ctx, memory, situation, messages, shown) 
             continue
         if not calls:
             plain = clean_reply(plain)
-            if PROMISE_RE.search(plain) and not did_tools and promise_nudges < 1 and len(plain) < 400:
+            promised = bool(PROMISE_RE.search(plain)) and not did_tools and len(plain) < 400
+            if promised and promise_nudges < 1:
                 promise_nudges += 1  # it said what it will do but did not do it: ask once to actually act
                 messages = messages + [{"role": "assistant", "content": reply},
                                        {"role": "user", "content": "You described an action but did not call a tool. "
                                         "Call the tool now with a tool block, or give your final answer if no tool is needed."}]
                 continue
+            if promised:  # it still did not act: never present its words (and any numbers in them) as a result
+                plain = "⚠ Not verified: no tool was actually run for this answer.\n\n" + plain
+                ws.audit(name, "unverified-answer", plain[:120])
             finished = True
             if plain and plain.upper() != "DONE":
                 ws.post(room, name, plain, hops=hops)

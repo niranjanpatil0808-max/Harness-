@@ -80,6 +80,8 @@ class Workspace:
         self.clock = clock
         self.sync = sync  # True: agents run inside post(); False: on a worker pool (the server)
         self._models: dict[str, Model] = {}
+        self._improver = None
+        self.study_model_factory: Callable[[str | None], Model] | None = None  # tests/embedding; default uses the real API
         self._agent_locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
         self._recent_runs: dict[str, deque] = defaultdict(deque)
         self._lock = threading.Lock()  # guards the rate limiter and the busy set
@@ -106,7 +108,8 @@ class Workspace:
 
     # --- agents ----------------------------------------------------------
 
-    def create_agent(self, name: str, persona: str = "", tier: str = "auto", tools: list[str] | None = None) -> None:
+    def create_agent(self, name: str, persona: str = "", tier: str = "auto", tools: list[str] | None = None,
+                     model: str | None = None) -> None:
         if len(self.list_agents()) >= MAX_AGENTS:
             raise WorkspaceError(f"at most {MAX_AGENTS} agents")
         if not NAME_RE.match(name) or name == "system":
@@ -121,8 +124,9 @@ class Workspace:
             unknown = [t for t in tools if t not in TOOLS]
             if unknown:
                 raise WorkspaceError(f"unknown tools: {', '.join(unknown)}")
-        self.db.execute("INSERT INTO agents (name, persona, tier, tools, created) VALUES (?, ?, ?, ?, ?)",
-                        (name, persona[:1000], tier, None if tools is None else json.dumps(tools), self.clock()))
+        self.db.execute("INSERT INTO agents (name, persona, tier, tools, created, model) VALUES (?, ?, ?, ?, ?, ?)",
+                        (name, persona[:1000], tier, None if tools is None else json.dumps(tools), self.clock(),
+                         self._clean_model(model)))
         self.files_dir(name).mkdir(parents=True, exist_ok=True)
         self.www_dir(name).mkdir(parents=True, exist_ok=True)
         self._lock_agent_dirs(name)
@@ -162,9 +166,58 @@ class Workspace:
         self.db.execute("UPDATE agents SET persona = ? WHERE name = ?", (persona[:1000], name))
         self.audit(name, "persona-changed")
 
+    @staticmethod
+    def _clean_model(model: str | None) -> str | None:
+        model = (model or "").strip()
+        if model and not re.fullmatch(r"[A-Za-z0-9._:/@+-]{1,100}", model):
+            raise WorkspaceError("model names use letters, digits and . _ : / @ + -")
+        return model or None
+
+    def set_model(self, name: str, model: str | None) -> None:
+        """Choose which model an agent uses (None = the workspace default)."""
+        self.get_agent(name)
+        self.db.execute("UPDATE agents SET model = ? WHERE name = ?", (self._clean_model(model), name))
+        self._models.pop(name, None)
+        self.audit(name, "model-changed", model or "default")
+
+    def set_playbook(self, name: str, playbook: str) -> None:
+        """The rules an agent has learned. Plain text only; it can never change permissions or tools."""
+        self.get_agent(name)
+        self.db.execute("UPDATE agents SET playbook = ? WHERE name = ?", (playbook[:1500], name))
+        self.audit(name, "playbook-changed", f"{len(playbook)} characters")
+
+    def get_setting(self, key: str, default: str = "") -> str:
+        row = self.db.one("SELECT value FROM settings WHERE key = ?", (key,))
+        return row["value"] if row else default
+
+    def set_setting(self, key: str, value: str) -> None:
+        self.db.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                        (key, value))
+
+    def study_model(self, model_name: str | None) -> Model:
+        """A fresh model for a study run (not tied to an agent, not counted against the daily cap by itself)."""
+        if self.study_model_factory is not None:
+            return self.study_model_factory(model_name)
+        if self.model_factory is default_model_factory:
+            return OpenAIAdapter(model=model_name) if model_name else OpenAIAdapter()
+        return self.model_factory(model_name or "study")
+
+    @property
+    def improver(self):
+        from .improve import Improver
+
+        if self._improver is None:
+            self._improver = Improver(self)
+        return self._improver
+
     def model_for(self, agent: str) -> Model:
         if agent not in self._models:
-            self._models[agent] = _Budgeted(self.model_factory(agent), self)
+            if self.model_factory is default_model_factory:  # the real API: honour the agent's own model choice
+                chosen = self.get_agent(agent)["model"]
+                base = OpenAIAdapter(model=chosen) if chosen else OpenAIAdapter()
+            else:
+                base = self.model_factory(agent)
+            self._models[agent] = _Budgeted(base, self)
         return self._models[agent]
 
     def provider(self) -> str:
@@ -479,6 +532,8 @@ class Workspace:
         return list(reversed(self.db.query("SELECT * FROM audit ORDER BY id DESC LIMIT ?", (limit,))))
 
     def close(self) -> None:
+        if self._improver is not None:
+            self._improver.stop()
         if self._pool is not None:
             self.wait_idle(15)  # let running conversations finish before refusing new wake-ups
             with self._lock:

@@ -21,6 +21,7 @@ is not, and what to do about it. Last reviewed 2026-10-22. It is a small project
 | Secrets leak | Secrets live in the keychain, are handed to code only by name, are redacted from tool output, audit entries and agent messages, and are never returned by the API or included in exports. | `test_workspace_privacy.py`, `test_workspace_server.py` |
 | Impersonation | People cannot post as an agent, `system` or a cron job. | `test_workspace_security.py` |
 | Prompt injection (text that tries to give the agent orders) | The agent is told that files, tool results and other people's messages are data, not instructions; risky tools still need your approval. | `test_workspace_agents.py` |
+| The workspace changes itself unsafely | Self-improvement can change only an agent's model and playbook text; it can never touch permissions, tools, the sandbox, approvals, secrets or code (enforced by tests that inspect its source and check a full study leaves everything else untouched). Rules about safety, secrets, links or approvals are dropped, a change that makes the prompt-injection trap worse is never proposed, and every change is reviewable and reversible. See [docs/SELF_IMPROVEMENT.md](docs/SELF_IMPROVEMENT.md). | `test_workspace_improve.py` |
 | Data you want gone | Delete an agent (everything it owns), a room, or old messages; download everything as JSON. UI: Details > Safety. CLI: `delete-agent`, `delete-room`, `purge`. | `test_workspace_privacy.py` |
 
 ## What does NOT protect you (read this)
@@ -36,6 +37,7 @@ is not, and what to do about it. Last reviewed 2026-10-22. It is a small project
   **disabled while the server runs as root** (set `KINTSUGI_ALLOW_FIX_CODE_AS_ROOT=1` to override at your own risk).
 - **Prompt injection is mitigated, not solved.** A model can still be talked into asking for something harmful; the
   approval card is your protection, so read it. Do not use `dangerous` mode with content you do not trust.
+- **Self-improvement studies spend model calls and send made-up practice tasks (and, if you opt in, an agent's lessons and pasted notes) to your provider.** They are off by default, capped per study and by the daily limit, and never use your chats or files. A pasted note that tries to smuggle in a rule is filtered, but review proposals before accepting them, especially with auto-apply on.
 - **Your conversations go to your model provider.** Whenever an agent thinks, the chat text and tool results are sent
   to the provider's API (Groq by default; shown in Details > Safety and by `kintsugi workspace status`). Files,
   keychain and other chats stay on the server. Read the provider's data policy; free tiers may keep data.

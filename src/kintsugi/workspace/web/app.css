@@ -55,7 +55,7 @@ button{cursor:pointer;background:none;border:0;padding:0}
 #topbar .title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #topbar .sub{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #topbar .sp{flex:1}
-.pill-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--line2);background:var(--surface);font-size:13px}
+.pill-btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none;padding:6px 12px;border-radius:999px;border:1px solid var(--line2);background:var(--surface);font-size:13px}
 .pill-btn:hover{border-color:var(--muted)}
 .pill-btn.warn{border-color:var(--accent);color:var(--accent);font-weight:600}
 #scroll{flex:1;overflow-y:auto;min-height:0;scroll-behavior:smooth}

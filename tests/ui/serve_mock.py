@@ -27,6 +27,12 @@ def reply(messages):
         return '```tool\n{"tool": "read_file", "args": {"path": "missing.txt"}}\n```'
     return "Hello! Here is a **list**:\n\n- one\n- two\n\n```python\nprint('hi')\n```\n\n[a link](https://example.com) <script>alert(1)</script>"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from dojo_models import factory, make_model  # noqa: E402
+
 ws = Workspace(sys.argv[1], model_factory=lambda n: MockModel(reply), sync=False, encrypt_keychain=False)
 seed(ws)
+# studies find a real improvement: the default model is weak, the candidate 'strong' is good
+ws.study_model_factory = factory({None: make_model(solves={'two_agents', 'write_file'}), 'strong': make_model()})
+ws.improver.update_settings({'candidates': ['strong'], 'repeats': 1})
 serve(ws, "127.0.0.1", int(sys.argv[2]))

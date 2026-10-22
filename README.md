@@ -17,6 +17,7 @@
 - **Has its context graphified.** The codebase is turned into a graph of what calls, uses and imports what. For each task the harness walks that graph and hands the model only the connected code, not the whole repo.
 - **Retries against real tests.** Every fix is checked by unit tests in a separate process, and the error goes back to the model for another try.
 - **A workspace for agents** (QM-style). Rooms and DMs, per-agent files, notes, keychain, tiered permissions with approvals, cron jobs, published web apps, a loop guard. Local, stdlib only. [Details](docs/WORKSPACE.md).
+- **It can study itself, safely** (new). A built-in practice suite tests your agents and other models, and proposes a better model or playbook only when it measurably wins and is no less safe. You review each change and can undo it; it can never touch permissions, secrets or code. Off by default. [Details and limits](docs/SELF_IMPROVEMENT.md).
 - **Honest numbers only.** Every table in this repo is generated from the benchmark's own result files, including runs that failed, were invalid or stopped early ([RESULTS.md](RESULTS.md)).
 
 ---
@@ -186,9 +187,9 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 
 ```
 src/kintsugi/   model.py  verifier.py  loop.py  memory.py  graph.py  cli.py
-src/kintsugi/workspace/   core.py  agents.py  tools.py  perms.py  sandbox.py  keychain.py
+src/kintsugi/workspace/   dojo.py  improve.py  core.py  agents.py  tools.py  perms.py  sandbox.py  keychain.py
                 scheduler.py  server.py  db.py  cli.py  web/index.html
-SECURITY.md   Dockerfile   render.yaml   docs/WORKSPACE.md   docs/HOSTING.md   docs/demo.html   examples/workspace_demo.py   .devcontainer/
+SECURITY.md   Dockerfile   render.yaml   docs/WORKSPACE.md   docs/HOSTING.md   docs/SELF_IMPROVEMENT.md   docs/demo.html   examples/workspace_demo.py   .devcontainer/
 benchmark/      tasks/  solutions/  split.json  check_tasks.py  run_benchmark.py
                 run.config  build_results_md.py  run_notes.json
 results/        every measured run (JSON + table + lessons learned)

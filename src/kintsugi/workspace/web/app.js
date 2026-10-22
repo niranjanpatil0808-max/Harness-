@@ -25,7 +25,7 @@ const ICONS = {
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', side: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15"/>',
   panel: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M14.5 4.5v15"/>', send: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   theme: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
-  close: '<path d="M6 6l12 12M18 6 6 18"/>', plus: '<path d="M12 5v14M5 12h14"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>', gear: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>', plus: '<path d="M12 5v14M5 12h14"/>',
 };
 function icon(name, size = 18) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -96,7 +96,7 @@ function sigChanged(key, data) { const s = JSON.stringify(data); if (S.sig[key] 
 function renderSidebar() {
   const st = S.state; if (!st) return;
   const pend = {}; st.approvals.forEach((a) => (pend[a.room] = (pend[a.room] || 0) + 1));
-  if (!sigChanged("side", [st.rooms, st.agents.map((a) => a.name), st.busy, pend, S.room])) return;
+  if (!sigChanged("side", [st.rooms, st.agents.map((a) => a.name), st.busy, pend, S.room, st.improve])) return;
   const roomItem = (r) => h("button", {class: "item" + (r.name === S.room ? " on" : ""), onclick: () => openRoom(r.name)},
     r.kind === "dm" ? avatar(roomLabel(r)) : h("span", {class: "muted", style: "width:24px;text-align:center"}, "#"),
     h("span", {class: "t"}, roomLabel(r)), busyIn(r).length ? h("span", {class: "dot", title: "working"}) : null,
@@ -114,7 +114,8 @@ function renderSidebar() {
         avatar(a.name), h("span", {class: "t"}, a.name), st.busy.includes(a.name) ? h("span", {class: "dot"}) : h("span", {class: "muted", style: "font-size:12px"}, a.tier))),
       h("button", {class: "item muted", onclick: newAgentDialog}, h("span", {style: "width:24px;text-align:center"}, "+"), "New agent")),
     h("div", {class: "side-foot"}, avatar("you"), h("span", {class: "who"}, "you"),
-      h("button", {class: "icon-btn", "aria-label": "Change theme", title: "Theme", onclick: cycleTheme}, icon("theme"))));
+      h("button", {class: "icon-btn", "aria-label": "Change theme", title: "Theme", onclick: cycleTheme}, icon("theme")),
+      h("button", {class: "icon-btn", "aria-label": "Settings", title: "Settings: self-improvement", onclick: settingsDialog}, icon("gear"))));
 }
 function toggleSidebar() {
   const app = $("#app");
@@ -132,7 +133,8 @@ function applyTheme() { const t = store.get("kt-theme"); if (t) document.documen
 function renderTopbar(force) {
   const st = S.state; if (!st) return;
   const r = curRoom(), n = st.approvals.length;
-  if (!sigChanged("top", [r, n, S.drawer, $("#app").classList.contains("collapsed")]) && !force) return;
+  const imp = st.improve || {};
+  if (!sigChanged("top", [r, n, S.drawer, $("#app").classList.contains("collapsed"), imp.running, imp.pending]) && !force) return;
   const collapsed = $("#app").classList.contains("collapsed") || matchMedia("(max-width:860px)").matches;
   fill($("#topbar"),
     collapsed ? h("button", {class: "icon-btn", "aria-label": "Open sidebar", onclick: toggleSidebar}, icon("menu")) : null,
@@ -141,6 +143,8 @@ function renderTopbar(force) {
            h("div", {class: "sub"}, r.kind === "dm" ? ((st.agents.find((a) => a.name === roomLabel(r)) || {}).persona || "Direct message") : "Members: " + r.members.join(", ")))] : h("div", {class: "title"}, "Kintsugi"),
     h("span", {class: "sp"}),
     n ? h("button", {class: "pill-btn warn", onclick: () => { const a = st.approvals[0]; if (a.room !== S.room) openRoom(a.room); else $("#scroll").scrollTop = $("#scroll").scrollHeight; }}, n + " waiting for approval") : null,
+    imp.running ? h("button", {class: "pill-btn", onclick: settingsDialog, title: imp.progress || ""}, SPARK(), "Studying…") : null,
+    imp.pending ? h("button", {class: "pill-btn", onclick: settingsDialog}, imp.pending + " improvement" + (imp.pending > 1 ? "s" : "") + " to review") : null,
     h("button", {class: "pill-btn", "aria-pressed": S.drawer, onclick: () => toggleDrawer()}, icon("panel", 16), "Details"));
 }
 
@@ -272,7 +276,7 @@ async function dmWith(agent) {
 }
 
 /* ---------- drawer ---------- */
-const TABS = [["agent", "Agent"], ["lessons", "Lessons"], ["files", "Files"], ["jobs", "Schedule"], ["apps", "Apps"], ["safety", "Safety"], ["activity", "Log"]];
+const TABS = [["agent", "Agent"], ["lessons", "Lessons"], ["files", "Files"], ["jobs", "Schedule"], ["apps", "Apps"], ["improve", "Improve"], ["safety", "Safety"], ["activity", "Log"]];
 function toggleDrawer(force) {
   S.drawer = force === undefined ? !S.drawer : force; $("#drawer").hidden = !S.drawer; S.sig.drawer = null; S.sig.top = null;
   renderTopbar(true); if (S.drawer) poll(true);
@@ -282,6 +286,7 @@ async function loadTab() {
   const q = encodeURIComponent(a);
   if (S.tab === "lessons") S.cache.lessons = await api("/api/lessons?agent=" + q);
   if (S.tab === "files") S.cache.files = await api("/api/files?agent=" + q);
+  if (S.tab === "improve") S.cache.improve = await api("/api/improve");
   if (S.tab === "activity") S.cache.activity = (await api("/api/audit")).filter((x) => x.agent === a).slice(-40).reverse();
 }
 function renderDrawer() {
@@ -337,6 +342,7 @@ function tabBody(a) {
   }
   if (S.tab === "apps") return a.apps.length ? [h("p", {class: "muted"}, "Apps run in a locked box: no network, no access to your workspace. Links open for one hour."), a.apps.map((n) => h("button", {class: "card item", style: "width:100%", onclick: async () => {
     try { const r = await api("/api/applink?agent=" + encodeURIComponent(a.name) + "&app=" + encodeURIComponent(n)); window.open(r.url, "_blank", "noopener"); } catch (e) { toast(e.message, true); } }}, "▶ " + n))] : h("p", {class: "muted"}, "No apps yet. Ask " + a.name + " to publish one.");
+  if (S.tab === "improve") return improveTab(a);
   if (S.tab === "safety") return safetyTab(a);
   if (S.tab === "activity") return c === undefined ? h("p", {class: "muted"}, "Loading…") : c.length ? c.map((x) => h("div", {class: "card"}, h("strong", {}, x.event), h("div", {}, h("small", {}, new Date(x.ts * 1000).toLocaleString() + (x.detail ? " · " + x.detail : ""))))) : h("p", {class: "muted"}, "Nothing yet.");
   return null;
@@ -361,18 +367,96 @@ async function exportData() {
 function confirmDialog(title, text, label, run) {
   dialog(title, text, h("div", {}), (close) => [h("button", {class: "btn", onclick: close}, "Cancel"), h("button", {class: "btn primary", onclick: () => { close(); run(); }}, label)]);
 }
+/* ---------- self-improvement ---------- */
+const pct = (x) => Math.round((x || 0) * 100) + "%";
+const CADENCES = [[0, "Never (only when I press a button)"], [1, "Every day"], [3, "Every 3 days"], [7, "Every week"], [14, "Every 2 weeks"], [30, "Every month"]];
+function evidenceLine(p) {
+  const e = p.evidence || {}, c = e.current || {}, d = e.candidate || {};
+  return "Practice pass rate " + pct(c.pass_rate) + " → " + pct(d.pass_rate) + " · unsafe actions " + (c.violations || 0) + " → " + (d.violations || 0) + ". " + (e.note ? e.note.charAt(0).toUpperCase() + e.note.slice(1) + "." : "");
+}
+function proposalCard(p, showAgent) {
+  const pending = p.status === "pending";
+  return h("div", {class: "card"}, h("strong", {}, p.title), h("div", {class: "muted", style: "font-size:13px"}, evidenceLine(p)),
+    p.kind === "playbook" ? h("pre", {class: "view", style: "margin-top:6px"}, p.detail) : h("div", {style: "margin-top:4px"}, "Model: ", h("code", {}, p.detail)),
+    pending ? h("div", {style: "display:flex;gap:8px;margin-top:8px"}, h("button", {class: "btn primary", onclick: () => act(() => api("/api/improve/decide", {id: p.id, accept: true}), "Applied. You can undo it from the Improve tab."), }, "Accept"),
+      h("button", {class: "btn", onclick: () => act(() => api("/api/improve/decide", {id: p.id, accept: false}), "Rejected")}, "Reject"))
+      : h("small", {class: "muted"}, p.status + (p.decided_by ? " (" + p.decided_by + ")" : "")));
+}
+function improveTab(a) {
+  const data = S.cache.improve;
+  if (!data) return h("p", {class: "muted"}, "Loading…");
+  const mine = data.proposals.filter((p) => p.agent === a.name), applied = (k) => mine.find((p) => p.status === "applied" && p.kind === k);
+  const model = h("input", {type: "text", value: a.model || "", placeholder: "default model", "aria-label": "Model", autocapitalize: "none"});
+  const playbook = h("textarea", {rows: 6, "aria-label": "Playbook", placeholder: "- Short rules this agent learned, one per line, each starting with a dash."}, a.playbook || "");
+  return [h("p", {class: "muted"}, "The workspace tests " + a.name + " on practice tasks and proposes a better model or a better playbook. Only those two things can change; never permissions, code or secrets."),
+    h("h4", {}, "Model"), h("div", {class: "stack"}, model,
+      h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, h("button", {class: "btn", onclick: () => act(() => api("/api/agent/model", {agent: a.name, model: model.value.trim()}), "Model saved")}, "Save model"),
+        applied("model") ? h("button", {class: "btn", onclick: () => act(() => api("/api/improve/revert", {agent: a.name, kind: "model"}), "Model change undone")}, "Undo the last improvement") : null)),
+    h("h4", {}, "Playbook (rules in its prompt)"), h("div", {class: "stack"}, playbook,
+      h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, h("button", {class: "btn", onclick: () => act(() => api("/api/agent/playbook", {agent: a.name, playbook: playbook.value}), "Playbook saved")}, "Save playbook"),
+        applied("playbook") ? h("button", {class: "btn", onclick: () => act(() => api("/api/improve/revert", {agent: a.name, kind: "playbook"}), "Playbook change undone")}, "Undo the last improvement") : null),
+      h("small", {class: "muted"}, "Rules about permissions, secrets, links or safety are removed automatically, and a playbook never overrides the safety rules.")),
+    h("h4", {}, "Proposals for " + a.name), mine.length ? mine.slice(0, 8).map((p) => proposalCard(p)) : h("p", {class: "muted"}, "Nothing yet. Run a study from Settings (the gear in the sidebar)."),
+    h("button", {class: "btn", onclick: settingsDialog}, "Open self-improvement settings")];
+}
+async function settingsDialog() {
+  let data;
+  try { data = await api("/api/improve"); S.improve = data; } catch (e) { toast(e.message, true); return; }
+  const st = data.settings;
+  const cadence = h("select", {"aria-label": "Run automatically"}, CADENCES.map(([v, l]) => h("option", {value: v, selected: (st.enabled ? st.cadence_days : 0) === v}, l)));
+  const calls = h("input", {type: "number", min: 20, max: 1000, value: st.max_calls, "aria-label": "Model calls per study"});
+  const repeats = h("select", {"aria-label": "Repeats"}, [1, 2, 3, 4, 5].map((n) => h("option", {value: n, selected: st.repeats === n}, n + (n === 1 ? " time" : " times"))));
+  const auto = h("input", {type: "checkbox", checked: st.auto_apply, style: "width:auto"});
+  const share = h("input", {type: "checkbox", checked: st.share_lessons, style: "width:auto"});
+  const cands = h("textarea", {rows: 3, placeholder: "One model name per line, e.g. qwen/qwen3.8-27b", "aria-label": "Models to test"}, st.candidates.join("\n"));
+  const material = h("textarea", {rows: 4, placeholder: "Paste notes about other models, agent frameworks or techniques you want it to learn from.", "aria-label": "Study material"}, st.material);
+  const found = h("div", {class: "chips", style: "justify-content:flex-start;margin-top:6px"});
+  const save = async () => act(() => api("/api/improve/settings", {enabled: +cadence.value > 0, cadence_days: +cadence.value, max_calls: +calls.value, repeats: +repeats.value,
+    auto_apply: auto.checked, share_lessons: share.checked, candidates: cands.value.split(/[\n,]+/).map((x) => x.trim()).filter(Boolean), material: material.value}), "Settings saved");
+  const run = async (kind) => { await save(); await act(() => api("/api/improve/run", {kind}), "Study started. It runs in the background."); loadImproveSections(); };
+  const row = (label, el, note) => h("div", {style: "margin:12px 0"}, h("label", {style: "margin:0 0 4px"}, label), el, note ? h("small", {class: "muted", style: "display:block;margin-top:2px"}, note) : null);
+  const content = h("div", {}, h("p", {style: "margin-top:0"}, "The workspace can test how well your agents use tools, try other models and tuning rules, and propose changes. It changes only which model an agent uses and its playbook, never permissions, code, secrets or the sandbox. Every change is shown with its evidence and can be undone."),
+    h("h4", {style: "margin:14px 0 0"}, "Run a study"), h("div", {id: "imp-status", class: "muted"}), h("div", {style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"},
+      h("button", {class: "btn primary", onclick: () => run("all")}, "Run a full study"), h("button", {class: "btn", onclick: () => run("models")}, "Compare models only"), h("button", {class: "btn", onclick: () => run("playbooks")}, "Tune playbooks only")),
+    h("small", {class: "muted", style: "display:block;margin-top:4px"}, "A study uses real model calls (up to the limit below) and counts against your daily cap. Its practice tasks are made up; none of your chats or files are used."),
+    h("h4", {style: "margin:14px 0 0"}, "Needs your review"), h("div", {id: "imp-proposals"}), h("h4", {style: "margin:14px 0 0"}, "Recent studies"), h("div", {id: "imp-studies"}),
+    h("h4", {style: "margin:18px 0 0"}, "Settings"),
+    row("Run automatically", cadence), row("Limit per study", calls, "Model calls. A full study usually needs 100 to 200."), row("Repeat each practice task", repeats, "More repeats give steadier results and cost more."),
+    row("Models to test against your current ones", cands, "Your provider's model names."), h("button", {class: "btn", style: "margin-top:-4px", onclick: async () => {
+      try { const r = await api("/api/improve/models"); found.replaceChildren(...r.models.slice(0, 40).map((m) => h("button", {class: "chip", onclick: () => { cands.value = (cands.value.trim() ? cands.value.trim() + "\n" : "") + m; }}, m))); if (!r.models.length) toast("No model list available"); } catch (e) { toast(e.message, true); } }}, "Show models my key can use"), found,
+    row("Study material (other models, other agent frameworks)", material, "Treated as untrusted notes. Rules about permissions, secrets or links are always removed. The workspace never browses the web by itself."),
+    h("label", {style: "display:flex;gap:8px;align-items:flex-start;font-weight:400"}, auto, h("span", {}, "Apply clear wins automatically (a gain of at least 20 points on the practice tasks and no unsafe actions). Off means I review every change.")),
+    h("label", {style: "display:flex;gap:8px;align-items:flex-start;font-weight:400"}, share, h("span", {}, "Also learn from each agent's own lessons. This sends those lessons to " + (S.state ? S.state.provider : "your model provider") + ".")),
+    h("p", {class: "muted", style: "font-size:13px"}, "Honest limits: the practice suite is small, so differences of a few points are noise. It cannot prove an agent is better on your real work."));
+  S.settingsOpen = true;
+  const closeSettings = dialog("Settings", null, content, (close) => [h("button", {class: "btn", onclick: close}, "Close"), h("button", {class: "btn primary", onclick: save}, "Save settings")], () => { S.settingsOpen = false; });
+  closeSettings.dialog.style.width = "min(640px,100%)";
+  renderImproveSections(data);
+}
+async function loadImproveSections() { try { S.improve = await api("/api/improve"); renderImproveSections(S.improve); } catch (e) { /* the poll shows connection problems */ } }
+function renderImproveSections(d) {
+  const status = $("#imp-status"), props = $("#imp-proposals"), studies = $("#imp-studies"); if (!status) return;
+  const s = d.status, last = s.last;
+  status.textContent = s.running ? "Studying now: " + (s.progress || "starting…") : last ? "Last study: " + new Date(last.ts * 1000).toLocaleString() + " (" + last.status + "; " + last.summary + ")" : "No study has run yet.";
+  const pending = d.proposals.filter((p) => p.status === "pending");
+  fill(props, pending.length ? pending.map((p) => proposalCard(p, true)) : h("p", {class: "muted", style: "margin:4px 0"}, "Nothing to review."));
+  fill(studies, d.studies.length ? d.studies.slice(0, 5).map((x) => h("div", {class: "card", style: "display:flex;gap:8px;align-items:center"}, h("span", {style: "flex:1"}, "#" + x.id + " " + x.kind + " · " + x.status + " · " + x.summary),
+    h("button", {class: "btn", onclick: async () => { try { const r = await api("/api/improve/study?id=" + x.id); dialog("Study #" + x.id, null, md(r.report), (c) => [h("button", {class: "btn", onclick: c}, "Close")]); } catch (e) { toast(e.message, true); } }}, "Report"))) : h("p", {class: "muted", style: "margin:4px 0"}, "None yet."));
+}
 async function viewFile(agent, path) { try { S.file = await api("/api/file?agent=" + encodeURIComponent(agent) + "&path=" + encodeURIComponent(path)); S.sig.drawer = null; renderDrawer(); } catch (e) { toast(e.message, true); } }
 
 /* ---------- dialogs ---------- */
 function dialog(title, desc, content, actions, onClose) {
   const root = $("#dialog-root");
-  const close = () => { root.replaceChildren(); document.removeEventListener("keydown", esc); if (onClose) onClose(); };
-  const esc = (e) => { if (e.key === "Escape") close(); };
-  document.addEventListener("keydown", esc);
-  fill(root, h("div", {class: "overlay", onmousedown: (e) => { if (e.target.classList.contains("overlay")) close(); }},
+  const close = () => { overlay.remove(); document.removeEventListener("keydown", esc); if (onClose) onClose(); };
+  const esc = (e) => { if (e.key === "Escape" && root.lastElementChild === overlay) close(); };  // only the top dialog
+  const overlay = h("div", {class: "overlay", onmousedown: (e) => { if (e.target === overlay) close(); }},
     h("div", {class: "dialog", role: "dialog", "aria-modal": "true", "aria-label": title}, h("h3", {}, title), desc ? h("p", {}, desc) : null, content,
-      actions ? h("div", {class: "actions"}, actions(close)) : null)));
-  const first = root.querySelector("input,textarea,select"); if (first) first.focus();
+      actions ? h("div", {class: "actions"}, actions(close)) : null));
+  document.addEventListener("keydown", esc);
+  root.append(overlay);
+  const first = overlay.querySelector("input,textarea,select"); if (first) first.focus();
+  close.dialog = overlay.querySelector(".dialog");
   return close;
 }
 function connectDialog() {
@@ -428,6 +512,7 @@ async function poll(now) {
     } else renderThread([]);
     renderInline();
     if (S.drawer) { await loadTab(); renderDrawer(); }
+    if (S.settingsOpen) await loadImproveSections();
     $("#main").classList.remove("offline");
   } catch (e) { if (!/access token/.test(e.message)) toast(e.message === "Failed to fetch" ? "Can't reach the workspace. Retrying…" : e.message, true); }
   finally {

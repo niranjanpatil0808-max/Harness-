@@ -181,12 +181,13 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
 
         def _get(self, path: str, query: dict):
             if path == "/api/state":
-                return {"agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools")},
+                return {"agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools", "model", "playbook")},
                                     "secrets": ws.keychain.names(a["name"]), "apps": _apps(ws, a["name"])}
                                    for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"])} for r in ws.list_rooms()],
                         "approvals": ws.approvals(), "jobs": ws.list_jobs(), "busy": ws.busy(),
                         "sandbox": sandbox.status(), "provider": ws.provider(),
+                        "improve": {k: v for k, v in ws.improver.status().items() if k != "last"},
                         "usage": {"calls": ws.calls_today(), "limit": ws.daily_calls}}
             if path == "/api/messages":
                 room = query["room"][0]
@@ -198,6 +199,24 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 ws.get_agent(agent)
                 base = ws.files_dir(agent)
                 return sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file())[:200]
+            if path == "/api/improve":
+                imp = ws.improver
+                return {"settings": imp.settings(), "status": imp.status(), "studies": imp.studies(),
+                        "proposals": imp.proposals("pending") + [p for p in imp.proposals(limit=30) if p["status"] != "pending"]}
+            if path == "/api/improve/study":
+                return {"report": ws.improver.study_report(int(query["id"][0]))}
+            if path == "/api/improve/models":  # the model names your provider says this key can use
+                from .core import default_model_factory
+
+                if ws.model_factory is not default_model_factory and ws.study_model_factory is None:
+                    return {"models": []}
+                try:
+                    probe = ws.study_model(None)
+                    return {"models": probe.list_models() if hasattr(probe, "list_models") else []}
+                except RuntimeError as err:
+                    raise WorkspaceError(str(err))
+                except OSError as err:
+                    raise WorkspaceError(f"could not reach the provider: {err}")
             if path == "/api/applink":
                 agent, app = query["agent"][0], query["app"][0]
                 if app not in _apps(ws, agent):
@@ -209,6 +228,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                         "rooms": [{**r, "members": ws.members(r["name"]), "messages": ws.history(r["name"], limit=100000)}
                                   for r in ws.list_rooms()],
                         "notes": ws.db.query("SELECT agent, text, ts FROM notes"), "jobs": ws.list_jobs(),
+                        "improvement": {"settings": ws.improver.settings(), "proposals": ws.improver.proposals(limit=200),
+                                        "studies": ws.improver.studies(50)},
                         "lessons": {a["name"]: _lessons(ws, a["name"]) for a in ws.list_agents()}}
             if path == "/api/file":
                 agent = query["agent"][0]
@@ -256,6 +277,32 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return {"ok": True}
             if path == "/api/purge":
                 return {"deleted": ws.purge_messages(float(body["days"]))}
+            if path == "/api/improve/settings":
+                return ws.improver.update_settings(body)
+            if path == "/api/improve/run":
+                kind = str(body.get("kind", "all"))
+                try:
+                    ws.study_model(None)  # fail now, with a clear message, if there is no model key
+                except RuntimeError as err:
+                    raise WorkspaceError(str(err))
+                return {"started": ws.improver.start(kind)}
+            if path == "/api/improve/decide":
+                return ws.improver.decide(int(body["id"]), bool(body["accept"]), by="web")
+            if path == "/api/improve/revert":
+                return {"reverted": ws.improver.revert(str(body["agent"]), str(body["kind"]))}
+            if path == "/api/agent/model":
+                ws.set_model(str(body["agent"]), str(body.get("model") or "") or None)
+                return {"ok": True}
+            if path == "/api/agent/playbook":
+                from .improve import clean_playbook
+
+                text = str(body.get("playbook", ""))
+                cleaned = clean_playbook(text)
+                if text.strip() and not cleaned:
+                    raise WorkspaceError("no acceptable rules: write short rules that each start with '- ' and are about using "
+                                         "tools (rules about permissions, secrets, links or safety are removed)")
+                ws.set_playbook(str(body["agent"]), cleaned)
+                return {"playbook": cleaned}
             if path == "/api/tier":
                 ws.set_tier(str(body["agent"]), str(body["tier"]))
                 return {"ok": True}

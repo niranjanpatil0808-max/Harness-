@@ -74,6 +74,7 @@ Times in cron schedules use the **server's** clock and time zone (a Codespace is
 | **Scheduler** | 5-field cron (`*`, lists, ranges, steps). A due job posts `@agent prompt` into its room once per minute. At most 10 jobs per agent. |
 | **Web apps** | `publish_app` writes `www/<name>/index.html`; the server serves it at `/apps/<agent>/<name>/` behind the access token, with a `sandbox` Content-Security-Policy so the app cannot call the API. |
 | **Memory** | Two kinds: notes (`remember` / `search_memory`, keyword search) and lessons (written automatically from failed tool calls, via `MemoryStore.reflect`). |
+| **Self-improvement** | Optional studies that test models and playbooks on a practice suite and propose changes you review. See [SELF_IMPROVEMENT.md](SELF_IMPROVEMENT.md). |
 | **`fix_code`** | An agent can call the Kintsugi loop itself on a folder with `task.json` and tests. |
 
 ## Safety and privacy in short
