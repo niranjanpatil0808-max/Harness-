@@ -62,6 +62,11 @@ async function api(path, body) {
   if (!r.ok) throw new Error(d.error || "Request failed (" + r.status + ")");
   return d;
 }
+function clamped(el) {  // the number an input will really be saved as, and the words for it
+  const lo = el.min === "" ? -Infinity : +el.min, hi = el.max === "" ? Infinity : +el.max, raw = Math.round(+el.value || 0), v = Math.min(hi, Math.max(lo, raw));
+  if (v !== raw) el.value = v;
+  return [v, v !== raw ? "Saved (set to " + v + ", the allowed range is " + el.min + " to " + el.max + ")" : "Saved"];
+}
 async function act(fn, ok) { try { const r = await fn(); if (ok) toast(ok); await poll(true); return r; } catch (e) { toast(e.message, true); } }
 
 /* ---------- markdown ---------- */
@@ -637,7 +642,7 @@ async function searchPanel() {
     h("div", {class: "card"}, d.configured ? "Search is on (" + d.providers[d.provider].label + "). Used today: " + d.used_today + " of " + d.daily_cap + "." : "Search is off. Add a key to turn it on."),
     row("Provider", provider, note), row("Key", key, h("small", {class: "muted", style: "display:block;margin-top:2px"}, "Stored in your keychain. It is never shown again, never sent to the model, and never included in exports.")),
     row("Searches per day", cap, h("small", {class: "muted", style: "display:block;margin-top:2px"}, "Stops runaway loops from using up your allowance.")),
-    h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, h("button", {class: "btn primary", onclick: async () => { const ok = await act(() => api("/api/search/settings", {provider: provider.value, key: key.value, daily_cap: +cap.value}), "Search settings saved"); if (ok) { key.value = ""; fill($("#settings-body"), await searchPanel()); } }}, "Save"),
+    h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, h("button", {class: "btn primary", onclick: async () => { const [capV, capMsg] = clamped(cap); const ok = await act(() => api("/api/search/settings", {provider: provider.value, key: key.value, daily_cap: capV}), capMsg === "Saved" ? "Search settings saved" : capMsg); if (ok) { key.value = ""; fill($("#settings-body"), await searchPanel()); } }}, "Save"),
       d.configured ? h("button", {class: "btn", onclick: async () => { try { const r = await api("/api/search/test", {query: "open source software"}); fill(out, r.results.length ? r.results.map((x) => h("div", {class: "card"}, h("strong", {}, x.title), h("div", {class: "muted", style: "font-size:13px"}, x.snippet), h("small", {}, x.url))) : h("p", {class: "muted"}, "The key works but the test found nothing.")); } catch (e) { toast(e.message, true); } }}, "Test search") : null,
       d.configured ? h("button", {class: "btn danger", onclick: () => confirmDialog("Remove the search key?", "Agents will no longer be able to search the web.", "Remove", async () => { await act(() => api("/api/search/remove", {}), "Key removed"); fill($("#settings-body"), await searchPanel()); })}, "Remove key") : null),
     out, h("p", {class: "muted", style: "font-size:13px;margin-top:14px"}, "Privacy: each search sends the words the agent chose to " + d.providers[d.provider].label + ". Secrets are never included, but think about what you ask. Search is counted and capped, and every search appears in the Log."));
@@ -684,7 +689,7 @@ async function internetPanel() {
   return h("div", {}, h("p", {style: "margin-top:0"}, "You decide whether the AI can go online. Each agent has its own Off / Ask / Allow setting (open the agent's details). This switch overrides all of them."),
     h("label", {style: "display:flex;gap:10px;align-items:center;margin:12px 0"}, on, "Let agents use the internet at all"),
     h("div", {style: "margin:12px 0"}, h("label", {style: "margin:0 0 4px"}, "Page fetches per day"), cap, h("small", {class: "muted", style: "display:block;margin-top:2px"}, "Used today: " + d.fetched_today + ". Stops runaway loops.")),
-    h("button", {class: "btn primary", onclick: async () => { const ok = await act(() => api("/api/internet", {enabled: on.checked, fetch_cap: +cap.value}), "Saved"); if (ok) fill($("#settings-body"), await internetPanel()); }}, "Save"),
+    h("button", {class: "btn primary", onclick: async () => { const [capV, capMsg] = clamped(cap); const ok = await act(() => api("/api/internet", {enabled: on.checked, fetch_cap: capV}), capMsg); if (ok) fill($("#settings-body"), await internetPanel()); }}, "Save"),
     h("p", {class: "muted", style: "font-size:13px;margin-top:16px"}, "What agents can do online: read one public web page as text (never internal addresses, downloads or logins) and, with a key under Search, look things up. Web text is always treated as untrusted information, never as instructions, and every online action appears in the Log."));
 }
 
@@ -702,7 +707,7 @@ async function modelsPanel() {
   const limit = h("input", {type: "number", min: 1, max: par.max, value: par.limit, "aria-label": "Agents working at once", style: "max-width:90px"});
   const parallel = h("div", {class: "card"}, h("div", {style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap"}, h("span", {style: "flex:1;min-width:180px"}, h("strong", {}, "Agents working at the same time"),
     h("div", {class: "muted", style: "font-size:13px"}, "Use @all to give every agent in a room the same task at once. Each one makes its own model calls, so more at once means faster work and faster spending (your daily cap still applies).")),
-    limit, h("button", {class: "btn", onclick: () => act(() => api("/api/parallel", {limit: +limit.value}), "Saved")}, "Save")));
+    limit, h("button", {class: "btn", onclick: () => { const [v, msg] = clamped(limit); act(() => api("/api/parallel", {limit: v}), msg); }}, "Save")));
   const preset = h("select", {"aria-label": "Provider type"}, Object.entries(d.presets).map(([k, p]) => h("option", {value: k}, p.label)));
   const url = h("input", {type: "text", "aria-label": "Address", autocapitalize: "none", placeholder: "https://api.example.com/v1"});
   const key = h("input", {type: "password", "aria-label": "API key", autocomplete: "off", placeholder: "Paste your API key"});
@@ -814,7 +819,7 @@ function tabBody(a) {
       [["0 9 * * 1-5", "Every weekday at 09:00"], ["0 9 * * *", "Every day at 09:00"], ["0 * * * *", "Every hour"], ["0 9 * * 1", "Every Monday at 09:00"], ["", "Custom cron…"]].map(([v, l]) => h("option", {value: v}, l)));
     const cron = h("input", {type: "text", placeholder: "min hour day month weekday", "aria-label": "Cron", hidden: true}), what = h("input", {type: "text", placeholder: "What should " + a.name + " do?", "aria-label": "Task"});
     preset.onchange = () => (cron.hidden = preset.value !== "");
-    return [h("p", {class: "muted"}, "Times use the server's clock."), mine.length ? mine.map((j) => h("div", {class: "card"}, h("code", {}, j.cron), " in ", j.room, h("div", {}, j.prompt),
+    return [h("p", {class: "muted"}, "Times use the workspace time zone (Settings > General), or the server's clock (UTC) if none is set."), mine.length ? mine.map((j) => h("div", {class: "card"}, h("code", {}, j.cron), " in ", j.room, h("div", {}, j.prompt),
         h("button", {class: "btn danger", style: "margin-top:6px", onclick: () => act(() => api("/api/jobs/delete", {id: j.id}), "Removed")}, "Remove"))) : h("p", {class: "muted"}, "Nothing scheduled."),
       h("h4", {}, "New schedule in " + (S.room || "this room")), h("div", {class: "stack"}, preset, cron, what,
         h("button", {class: "btn primary", onclick: () => act(() => api("/api/jobs", {agent: a.name, room: S.room, cron: preset.value || cron.value.trim(), prompt: what.value.trim()}), "Scheduled")}, "Schedule"))];
