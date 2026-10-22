@@ -260,3 +260,15 @@ Paired comparisons (same tasks; interval = bootstrap over tasks):
 - **Retries (loop mode):** first attempt passes 10%, after retries 14% (+4.8 pp, 95% interval +0.0 pp to +14.3 pp; the interval includes zero, so this is not distinguishable from no effect). Of 21 task runs, 19 failed the first attempt and 1 of those were repaired by the retries. The first attempt of this mode is the same request as the no-retry baseline, so the comparison is within the same runs.
 
 Raw data: `results/20261022-181346-openai.json`
+
+## 2026-10-22 20:04 UTC · `openai/gpt-oss-20b` · code `44dbf7c`
+
+_Batch 2. gpt-oss-20b (reasoning_effort=low, deliberately weakened), loop+memory, same split and settings as batch 1(a) loop mode. INCOMPLETE: planned 3 repeats, 2 finished; the third was stopped by Groq's 200,000 tokens-per-day limit for this model (the limit was shared with earlier runs that day). Two repeats are a valid result but a small one._
+
+Model: `openai/gpt-oss-20b` · held-out tasks: 21 (5 hard) · repeats: 2 · max retries: 3 · temperature: 0.6 · extra request fields: {"reasoning_effort": "low"}
+
+| Mode | Pass rate (held-out) | On the first attempt | Hard tasks only | Avg attempts | Model calls (scored tasks) | Tokens (scored tasks) |
+|---|---|---|---|---|---|---|
+| loop+memory | 100% (21/21) [100%–100%] | 95% | 100% (5/5) | 1.05 | 23 | 20,470 |
+
+Raw data: `results/20261022-200448-openai.json`
