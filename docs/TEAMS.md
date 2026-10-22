@@ -49,6 +49,20 @@ Remove a person (Settings > Team) and their token stops working at once. Anyone 
   chat; in other rooms it cannot see it, and only people in that chat can download it. (Agent code run with run_python cannot see uploads.)
 - **Long chats**: agents see the last 12 messages and a short summary of older ones, so a team can come back to a room days later.
 
+## Agents get to know each person
+
+Every 8 messages a person sends, one extra model call updates a short profile of them from their own recent messages and the replies
+they marked 👍 or 👎. It has two parts:
+
+- **How you like replies** (length, format, language, tone): used in every chat with you, including shared rooms.
+- **About your work** (role, projects, recurring tasks): used only in your private chats with agents, never in shared rooms.
+
+Each person sees and edits only their own profile in Settings > General ("What agents have learned about you"), and can clear it or
+switch learning off. Sentences that look like rule changes ("ignore the approval rules") or secrets are dropped; the profile can only
+shape style and context, never permissions. It is deleted when the person is removed. Honest limits: the owner's server stores it
+(so the owner could read it in the database); the model may learn something wrong, so check it now and then; it is not tested with
+real models yet.
+
 ## Signing in again
 
 If someone loses their sign-in, the **owner** opens Settings > Team > *Reset sign-in* for that person and sends them the new link

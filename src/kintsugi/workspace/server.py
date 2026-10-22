@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import compact, sandbox, tasks
+from . import compact, personal, sandbox, tasks
 from .core import Workspace, WorkspaceError
 from .keychain import _write_private
 from .sandbox import PathError, safe_path
@@ -330,6 +330,9 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/find":
                 rooms = None if self.who.role == "owner" else [r["name"] for r in ws.list_rooms() if ws.team.can_see_room(self.who, r["name"])]
                 return ws.find_messages((query.get("q") or [""])[0], rooms)
+            if path == "/api/me/profile":  # only ever your own
+                me_name = "you" if self.who.role == "owner" else self.who.name
+                return personal.get(ws, me_name)
             if path == "/api/tasks":
                 return tasks.listing(ws, self.who, (query.get("room") or [None])[0])
             if path == "/api/templates":
@@ -482,6 +485,23 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return templates.apply(ws, str(body["id"]), self.who.name)
             if path == "/api/team/reset":
                 return {"token": ws.team.reset_token(self.who, str(body["name"]))}
+            if path == "/api/me/profile/save":
+                me_name = "you" if self.who.role == "owner" else self.who.name
+                action = str(body.get("action") or "save")
+                if action == "clear":
+                    personal.forget(ws, me_name)
+                elif action == "enabled":
+                    personal.set_enabled(ws, me_name, bool(body.get("enabled")))
+                else:
+                    personal.set_text(ws, me_name, str(body.get("style") or ""), str(body.get("context") or ""))
+                return personal.get(ws, me_name)
+            if path == "/api/feedback":
+                msg = ws.db.one("SELECT room, sender FROM messages WHERE id = ?", (int(body["id"]),))
+                if msg is None or not ws.team.can_see_room(self.who, msg["room"]) or ws.get_agent(msg["sender"], missing_ok=True) is None:
+                    raise WorkspaceError("you can rate agents' replies in your chats")
+                good = body.get("good")
+                personal.record_feedback(ws, "you" if self.who.role == "owner" else self.who.name, int(body["id"]), None if good is None else bool(good))
+                return {"ok": True}
             if path == "/api/share":
                 self._rate_limit(self.who.name)
                 src = ws.db.one("SELECT room FROM messages WHERE id = ?", (int(body["id"]),))

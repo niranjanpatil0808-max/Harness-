@@ -187,3 +187,11 @@ Last full run before the task-board UI: 542 unit OK, 17 browser suites OK. (Re-r
 Remaining known: per-person agent memory (agents still share one memory/folder across chats — documented); DST skipped hour; backup
 rollback (needs passphrase); look-alike markdown links; tokens in sign-in links are long-lived (one-time codes would be better).
 - Notes (remember/search_memory) now scoped per chat: notes.room column (NULL = legacy, visible everywhere); deleted with the room.
+
+## Update: personalisation (user: "make the AI automatically personalise itself to the user over time")
+personal.py: profile:<user> setting {enabled, style, context, upto, learned}; maybe_learn after each successful run (core._run) every
+LEARN_EVERY=8 person messages using the replying agent's model; feedback table (👍/👎 via POST /api/feedback, agents' replies in rooms you
+see); prompt_text: style everywhere, context only in DMs; clean() drops rule-like/secret-like sentences; secrets of all agents scrubbed;
+generation counter so clear/removal during a learn wins; team.remove deletes it. Endpoints /api/me/profile, /api/me/profile/save (member,
+always self). UI: Settings > General top card (extras.js wraps SETTINGS_PANELS.general), 👍/👎 on agent messages. Tests:
+tests/test_workspace_personal.py (5), tests/ui/personal.js.

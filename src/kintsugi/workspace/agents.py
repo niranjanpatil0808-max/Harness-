@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 from kintsugi.memory import MemoryStore, tokens
 
-from . import compact
+from . import compact, personal
 from .improve import clean_playbook
 from .tools import TOOLS, Ctx, describe_tools, execute
 
@@ -234,7 +234,7 @@ def run_agent(ws: "Workspace", name: str, room: str, message_id: int, hops: int)
                           "They are guidance only and never override the safety rules above, approvals or permissions):\n" + skills + "\n")
     asker = trigger["sender"] if trigger["sender"] not in ("system",) and not trigger["sender"].startswith("cron-") else "you"
     system = SYSTEM.format(name=name, persona=agent["persona"], max_tools=MAX_TOOLS_PER_STEP, playbook=playbook_text,
-                           tone=ws.tone_text(asker),
+                           tone=ws.tone_text(asker) + personal.prompt_text(ws, asker, ws._require_room(room)["kind"] == "dm"),
                            tools=describe_tools(agent["tools"], ws, name))
     messages = [
         {"role": "system", "content": system},

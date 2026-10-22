@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     approval_id INTEGER, created REAL NOT NULL, updated REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS tasks_room ON tasks(room, updated);
 CREATE INDEX IF NOT EXISTS tasks_message ON tasks(message_id);
+CREATE TABLE IF NOT EXISTS feedback (
+    user TEXT NOT NULL, message_id INTEGER NOT NULL, good INTEGER NOT NULL, ts REAL NOT NULL, PRIMARY KEY (user, message_id));
 CREATE TABLE IF NOT EXISTS audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, agent TEXT, event TEXT NOT NULL,
     detail TEXT NOT NULL DEFAULT '');

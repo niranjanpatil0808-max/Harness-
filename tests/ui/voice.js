@@ -43,7 +43,7 @@ const FAKES = `
   p = await open(FAKES);
   await p.click('#topbar button[aria-label="Open sidebar"]'); await p.click('button[aria-label="Settings"]');
   await p.waitForSelector('text=Hands-free conversation');
-  await p.click('input[type=checkbox] >> nth=1');
+  await p.click('label:has-text("Hands-free conversation") input[type=checkbox]');
   await p.keyboard.press('Escape');  // closes Settings
   await p.keyboard.press('Escape');  // closes the sidebar behind it
   await p.waitForTimeout(300);

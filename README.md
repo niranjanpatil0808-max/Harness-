@@ -31,6 +31,7 @@
 | **Usage dashboard:** calls per day, per agent and per model; tokens when your provider reports them; a cost estimate from prices you enter | **Works**; the estimate is only as good as the prices you type, your provider's bill is the final word |
 | **Long chats:** agents see the last 12 messages plus a short running summary of older ones (one extra model call per 16 older messages; owner can switch it off) | **Works** in tests with scripted models; summary quality depends on your model |
 | **Team work with agents:** a shared task board (give an agent a task in a room, everyone follows it to done, with approvals shown), Share a message into another room, @person mentions, files given in a chat stay in that chat ([docs/TEAMS.md](docs/TEAMS.md)) | **Works** in unit and browser tests (desktop and phone); not yet used by a real team |
+| **Gets to know you:** agents learn each person's preferred reply style and work context over time from their messages and 👍/👎, per person; you can see, edit, clear or switch it off (work context only in private chats) | **Works** in tests with scripted models; how well it learns depends on your model |
 
 Rows marked planned do not exist yet. This table is updated as each one lands, and it says what has and has not been verified.
 

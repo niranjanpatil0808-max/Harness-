@@ -21,7 +21,7 @@ from typing import Callable
 from kintsugi.memory import tokens
 from kintsugi.model import Model, ModelInfraError, ModelRequestError, OpenAIAdapter, QuotaExhausted
 
-from . import compact, perms, providers, tasks, uploads
+from . import compact, perms, personal, providers, tasks, uploads
 from .db import Database
 from .keychain import Keychain
 
@@ -986,6 +986,13 @@ class Workspace:
                     tasks.finish(self, agent, room, message_id, outcome, self.stop_requested(agent))
                 except Exception as err:  # the board is a view: it must never break a run
                     self.audit(agent, "task-error", f"{type(err).__name__}: {str(err)[:150]}")
+                if outcome == "ran":  # get to know the person who asked, a little, every few messages (after the reply, so it never slows it)
+                    try:
+                        asker = self.requester_of(f"{room}#{message_id}")
+                        if asker:
+                            personal.maybe_learn(self, asker, self.model_for(agent))
+                    except Exception as err:  # noqa: BLE001
+                        self.audit(agent, "profile-error", f"{type(err).__name__}: {str(err)[:150]}")
             finally:
                 with self._lock:
                     was_busy, was_room, was_stopped, was_activity = before

@@ -60,7 +60,7 @@ class Identity:
 MEMBER_PATHS = {
     "/api/state", "/api/messages", "/api/say", "/api/dm", "/api/me", "/api/me/token", "/api/tone", "/api/push", "/api/push/subscribe",
     "/api/push/unsubscribe", "/api/push/test", "/api/approve", "/api/timezone", "/api/applink", "/api/automations",
-    "/api/automations/toggle", "/api/automations/run", "/api/jobs", "/api/jobs/delete", "/api/stop", "/api/find", "/api/upload", "/api/tasks", "/api/tasks/create", "/api/tasks/update", "/api/share", "/api/download",
+    "/api/automations/toggle", "/api/automations/run", "/api/jobs", "/api/jobs/delete", "/api/stop", "/api/find", "/api/upload", "/api/tasks", "/api/tasks/create", "/api/tasks/update", "/api/share", "/api/download", "/api/me/profile", "/api/me/profile/save", "/api/feedback",
 }
 ADMIN_PATHS = {
     "/api/agents", "/api/persona", "/api/secret", "/api/secret/delete", "/api/agent/delete", "/api/agent/model", "/api/agent/playbook",
@@ -198,6 +198,9 @@ class Team:
         self.ws.db.execute("DELETE FROM push_subs WHERE user = ?", (name,))
         self.ws.db.execute("DELETE FROM jobs WHERE owner = ?", (name,))
         self.ws.db.execute("DELETE FROM settings WHERE key = ?", (f"tone:{name}",))
+        from . import personal
+
+        personal.remove_person(self.ws, name)  # what agents learned about them goes with them
         self.ws.db.execute("UPDATE approvals SET requested_by = NULL WHERE requested_by = ?", (name,))
         self.ws.audit(None, "person-removed", f"{name} by {by.name}")
 

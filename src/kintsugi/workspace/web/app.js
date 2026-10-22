@@ -215,7 +215,9 @@ function bodyOf(m) {
       agent || shared ? md(m.text) : h("div", {class: "body", style: "white-space:pre-wrap"}, m.text),
       h("div", {class: "msg-actions"}, h("button", {class: "mini", "aria-label": "Copy this message", onclick: (e) => copyText(m.text, e.currentTarget)}, "Copy"),
         agent ? h("button", {class: "mini", "aria-label": "Ask again", title: "Send your last message to " + m.sender + " again", onclick: () => askAgain(m.sender)}, "Ask again") : null,
-        h("button", {class: "mini", "aria-label": "Share this message to a room", onclick: () => shareDialog(m)}, "Share"))));
+        h("button", {class: "mini", "aria-label": "Share this message to a room", onclick: () => shareDialog(m)}, "Share"),
+        agent ? [h("button", {class: "mini rate" + ((S.rated || {})[m.id] === true ? " on" : ""), "data-good": "1", "aria-label": "Helpful", title: "Helpful: agents learn what works for you", onclick: (e) => rate(m, true, e.currentTarget)}, "👍"),
+          h("button", {class: "mini rate" + ((S.rated || {})[m.id] === false ? " on" : ""), "data-good": "0", "aria-label": "Not helpful", title: "Not helpful: agents adjust to you", onclick: (e) => rate(m, false, e.currentTarget)}, "👎")] : null)));
 }
 function emptyState() {
   const r = curRoom(), ra = roomAgents(r), first = ra[0] || (agents()[0] || {}).name;

@@ -245,3 +245,40 @@ function shareDialog(m) {
   const close = dialog("Share this message", "It is copied into the room with your name and where it came from. Nobody is woken up by it.", h("div", {}, h("blockquote", {class: "share-preview"}, m.text.slice(0, 400) + (m.text.length > 400 ? "…" : "")), sel),
     (c) => [h("button", {class: "btn", onclick: c}, "Cancel"), h("button", {class: "btn primary", onclick: async () => { try { await api("/api/share", {id: m.id, room: sel.value}); c(); toast("Shared to #" + sel.value); } catch (e) { toast(e.message, true); } }}, "Share")]);
 }
+
+/* ---------- personalisation: what agents have learned about you (yours only; edit, clear or switch off) ---------- */
+const _generalPanel = SETTINGS_PANELS.general;
+SETTINGS_PANELS.general = async () => {
+  const base = await _generalPanel();
+  let p; try { p = await api("/api/me/profile"); } catch (e) { return base; }
+  const style = h("textarea", {rows: 3, maxlength: 600, "aria-label": "How you like replies", placeholder: "Nothing learned yet. It fills in as you chat, or write it yourself, e.g. Short answers with bullet points."}, p.style);
+  const context = h("textarea", {rows: 3, maxlength: 600, "aria-label": "About your work", placeholder: "e.g. I run growth at a small startup and write weekly updates."}, p.context);
+  const on = h("input", {type: "checkbox", checked: p.enabled, style: "width:auto", "aria-label": "Learn from my chats",
+    onchange: (e) => act(() => api("/api/me/profile/save", {action: "enabled", enabled: e.target.checked}), e.target.checked ? "Agents will keep learning how you like to work" : "Learning is off; agents will not use your profile")});
+  const refresh = async () => fill($("#settings-body"), await SETTINGS_PANELS.general());
+  const section = h("div", {class: "card", id: "personal", style: "margin-top:18px"},
+    h("h4", {style: "margin:0 0 4px"}, "What agents have learned about you"),
+    h("p", {class: "muted", style: "font-size:13px;margin:0 0 10px"}, "Every few messages, agents update this from what you write and the replies you mark 👍 or 👎. Only you see it here. " +
+      (p.learned ? "Updated " + p.learned + " time" + (p.learned === 1 ? "" : "s") + (p.updated ? ", last on " + new Date(p.updated * 1000).toLocaleDateString() : "") + "." : "Nothing learned yet.")),
+    h("label", {style: "display:flex;gap:8px;align-items:center;font-weight:400;margin-bottom:10px"}, on, "Learn from my chats and use it in replies"),
+    h("label", {}, "How you like replies"), style, h("small", {class: "muted", style: "display:block;margin:2px 0 10px"}, "Used in every chat with you."),
+    h("label", {}, "About your work"), context, h("small", {class: "muted", style: "display:block;margin:2px 0 10px"}, "Used only in your private chats with agents, never in shared rooms."),
+    h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"},
+      h("button", {class: "btn primary", onclick: async () => { const r = await act(() => api("/api/me/profile/save", {style: style.value, context: context.value}), "Saved"); if (r && (r.style !== style.value.trim() || r.context !== context.value.trim())) toast("Saved. Anything that looked like a rule change or a secret was left out."); await refresh(); }}, "Save"),
+      h("button", {class: "btn danger", onclick: () => confirmDialog("Clear what agents learned about you?", "They start learning again from your next messages (unless you switch learning off).", "Clear", async () => { await act(() => api("/api/me/profile/save", {action: "clear"}), "Cleared"); await refresh(); })}, "Clear")),
+    h("p", {class: "muted", style: "font-size:12px;margin:10px 0 0"}, "It only shapes style and context: it can never change what agents are allowed to do. Each update is one extra model call (about one per " + 8 + " of your messages). Health, money, passwords and other secrets are never kept on purpose; check it now and then and edit what is wrong."));
+  section.style.marginTop = "0"; section.style.marginBottom = "18px";
+  return h("div", {}, section, base);
+};
+
+/* rate an agent's reply: it teaches agents what works for you */
+async function rate(m, good, btn) {
+  S.rated = S.rated || {};
+  const now = S.rated[m.id] === good ? null : good;
+  try {
+    await api("/api/feedback", {id: m.id, good: now});
+    S.rated[m.id] = now;
+    const row = btn.closest(".msg-actions"); if (row) row.querySelectorAll(".rate").forEach((b) => b.classList.toggle("on", S.rated[m.id] === (b.dataset.good === "1")));
+    if (now !== null) toast(now ? "Thanks. Agents will do more of this for you." : "Noted. Agents will adjust to you over time.");
+  } catch (e) { toast(e.message, true); }
+}
