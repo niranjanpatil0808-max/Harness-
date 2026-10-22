@@ -275,12 +275,16 @@ function renderInline() {
   fill($("#inline"),
     pend.map((a) => {
       let args = {}; try { args = JSON.parse(a.args); } catch (e) { /* keep raw */ }
-      const code = args.code !== undefined ? args.code : JSON.stringify(args, null, 2);
+      // show EVERYTHING that will run: the code of run_python as code, and every other argument as it is (never only a part)
+      const isCode = a.tool === "run_python" && typeof args.code === "string", rest = Object.fromEntries(Object.entries(args).filter(([k]) => !isCode || k !== "code"));
+      const code = isCode ? args.code : JSON.stringify(args, null, 2), lines = code.split("\n").length;
       return h("div", {class: "perm"}, h("h5", {}, a.agent + " wants to use " + a.tool),
         h("div", {class: "meta"}, sandboxLine(a.tool)),
         args.secrets && args.secrets.length ? h("div", {class: "meta"}, "It will be GIVEN these secrets (the code could print or send them): " + args.secrets.join(", ")) : null,
         a.tool === "publish_app" ? h("div", {class: "meta"}, "This publishes a web page people can open from this workspace. Never type passwords or tokens into agent-made pages.") : null,
-        h("pre", {}, code.length > 20000 ? code.slice(0, 20000) + "\n…(truncated)" : code),
+        lines > 25 || code.length > 2000 ? h("div", {class: "meta"}, "Long: " + lines + " lines, " + code.length + " characters. Scroll to the end before you allow it.") : null,
+        h("pre", {}, code),
+        isCode && Object.keys(rest).length ? [h("div", {class: "meta"}, "Other details it sent:"), h("pre", {}, JSON.stringify(rest, null, 2))] : null,
         a.requested_by && a.requested_by !== me().name ? h("div", {class: "meta"}, "Asked by " + a.requested_by) : null,
         a.can_decide === false ? h("div", {class: "meta"}, "Waiting for " + (S.state.approval_policy === "admins" ? "an admin" : "someone allowed") + " to decide.")
         : h("div", {class: "actions"}, h("button", {class: "btn primary", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: true})); }}, "Allow once"),
@@ -612,7 +616,7 @@ async function teamPanel() {
   const rows = [h("div", {class: "card", style: "display:flex;gap:8px;align-items:center"}, h("strong", {style: "flex:1"}, isOwner() ? "you" : "the owner"), h("span", {class: "muted"}, "owner"))].concat(d.users.map((u) => h("div", {class: "card", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"},
     h("strong", {style: "flex:1"}, u.name), isOwner() ? h("select", {"aria-label": "Role of " + u.name, onchange: async (e) => { await act(() => api("/api/team/role", {name: u.name, role: e.target.value}), u.name + " is now " + e.target.value); await refresh(); }}, ["member", "admin"].map((r) => h("option", {value: r, selected: u.role === r}, r))) : h("span", {class: "muted"}, u.role),
     h("span", {class: "muted", style: "font-size:12px"}, u.last_seen ? "seen " + new Date(u.last_seen * 1000).toLocaleDateString() : "not yet"),
-    (isOwner() || u.role === "member") ? h("button", {class: "btn", onclick: () => confirmDialog("Reset " + u.name + "'s sign-in?", "Their current sign-in stops working at once. You get a new private link to send them.", "Reset", async () => { try { const r = await api("/api/team/reset", {name: u.name}); signInLinkDialog(u.name, r.token); } catch (e) { toast(e.message, true); } })}, "Reset sign-in") : null,
+    isOwner() ? h("button", {class: "btn", onclick: () => confirmDialog("Reset " + u.name + "'s sign-in?", "Their current sign-in stops working at once. You get a new private link to send them.", "Reset", async () => { try { const r = await api("/api/team/reset", {name: u.name}); signInLinkDialog(u.name, r.token); } catch (e) { toast(e.message, true); } })}, "Reset sign-in") : null,
     (isOwner() || u.role === "member") ? h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + u.name + "?", "Their sign-in stops working at once. Their messages stay in the rooms.", "Remove", async () => { await act(() => api("/api/team/remove", {name: u.name}), u.name + " removed"); await refresh(); })}, "Remove") : null)));
   const role = h("select", {"aria-label": "Invite as"}, [["member", "Member"]].concat(isOwner() ? [["admin", "Admin"]] : []).map(([v, l]) => h("option", {value: v}, l)));
   const rooms = d.rooms.map((r) => h("label", {style: "display:flex;gap:8px;align-items:center;font-weight:400"}, h("input", {type: "checkbox", value: r, checked: r === "team", style: "width:auto", "aria-label": "Add to " + r}), r));
@@ -1076,9 +1080,11 @@ function setupMobile() {
 }
 async function confirmSignIn(incoming) {
   let who = "another account";
-  try { const r = await fetch("/api/me", {headers: {"X-Token": incoming}}); if (r.ok) { const d = await r.json(); who = d.name + " (" + d.role + ")"; } else { toast("That sign-in link is not valid", true); poll(true); return; } } catch (e) { /* show the generic wording */ }
-  dialog("Sign in as " + who + "?", "This link would replace the account this browser is signed in as. Only continue if you trust whoever sent it: they would be able to read what you type here.", h("div", {}),
-    (close) => [h("button", {class: "btn", onclick: () => { close(); poll(true); }}, "Keep my current sign-in"), h("button", {class: "btn primary", onclick: () => { S.token = incoming; store.set("kt-token", incoming); try { sessionStorage.setItem("kt", incoming); } catch (e) { /* ok */ } close(); poll(true); }}, "Sign in as " + who)],
+  const accept = () => { S.token = incoming; store.set("kt-token", incoming); poll(true); };
+  try { const r = await fetch("/api/me", {headers: {"X-Token": incoming}}); if (r.ok) { const d = await r.json(); who = d.name + " (" + d.role + ")"; if (S.firstSignIn && d.role === "owner") { accept(); return; } } else { toast("That sign-in link is not valid", true); poll(true); return; } } catch (e) { /* show the generic wording */ }
+  dialog("Sign in as " + who + "?", S.firstSignIn ? "Only continue if this link was made for you. If someone sent you their own link, you would be using their account and they could read what you type here."
+    : "This link would replace the account this browser is signed in as. Only continue if you trust whoever sent it: they would be able to read what you type here.", h("div", {}),
+    (close) => [h("button", {class: "btn", onclick: () => { close(); poll(true); }}, S.firstSignIn ? "Cancel" : "Keep my current sign-in"), h("button", {class: "btn primary", onclick: () => { S.token = incoming; store.set("kt-token", incoming); try { sessionStorage.setItem("kt", incoming); } catch (e) { /* ok */ } close(); poll(true); }}, "Sign in as " + who)],
     () => poll(true));
 }
 const lowerName = (e) => { e.target.value = e.target.value.toLowerCase().replace(/\s+/g, "-"); };  // names are lowercase everywhere: fix it as people type
@@ -1108,8 +1114,8 @@ function init() {
   S.token = store.get("kt-token") || "";
   if (m) {
     const incoming = decodeURIComponent(m[1]); history.replaceState(null, "", location.pathname);
-    if (!S.token || S.token === incoming) { S.token = incoming; store.set("kt-token", S.token); }
-    else S.pendingToken = incoming;  // someone else's link must not silently replace who you are signed in as
+    if (S.token === incoming) { /* already signed in with it */ }
+    else { S.pendingToken = incoming; S.firstSignIn = !S.token; }  // a link never silently decides who you are: confirm the account first
   }
   if (store.get("kt-collapsed")) $("#app").classList.add("collapsed");
   $("#scrim").addEventListener("click", closeSidebarMobile);

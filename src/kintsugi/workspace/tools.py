@@ -12,6 +12,7 @@ import sqlite3
 import json
 import os
 import re
+import stat
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -230,15 +231,31 @@ def run_python_tool(ctx: Ctx, args: dict) -> str:
     timeout = float(args.get("timeout", 10))
     timeout = 10.0 if timeout != timeout else min(max(timeout, 1.0), 30.0)
     base = ctx.ws.files_dir(ctx.agent)
-    started = time.time() - 1
+    def files():
+        out = {}
+        for p in base.rglob("*"):
+            try:
+                st = p.lstat()
+            except OSError:
+                continue
+            out[p] = (st.st_ino, st.st_size, stat.S_IFMT(st.st_mode))
+        return out
+
+    before = files()
     ok, output = run_python(base, code, timeout=timeout, extra_env=env, agent=ctx.agent)
-    if folder_size(base) > MAX_FOLDER_BYTES:  # code can write many files; the cap must hold for it too
-        for path in sorted(base.rglob("*"), key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True):
+    after = files()
+    for path, (_, _, kind) in after.items():  # pipes, sockets and devices have no place in a folder of files (and break backups)
+        if kind not in (stat.S_IFREG, stat.S_IFDIR, stat.S_IFLNK):
+            path.unlink(missing_ok=True)
+    if folder_size(base) > MAX_FOLDER_BYTES:  # code can write many files; the cap must hold for it too (whatever dates they claim)
+        changed = sorted((p for p, sig in after.items() if sig[2] == stat.S_IFREG and before.get(p) != sig), key=lambda p: after[p][1], reverse=True)
+        removed = 0
+        for path in changed:
             if folder_size(base) <= MAX_FOLDER_BYTES:
                 break
-            if path.is_file() and not path.is_symlink() and path.stat().st_mtime >= started:
-                path.unlink()
-        raise ToolError("that code filled your folder (5 MB limit); the files it created were removed")
+            path.unlink(missing_ok=True)
+            removed += 1
+        raise ToolError(f"that code filled your folder (5 MB limit); {removed} file(s) it created or changed were removed")
     if not ok:
         raise ToolError(output)
     return output
@@ -309,7 +326,10 @@ def schedule(ctx: Ctx, args: dict) -> str:
         raise ToolError(f"you are not a member of room '{room}'")
     if room != ctx.room:
         _may_cross_rooms(ctx, room)
-    job_id = ctx.ws.add_job(ctx.agent, room, cron, prompt)
+    owner = ctx.ws.requester_of(ctx.situation)
+    if owner is None:  # a schedule keeps acting for someone: it must be a person who asked, and it goes when they go
+        raise ToolError("a schedule can only be set when a person asks for it")
+    job_id = ctx.ws.add_job(ctx.agent, room, cron, prompt, owner=owner)
     return f"scheduled job {job_id}: '{cron}' in {room}"
 
 
@@ -344,6 +364,7 @@ ALIASES = {
     "cron": ("schedule", "when", "expression"),
     "prompt": ("task", "instruction", "message", "text"),
 }
+MAX_APPROVAL_CHARS = 20_000
 WANTED = {"send_message": ("text",), "read_file": ("path",), "write_file": ("path", "content"), "list_files": (),
           "remember": ("text",), "search_memory": ("query",), "run_python": ("code",), "publish_app": ("name", "html"),
           "fix_code": ("path",), "schedule": ("cron", "prompt"), "map_project": (), "list_secrets": (), "web_search": ("query",), "web_fetch": ("url",), "skill": ("name",)}
@@ -428,6 +449,8 @@ def execute(ctx: Ctx, name: str, args: object, approved: bool = False) -> Outcom
         ctx.ws.audit(ctx.agent, "denied", name)
         return Outcome("denied", f"tool '{name}' is not allowed for this agent")
     if decision == perms.ASK:
+        if len(json.dumps(args, ensure_ascii=False)) > MAX_APPROVAL_CHARS:  # a person must be able to read all of what they allow
+            return Outcome("error", f"that is too long to ask a person to review (over {MAX_APPROVAL_CHARS:,} characters); split it into smaller steps")
         approval_id = ctx.ws.request_approval(ctx.agent, ctx.room, name, args, ctx.ws.requester_of(ctx.situation))
         ctx.ws.audit(ctx.agent, "approval-requested", f"#{approval_id} {name}")
         return Outcome("pending", f"waiting for a human to approve (approval #{approval_id})", approval_id)

@@ -124,7 +124,7 @@ def snapshot(ws: "Workspace") -> bytes:
             for item in sorted(ws.root.iterdir()):
                 if item.name in SKIP or item.name.startswith("workspace.db") or item.is_symlink():
                     continue
-                tar.add(item, arcname=item.name, filter=lambda info: None if info.issym() or info.islnk() else info)
+                tar.add(item, arcname=item.name, filter=lambda info: info if info.isreg() or info.isdir() else None)  # never links, pipes or devices: restore refuses them
         data = buffer.getvalue()
     if len(data) > MAX_BACKUP_BYTES:
         raise BackupError(f"the workspace is {len(data) // 1_000_000} MB, over the {MAX_BACKUP_BYTES // 1_000_000} MB backup limit: delete old files or chats")
@@ -144,6 +144,16 @@ def unpack(data: bytes, root: Path) -> None:
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
         members = list(_safe_members(tar))
         tar.extractall(root, members=members, filter="data") if hasattr(tarfile, "data_filter") else tar.extractall(root, members=members)  # noqa: S202 - every member was checked above (no links, devices or escapes)
+    lock_down(root)
+
+
+def lock_down(root: Path) -> None:
+    """Restored files get the same private permissions a fresh workspace has: nothing readable by other users.
+    (The workspace re-opens the few folders that must be reachable, such as agents' published apps, when it starts.)"""
+    for path in [root, *root.rglob("*")]:
+        if path.is_symlink():
+            continue
+        os.chmod(path, 0o700 if path.is_dir() else 0o600)
 
 
 def is_empty(root: Path) -> bool:

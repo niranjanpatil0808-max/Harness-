@@ -35,7 +35,7 @@ APP_LINK_SECONDS = 3600
 MAX_FAILURES, FAILURE_WINDOW = 10, 60  # wrong tokens per client per minute before it is turned away
 MIN_PUBLIC_TOKEN = 24
 APP_CSP = ("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; "
-           "style-src 'unsafe-inline'; img-src data:")
+           "style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'")
 
 
 class RateLimited(Exception):
@@ -314,7 +314,10 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 room = query["room"][0]
                 if not ws.team.can_see_room(self.who, room):
                     raise Forbidden("you are not in that room")
-                return ws.history(room, after=int((query.get("after") or ["0"])[0]))
+                after = int((query.get("after") or ["0"])[0])
+                if (query.get("order") or [""])[0] == "asc":  # oldest first, page by page (saving a whole chat)
+                    return ws.db.query("SELECT * FROM messages WHERE room = ? AND id > ? ORDER BY id LIMIT 200", (room, after))
+                return ws.history(room, after=after)
             if path == "/api/audit":
                 rows = ws.audit_log()
                 if self.who.role != "owner":  # tool arguments can hold private chat content: admins see what happened, not the content

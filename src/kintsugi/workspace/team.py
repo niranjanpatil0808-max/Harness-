@@ -64,7 +64,7 @@ MEMBER_PATHS = {
 }
 ADMIN_PATHS = {
     "/api/agents", "/api/persona", "/api/secret", "/api/secret/delete", "/api/agent/delete", "/api/agent/model", "/api/agent/playbook",
-    "/api/agent/internet", "/api/tier", "/api/rooms", "/api/room/delete", "/api/room/members", "/api/audit", "/api/usage", "/api/templates", "/api/templates/apply", "/api/team/reset", "/api/files", "/api/file",
+    "/api/agent/internet", "/api/tier", "/api/rooms", "/api/room/delete", "/api/room/members", "/api/audit", "/api/usage", "/api/templates", "/api/templates/apply", "/api/files", "/api/file",
     "/api/lessons", "/api/improve", "/api/improve/study", "/api/improve/models", "/api/improve/settings", "/api/improve/run",
     "/api/improve/decide", "/api/improve/revert", "/api/team", "/api/team/invite", "/api/team/revoke-invite", "/api/team/remove",
 }
@@ -216,8 +216,8 @@ class Team:
         user = self.get(name)
         if user is None:
             raise TeamError("no such person")
-        if RANK[user["role"]] >= RANK[by.role] and by.role != "owner":
-            raise TeamError("you can only reset a member's sign-in")
+        if by.role != "owner":  # a new sign-in opens the person's private chats, so only the owner (who can read them anyway) may make one
+            raise TeamError("only the owner can reset someone's sign-in")
         token = self._new_token()
         self.ws.db.execute("UPDATE users SET token_hash = ? WHERE name = ?", (_hash(token), name))
         self.ws.audit(None, "token-reset", f"{name} by {by.name}")

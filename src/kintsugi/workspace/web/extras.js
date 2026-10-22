@@ -175,9 +175,9 @@ newChatDialog = function () {
 async function exportChat(room) {
   try {
     const all = []; let after = 0;
-    for (let page = 0; page < 400; page++) {  // 50 a page; stops at 20,000 messages
-      const got = await api("/api/messages?room=" + encodeURIComponent(room) + "&after=" + after);
-      all.push(...got); if (got.length < 50) break; after = got[got.length - 1].id;
+    for (let page = 0; page < 250; page++) {  // 200 a page, oldest first; stops at 50,000 messages
+      const got = await api("/api/messages?order=asc&room=" + encodeURIComponent(room) + "&after=" + after);
+      all.push(...got); if (got.length < 200) break; after = got[got.length - 1].id;
     }
     const r = rooms().find((x) => x.name === room), title = r ? (r.kind === "dm" ? "Chat with " + roomLabel(r) : "#" + room) : room;
     const md = "# " + title + "\n\n" + all.map((m) => "**" + m.sender + "** · " + new Date(m.ts * 1000).toLocaleString() + "\n\n" + m.text + "\n").join("\n---\n\n");

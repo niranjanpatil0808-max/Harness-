@@ -64,6 +64,9 @@ const OWNER = 'tok123';
   await member.waitForSelector('input[aria-label="Access token"]', { timeout: 8000 }).catch(() => errs.push('old sign-in still works after reset'));
   const sam2 = await (await b.newContext()).newPage();
   await sam2.goto(fresh); await sam2.waitForSelector('#sidebar .brand', { state: 'attached' });
+  // a link never signs you in silently as someone else: it names the account first
+  await sam2.waitForSelector('.dialog[aria-label^="Sign in as sam"]', { timeout: 8000 }).catch(() => errs.push('no confirmation before signing in from a link'));
+  await sam2.click('.dialog .btn.primary:has-text("Sign in as sam")');
   await sam2.waitForSelector('#sidebar .item:has-text("team")', { state: 'attached', timeout: 8000 }).catch(() => errs.push('new sign-in link does not load the workspace'));
   if (await sam2.locator('input[aria-label="Access token"]').count()) errs.push('new sign-in link does not work');
   await owner.click('.card:has-text("sam") .btn.danger:has-text("Remove")'); await owner.click('.overlay:last-child .btn.primary');

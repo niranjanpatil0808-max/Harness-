@@ -54,6 +54,9 @@ def apply(ws: "Workspace", template_id: str, member: str) -> dict:
 
     if template_id not in TEMPLATES:
         raise WorkspaceError("unknown template")
+    taken = [name for name, _ in TEMPLATES[template_id]["agents"] if ws.get_agent(name, missing_ok=True) is None and ws.team.is_person(name)]
+    if taken:  # check every name first, so a template is never left half made
+        raise WorkspaceError(f"{', '.join(taken)} is already a person's name here; rename them or pick another team")
     made = []
     for name, persona in TEMPLATES[template_id]["agents"]:
         if ws.get_agent(name, missing_ok=True) is None:

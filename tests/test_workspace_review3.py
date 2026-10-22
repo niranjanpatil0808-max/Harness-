@@ -125,3 +125,74 @@ class TestUploadPrivacy(Base):
         self.assertEqual(status, 200, out)
         self.assertEqual(out["path"], "uploads/note (2).txt")
         self.assertFalse(os.path.exists(outside))
+
+
+class TestReviewC(Base):
+    def test_sandbox_output_can_never_turn_isolation_off(self):
+        from kintsugi.workspace import sandbox
+
+        if sandbox.backend() != "namespaces":
+            self.skipTest("needs the namespace sandbox")
+        code = "import os\nprint('namespaces unavailable' if os.getcwd() == '/work' else 'ESCAPED')"
+        ok, out = sandbox.run_python(self.ws.files_dir("alice"), code)
+        self.assertNotIn("ESCAPED", out)
+
+    def test_an_approved_action_runs_for_the_person_who_asked(self):
+        approval = self.ws.request_approval("alice", "team", "send_message", {"room": "secret-room", "text": "x"}, "sam-not-a-person")
+        self.assertIsNone(self.ws.requester_of(f"approval#{approval}"))
+        self.ws.db.execute("UPDATE approvals SET requested_by = 'you' WHERE id = ?", (approval,))
+        self.assertEqual(self.ws.requester_of(f"approval#{approval}"), "you")
+
+    def test_schedules_belong_to_who_asked_and_go_with_them(self):
+        from kintsugi.workspace.tools import Ctx, execute
+
+        self.invite_and_join("sam", rooms=["team"])
+        mid = self.ws.post("team", "sam", "please schedule", human=True, wake=False)
+        out = execute(Ctx(self.ws, "alice", "team", 0, f"team#{mid}"), "schedule", {"cron": "0 9 * * *", "prompt": "hi"}, approved=True)
+        self.assertEqual(out.status, "ok", out.output)
+        self.assertEqual(self.ws.db.one("SELECT owner FROM jobs")["owner"], "sam")
+        self.call("owner", "POST", "/api/team/remove", {"name": "sam"})
+        self.assertIsNone(self.ws.db.one("SELECT 1 FROM jobs"))
+        nobody = execute(Ctx(self.ws, "alice", "team", 0, "team#999999"), "schedule", {"cron": "0 9 * * *", "prompt": "hi"}, approved=True)
+        self.assertNotEqual(nobody.status, "ok")
+
+    def test_restore_leaves_private_permissions_and_skips_special_files(self):
+        import io, os, stat as st, tarfile
+        from kintsugi.workspace import backup
+
+        os.mkfifo(self.ws.files_dir("alice") / "pipe")
+        data = backup.snapshot(self.ws)
+        names = tarfile.open(fileobj=io.BytesIO(data)).getnames()
+        self.assertFalse(any(n.endswith("pipe") for n in names))
+        with tempfile.TemporaryDirectory() as fresh:
+            backup.unpack(data, __import__("pathlib").Path(fresh))
+            self.assertEqual(st.S_IMODE(os.stat(os.path.join(fresh, "workspace.db")).st_mode), 0o600)
+            self.assertEqual(st.S_IMODE(os.stat(os.path.join(fresh, "agents", "alice", "files")).st_mode), 0o700)
+
+    def test_back_dated_files_cannot_dodge_the_folder_cap(self):
+        from kintsugi.workspace.tools import Ctx, execute
+
+        code = "import os\nfor i in range(7):\n    p=f'big{i}.bin'\n    open(p,'wb').write(b'x'*1_000_000)\n    os.utime(p,(1,1))\nos.mkfifo('p')"
+        out = execute(Ctx(self.ws, "alice", "team", 0, "team#1"), "run_python", {"code": code}, approved=True)
+        from kintsugi.workspace.sandbox import MAX_FOLDER_BYTES, folder_size
+        self.assertLessEqual(folder_size(self.ws.files_dir("alice")), MAX_FOLDER_BYTES)
+        self.assertFalse((self.ws.files_dir("alice") / "p").exists())
+
+    def test_approvals_show_everything_and_are_never_too_long_to_read(self):
+        from kintsugi.workspace.tools import Ctx, execute
+
+        self.ws.set_tier("alice", "strict")
+        out = execute(Ctx(self.ws, "alice", "team", 0, "team#1"), "run_python", {"code": "#" + "x" * 25000})
+        self.assertEqual(out.status, "error")
+        self.assertIn("too long", out.output)
+
+    def test_a_template_is_never_half_made(self):
+        from kintsugi.workspace import templates
+
+        first = templates.TEMPLATES["founder"]["agents"][-1][0]
+        self.invite_and_join(first, rooms=["team"])
+        before = {a["name"] for a in self.ws.list_agents()} if hasattr(self.ws, "list_agents") else None
+        with self.assertRaises(Exception):
+            templates.apply(self.ws, "founder", "you")
+        if before is not None:
+            self.assertEqual({a["name"] for a in self.ws.list_agents()}, before)

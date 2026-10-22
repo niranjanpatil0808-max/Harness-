@@ -189,13 +189,14 @@ def status() -> dict:
     return {"backend": name, "isolated": name != "process", "network_blocked": name == "namespaces", "note": _backend_note}
 
 
-def _run_namespaces(folder: Path, source: str, timeout: float, env: dict, memory_mb: int) -> tuple[bool, str]:
+def _run_namespaces(folder: Path, source: str, timeout: float, env: dict, memory_mb: int) -> tuple[bool, str] | None:
+    """None means the isolated command could not be built. Never signalled through the output, which the code controls."""
     with tempfile.TemporaryDirectory(prefix="kw-run-") as tmp:
         script_dir = Path(tmp)
         (script_dir / "main.py").write_text(source)
         command = _namespace_command(folder, script_dir, int(timeout) + 2, memory_mb * 1024 * 1024, MAX_FILE_BYTES * 5)
         if command is None:
-            return False, "namespaces unavailable"
+            return None
         code, output = _run(command, None, env, timeout)
     return _finish(code, output, timeout)
 
@@ -226,9 +227,10 @@ def run_python(folder: Path, source: str, timeout: float = 10.0, extra_env: dict
     env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "SANDBOX_PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": "/work" if inside else str(folder), "LANG": "C.UTF-8",
            "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1", **(extra_env or {})}
     if inside:
-        ok, output = _run_namespaces(folder, source, timeout, env, memory_mb)
-        if output != "namespaces unavailable":
-            return ok, output
+        result = _run_namespaces(folder, source, timeout, env, memory_mb)
+        if result is None:  # isolation was promised and is not available right now: refuse, never run it unisolated instead
+            return False, "run_python could not start its isolated sandbox on this machine, so the code was not run."
+        return result
     with tempfile.TemporaryDirectory(prefix="kw-run-") as tmp:
         script = Path(tmp) / "main.py"
         script.write_text(source)

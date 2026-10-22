@@ -215,14 +215,15 @@ class TestUploads(Base):
 
 
 class TestResetSignIn(Base):
-    def test_admin_resets_a_member_owner_resets_anyone_and_the_old_token_dies(self):
+    def test_only_the_owner_resets_sign_ins_and_the_old_token_dies(self):
         self.join("sam")
         self.join("ada", "admin")
         old = self.tokens["sam"]
-        new = self.call("ada", "POST", "/api/team/reset", {"name": "sam"})[1]["token"]
+        # an admin must not be able to mint a member's sign-in: it would open that member's private chats
+        self.assertEqual(self.call("ada", "POST", "/api/team/reset", {"name": "sam"})[0], 403)
+        new = self.call("owner", "POST", "/api/team/reset", {"name": "sam"})[1]["token"]
         self.assertEqual(self.call(old, "GET", "/api/me")[0], 401)
         self.assertEqual(self.call(new, "GET", "/api/me")[1]["name"], "sam")
-        self.assertEqual(self.call("ada", "POST", "/api/team/reset", {"name": "ada"})[0], 400)  # not for admins
         self.assertEqual(self.call("owner", "POST", "/api/team/reset", {"name": "ada"})[0], 200)
         self.assertEqual(self.call(new, "POST", "/api/team/reset", {"name": "sam"})[0], 403)
 

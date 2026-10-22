@@ -104,6 +104,13 @@ class Workspace:
         self.db = Database(self.root / "workspace.db")
         self.keychain = Keychain(self.root / "keychain", encrypt=encrypt_keychain)
         os.chmod(self.keychain.folder, 0o700)
+        for db_file in self.root.glob("workspace.db*"):  # also after a restore, which cannot be trusted to keep modes
+            os.chmod(db_file, 0o600)
+        for row in self.db.query("SELECT name FROM agents"):
+            if self.agent_dir(row["name"]).is_dir():
+                self.files_dir(row["name"]).mkdir(parents=True, exist_ok=True)
+                self.www_dir(row["name"]).mkdir(parents=True, exist_ok=True)
+                self._lock_agent_dirs(row["name"])
         raw = os.environ.get("KINTSUGI_DAILY_CALLS", "")
         self.daily_calls = int(raw) if raw.strip().isdigit() else DEFAULT_DAILY_CALLS
         self.model_factory = model_factory or default_model_factory
@@ -1024,6 +1031,13 @@ class Workspace:
 
     def requester_of(self, situation: str) -> str | None:
         """The person whose message started this run (None when an agent, a schedule or the system did)."""
+        if str(situation).startswith("approval#"):  # an approved action runs for whoever's request led to it, never for a look-alike message id
+            try:
+                row = self.db.one("SELECT requested_by FROM approvals WHERE id = ?", (int(str(situation)[9:]),))
+            except ValueError:
+                return None
+            by = row["requested_by"] if row else None
+            return by if by and self.team.is_person(by) else None
         try:
             sender = self.db.one("SELECT sender FROM messages WHERE id = ?", (int(str(situation).rsplit("#", 1)[1]),))["sender"]
         except (IndexError, ValueError, TypeError):
