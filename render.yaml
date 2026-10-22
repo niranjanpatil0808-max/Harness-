@@ -10,11 +10,6 @@ services:
     envVars:
       - key: KINTSUGI_TOKEN
         generateValue: true
-      - key: KINTSUGI_API_KEY
-        sync: false          # you paste your model API key in Render's dashboard, never in the repository
-      - key: KINTSUGI_BASE_URL
-        value: https://api.groq.com/openai/v1
-      - key: KINTSUGI_MODEL
-        value: openai/gpt-oss-20b
+      # No model key is needed here: after you sign in, the app opens Settings > Models and you paste your own key there.
       - key: KINTSUGI_DAILY_CALLS
         value: "300"

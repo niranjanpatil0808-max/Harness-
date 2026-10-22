@@ -1,6 +1,6 @@
 # Kintsugi (working name)
 
-**A phone-first assistant you can trust with real work.** AI agents that remember, work on a schedule, ask before they do anything risky, run your code in a locked box, and only change themselves when a measurement says it helps.
+**A phone-first assistant you can trust with real work, running on your own API key.** AI agents that remember, work in parallel and on a schedule, go online only if you allow it, take plugins, ask before they do anything risky, run your code in a locked box, and only change themselves when a measurement says it helps. Use any model provider: you paste your key, nothing is sold or hosted for you.
 
 > Built for the Meta Global AI Developer Hackathon (Indie developer track). Python standard library only (plus two small web libraries bundled for the interface).
 > The name is a placeholder and will change.

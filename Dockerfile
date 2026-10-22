@@ -1,5 +1,5 @@
 # Kintsugi workspace as a small web service. Build: docker build -t kintsugi .
-# Run:   docker run -p 8765:8765 -e KINTSUGI_TOKEN=<long random string> -e KINTSUGI_API_KEY=<your model key> -v kintsugi-data:/data kintsugi
+# Run:   docker run -p 8765:8765 -e KINTSUGI_TOKEN=<long random string> -v kintsugi-data:/data kintsugi
 FROM python:3.12-slim
 
 # util-linux (unshare, mount) lets the code sandbox isolate agent code when the platform allows it.

@@ -22,7 +22,7 @@ class TestDeploymentFiles(unittest.TestCase):
         render = self.read("render.yaml")
         self.assertIn("key: KINTSUGI_TOKEN", render)
         self.assertIn("generateValue: true", render)
-        self.assertRegex(render, r"key: KINTSUGI_API_KEY\s+sync: false")  # the key is never in the repository
+        self.assertNotRegex(render, r"KINTSUGI_API_KEY")  # no model key is needed at deploy time: users paste their own in the app
 
     def test_no_secrets_are_committed_in_deployment_files(self):
         for name in ("Dockerfile", "render.yaml", ".devcontainer/devcontainer.json", "examples/smoke.config", "examples/study.config"):

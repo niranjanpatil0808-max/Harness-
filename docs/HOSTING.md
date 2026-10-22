@@ -9,9 +9,9 @@ Three ways, easiest first. All of them need **your own model API key** (for exam
 
 ## 1. GitHub Codespaces (works from a phone browser)
 
-1. Add secrets: GitHub > Settings > Codespaces > Secrets: `KINTSUGI_API_KEY` (your model key) and `KINTSUGI_TOKEN`
+1. Add a secret: GitHub > Settings > Codespaces > Secrets: `KINTSUGI_TOKEN`
    (any random string of 24+ characters; mashing a keyboard for a while is fine, or use a password manager).
-   Give them access to this repository.
+   Give it access to this repository.
 2. Repository > Code > Codespaces > Create codespace. It installs the package, runs the tests and starts the server.
 3. Open the forwarded port 8765 and sign in with your `KINTSUGI_TOKEN`. Keep the port **Private** (the default).
 4. Codespaces sleep after inactivity; files persist until you delete the codespace.
@@ -20,9 +20,9 @@ Three ways, easiest first. All of them need **your own model API key** (for exam
 
 1. Push or fork this repository to your GitHub account.
 2. render.com > New > Blueprint > pick the repository. Render reads `render.yaml`.
-3. In the new service's Environment tab, paste your model key into `KINTSUGI_API_KEY`. `KINTSUGI_TOKEN` is generated
-   for you; copy it from the same tab: that is your sign-in token.
-4. Open the service address and sign in. The Safety tab shows how code is isolated.
+3. In the new service's Environment tab, copy `KINTSUGI_TOKEN` (it is generated for you): that is your sign-in token.
+4. Open the service address and sign in. The app opens **Settings > Models**: choose your provider and paste **your own API key**
+   there (nothing about your key goes through the repository or the Render settings). The Safety tab shows how code is isolated.
 
 Things to know about the **free plan**: the service sleeps when idle (the first visit after a while is slow and
 scheduled jobs do not run while it sleeps), and **files are lost on every deploy or restart** (chats, agents,
@@ -36,7 +36,7 @@ persistent disk mounted at `/data` (the image keeps everything there).
 docker build -t kintsugi .
 docker run -p 8765:8765 \
   -e KINTSUGI_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" \
-  -e KINTSUGI_API_KEY=... -v kintsugi-data:/data kintsugi
+  -v kintsugi-data:/data kintsugi
 ```
 
 Put it behind HTTPS (Caddy, nginx, a cloud load balancer, a tunnel). Set `KINTSUGI_TRUST_PROXY=1` only when a proxy

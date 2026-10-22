@@ -574,12 +574,13 @@ async function internetPanel() {
 }
 
 /* ---------- settings: models (your own API key) ---------- */
+const testResult = (r) => r.ok ? h("div", {class: "card"}, h("strong", {}, "Works. "), r.reply ? "The model said: " + r.reply : (r.note || ""), r.models.length ? h("div", {class: "muted", style: "font-size:13px;margin-top:4px"}, "Models you can use: " + r.models.slice(0, 40).join(", ")) : null) : h("div", {class: "card"}, "Problem: " + r.error);
 async function modelsPanel() {
   const d = await api("/api/providers");
   const out = h("div", {id: "model-test"});
   const rows = d.profiles.map((p) => h("div", {class: "card"}, h("div", {style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"},
     h("strong", {style: "flex:1"}, p.label + (p.default ? "  · default" : "")), h("span", {class: "muted", style: "font-size:13px"}, p.model || "no model chosen"),
-    h("button", {class: "btn", onclick: async () => { try { const r = await api("/api/providers/test", {id: p.id}); fill(out, r.ok ? h("div", {class: "card"}, h("strong", {}, "Works. "), r.reply ? "The model said: " + r.reply : (r.note || ""), r.models.length ? h("div", {class: "muted", style: "font-size:13px;margin-top:4px"}, "Models you can use: " + r.models.slice(0, 40).join(", ")) : null) : h("div", {class: "card"}, "Problem: " + r.error)); } catch (e) { toast(e.message, true); } }}, "Test"),
+    h("button", {class: "btn", onclick: async () => { try { fill(out, testResult(await api("/api/providers/test", {id: p.id}))); } catch (e) { toast(e.message, true); } }}, "Test"),
     p.default ? null : h("button", {class: "btn", onclick: async () => { await act(() => api("/api/providers/default", {id: p.id}), "Default changed"); fill($("#settings-body"), await modelsPanel()); }}, "Make default"),
     h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + p.label + "?", "Its saved key is deleted. Agents using it fall back to the default provider.", "Remove", async () => { await act(() => api("/api/providers/remove", {id: p.id}), "Provider removed"); fill($("#settings-body"), await modelsPanel()); })}, "Remove"))));
   const par = await api("/api/parallel");
@@ -598,7 +599,7 @@ async function modelsPanel() {
   preset.onchange = fillPreset; fillPreset();
   const save = async () => { const p = d.presets[preset.value], id = preset.value === "custom" ? "custom-" + Math.random().toString(36).slice(2, 6) : preset.value;
     const ok = await act(() => api("/api/providers/save", {id, label: p.label, kind: kind.value, base_url: url.value, model: model.value, key: key.value, keyless: !!p.keyless, make_default: !d.profiles.length}), "Saved");
-    if (ok) { key.value = ""; fill($("#settings-body"), await modelsPanel()); } };
+    if (ok) { key.value = ""; fill($("#settings-body"), await modelsPanel()); try { fill($("#model-test"), h("div", {class: "card"}, "Testing your key…")); fill($("#model-test"), testResult(await api("/api/providers/test", {id}))); } catch (e) { toast(e.message, true); } } };
   const row = (label, el) => h("div", {style: "margin:10px 0"}, h("label", {style: "margin:0 0 4px"}, label), el);
   return h("div", {}, h("p", {style: "margin-top:0"}, "This app runs on your own API key. Add any provider; agents use the default one unless you pick another for an agent. Your key is stored in your keychain, never shown again, and only ever sent to the address you enter here."),
     d.profiles.length ? rows : h("div", {class: "card"}, d.env_fallback ? "Using the key from this server's settings. Add a provider here to override it." : "No model is set up yet. Add one below to start."), out,
