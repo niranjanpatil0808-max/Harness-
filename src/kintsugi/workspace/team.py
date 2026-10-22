@@ -60,11 +60,11 @@ class Identity:
 MEMBER_PATHS = {
     "/api/state", "/api/messages", "/api/say", "/api/dm", "/api/me", "/api/me/token", "/api/tone", "/api/push", "/api/push/subscribe",
     "/api/push/unsubscribe", "/api/push/test", "/api/approve", "/api/timezone", "/api/applink", "/api/automations",
-    "/api/automations/toggle", "/api/automations/run", "/api/jobs", "/api/jobs/delete", "/api/stop",
+    "/api/automations/toggle", "/api/automations/run", "/api/jobs", "/api/jobs/delete", "/api/stop", "/api/find", "/api/upload",
 }
 ADMIN_PATHS = {
     "/api/agents", "/api/persona", "/api/secret", "/api/secret/delete", "/api/agent/delete", "/api/agent/model", "/api/agent/playbook",
-    "/api/agent/internet", "/api/tier", "/api/rooms", "/api/room/delete", "/api/room/members", "/api/audit", "/api/usage", "/api/files", "/api/file",
+    "/api/agent/internet", "/api/tier", "/api/rooms", "/api/room/delete", "/api/room/members", "/api/audit", "/api/usage", "/api/templates", "/api/templates/apply", "/api/team/reset", "/api/download", "/api/files", "/api/file",
     "/api/lessons", "/api/improve", "/api/improve/study", "/api/improve/models", "/api/improve/settings", "/api/improve/run",
     "/api/improve/decide", "/api/improve/revert", "/api/team", "/api/team/invite", "/api/team/revoke-invite", "/api/team/remove",
 }
@@ -211,6 +211,18 @@ class Team:
             self.ws.db.execute("DELETE FROM invites WHERE created_by = ? AND used_by IS NULL", (name,))  # a demoted admin's open invites (some for admins) go too
         self.ws.audit(None, "role-changed", f"{name} -> {role}")
 
+    def reset_token(self, by: Identity, name: str) -> str:
+        """Give a person a new sign-in (they lost theirs or signed out everywhere). Admins can do this for members; the owner for anyone."""
+        user = self.get(name)
+        if user is None:
+            raise TeamError("no such person")
+        if RANK[user["role"]] >= RANK[by.role] and by.role != "owner":
+            raise TeamError("you can only reset a member's sign-in")
+        token = self._new_token()
+        self.ws.db.execute("UPDATE users SET token_hash = ? WHERE name = ?", (_hash(token), name))
+        self.ws.audit(None, "token-reset", f"{name} by {by.name}")
+        return token
+
     def rotate_token(self, name: str) -> str:
         if self.get(name) is None:
             raise TeamError("the owner's token is changed by setting KINTSUGI_TOKEN (or deleting the token file), not here")
@@ -259,6 +271,16 @@ class Team:
         if policy == "everyone":
             return True
         return policy == "requester" and approval.get("requested_by") == who.name
+
+    def can_use_agent(self, who: Identity, agent: str) -> bool:
+        """Owners and admins can use any agent; a member only agents that share a chat with them."""
+        if who.at_least("admin"):
+            return True
+        for room in self.ws.list_rooms():
+            members = self.ws.members(room["name"])
+            if agent in members and who.name in members:
+                return True
+        return False
 
     def can_see_room(self, who: Identity, room: str) -> bool:
         return who.role == "owner" or who.name in self.ws.members(room)

@@ -11,6 +11,7 @@ import hmac
 import json
 import mimetypes
 import os
+import re
 import secrets
 import threading
 import time
@@ -157,9 +158,9 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             return (len(parts) >= 4 and expires > time.time()
                     and hmac.compare_digest(signature.encode(), sign(parts[2], parts[3], expires).encode()))  # bytes: a non-ASCII signature must not crash
 
-        def _body(self) -> dict:
+        def _body(self, limit: int = MAX_BODY) -> dict:
             length = int(self.headers.get("Content-Length") or 0)
-            if length < 0 or length > MAX_BODY:
+            if length < 0 or length > limit:
                 raise WorkspaceError("request too large")
             data = json.loads(self.rfile.read(length) or b"{}")
             if not isinstance(data, dict):
@@ -188,6 +189,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return self._static(url.path[len("/static/"):])
             if not self._authorized():
                 return self._json(401, {"error": "missing or wrong access token"})
+            if url.path == "/api/download":
+                return self._guard(lambda: self._download(query), url.path)
             self._guard(lambda: self._json(200, self._get(url.path, query)), url.path)
 
         def do_POST(self):
@@ -196,7 +199,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return self._guard(lambda: self._json(200, self._join(self._body())))
             if not self._authorized():
                 return self._json(401, {"error": "missing or wrong access token"})
-            self._guard(lambda: self._json(200, self._post(url.path, self._body())), url.path)
+            self._guard(lambda: self._json(200, self._post(url.path, self._body(2_200_000 if url.path == "/api/upload" else MAX_BODY))), url.path)
 
         def _rate_limit(self, name: str, limit: int = 30, window: float = 60.0) -> None:
             """One person cannot spend the whole team's model quota with a flood of messages."""
@@ -208,6 +211,17 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     raise RateLimited(f"slow down: at most {limit} messages a minute")
                 recent.append(now)
                 sent_times[name] = recent
+
+        def _download(self, query: dict) -> None:
+            from . import uploads
+
+            try:
+                name, data = uploads.read_for_download(ws, query["agent"][0], query["path"][0])
+            except uploads.UploadError as err:
+                raise WorkspaceError(str(err)) from None
+            safe_name = re.sub(r"[^A-Za-z0-9._ -]", "_", name)[:80]
+            ws.audit(None, "file-downloaded", f"{query['agent'][0]}/{safe_name} by {self.who.name}")
+            self._send(200, data, "application/octet-stream", {"Content-Disposition": f'attachment; filename="{safe_name}"'})  # never rendered or run by the browser
 
         def _known_name(self, name: str) -> None:
             if not (ws.get_agent(name, missing_ok=True) or ws.team.is_person(name)):
@@ -298,6 +312,15 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return rows
             if path == "/api/usage":
                 return ws.usage_report(int((query.get("days") or ["14"])[0]))
+            if path == "/api/download":  # handled before JSON: it sends a file
+                raise WorkspaceError("use the file download link")
+            if path == "/api/find":
+                rooms = None if self.who.role == "owner" else [r["name"] for r in ws.list_rooms() if ws.team.can_see_room(self.who, r["name"])]
+                return ws.find_messages((query.get("q") or [""])[0], rooms)
+            if path == "/api/templates":
+                from . import templates
+
+                return templates.listing()
             if path == "/api/me":
                 return {"name": self.who.name, "role": self.who.role}
             if path == "/api/team":
@@ -424,6 +447,23 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return {"ok": True}
             if path == "/api/team/policy":
                 return {"policy": ws.team.set_policy(str(body["policy"]))}
+            if path == "/api/upload":
+                from . import uploads
+
+                agent = str(body["agent"])
+                if not ws.team.can_use_agent(self.who, agent):
+                    raise Forbidden("you can only give files to agents you share a chat with")
+                self._rate_limit("upload:" + self.who.name, limit=20)
+                try:
+                    return {"path": uploads.save(ws, agent, str(body.get("name", "")), str(body.get("data", "")))}
+                except uploads.UploadError as err:
+                    raise WorkspaceError(str(err)) from None
+            if path == "/api/templates/apply":
+                from . import templates
+
+                return templates.apply(ws, str(body["id"]), self.who.name)
+            if path == "/api/team/reset":
+                return {"token": ws.team.reset_token(self.who, str(body["name"]))}
             if path == "/api/stop":
                 agent = str(body["agent"])
                 room = ws.busy_room(agent)

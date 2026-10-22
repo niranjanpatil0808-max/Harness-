@@ -324,6 +324,14 @@ class Workspace:
             raise providers.ProviderError(f"The provider '{pid}' has no API key. Open Settings > Models and paste it.")
         return providers.build(profile, key, model)
 
+    @staticmethod
+    def _fast(adapter):
+        """A key test must answer in seconds: no retries and a short timeout (a wrong address must not freeze the app for minutes)."""
+        for attr, value in (("max_retries", 0), ("timeout", 12.0)):
+            if hasattr(adapter, attr):
+                setattr(adapter, attr, value)
+        return adapter
+
     def test_provider(self, pid: str, model: str | None = None) -> dict:
         """Ask the model to say OK (proves key, address and model) and list the models this key can use."""
         state = self._provider_state()
@@ -332,6 +340,7 @@ class Workspace:
         listing: list[str] = []
         try:
             adapter = self.build_model(pid, model or state["profiles"][pid].get("model") or "list-only")
+            self._fast(adapter)
             try:
                 listing = adapter.list_models()
             except Exception:  # not every service lists models; the real test is below
@@ -340,7 +349,7 @@ class Workspace:
             if not chosen:
                 return {"ok": True, "models": listing, "reply": "", "note": "The key works. Choose a model, then test again."} if listing else \
                     {"ok": False, "models": [], "reply": "", "error": "Type a model name, then test again."}
-            reply = self.build_model(pid, chosen).complete([{"role": "user", "content": "Reply with the single word OK."}])
+            reply = self._fast(self.build_model(pid, chosen)).complete([{"role": "user", "content": "Reply with the single word OK."}])
         except providers.ProviderError as err:
             return {"ok": False, "models": listing, "reply": "", "error": str(err)}
         except (ModelRequestError, ModelInfraError, QuotaExhausted, RuntimeError) as err:
@@ -813,6 +822,26 @@ class Workspace:
         return row
 
     # --- messages and routing -------------------------------------------
+
+    def find_messages(self, query: str, rooms: list[str] | None = None, limit: int = 30) -> list[dict]:
+        """Messages containing the text, newest first, only from the given rooms (None = all). Used by the quick switcher."""
+        query = " ".join(str(query).split())[:80]
+        if len(query) < 2:
+            return []
+        like = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        sql, params = "SELECT id, room, sender, text, ts FROM messages WHERE text LIKE ? ESCAPE '\\' AND sender != 'system'", [like]
+        if rooms is not None:
+            if not rooms:
+                return []
+            sql += " AND room IN (" + ",".join("?" * len(rooms)) + ")"
+            params += rooms
+        rows = self.db.query(sql + " ORDER BY id DESC LIMIT ?", tuple(params + [max(1, min(limit, 50))]))
+        out = []
+        for r in rows:
+            at = r["text"].lower().find(query.lower())
+            start = max(0, at - 40)
+            out.append({"id": r["id"], "room": r["room"], "sender": r["sender"], "ts": r["ts"], "snippet": ("…" if start else "") + r["text"][start:start + 140].replace("\n", " ")})
+        return out
 
     def history(self, room: str, after: int = 0, limit: int = 50) -> list[dict]:
         self._require_room(room)

@@ -73,7 +73,10 @@ def request_json(request: urllib.request.Request, timeout: float, max_retries: i
     for attempt in range(max_retries + 1):
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
-                return json.load(response)
+                try:
+                    return json.load(response)
+                except ValueError:  # an HTML page or empty answer: the address is not an AI API
+                    raise RuntimeError("that address did not answer like an AI service (does it end in /v1?)") from None
         except urllib.error.HTTPError as err:
             body_text = err.read()[:500].decode("utf-8", "replace")
             detail = f"Model API error {err.code}: {body_text!r}"

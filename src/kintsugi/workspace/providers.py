@@ -14,6 +14,7 @@ model adapters on a shared context; the code here is written from scratch for th
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import re
 import urllib.parse
@@ -53,6 +54,12 @@ def clean_base_url(url: str) -> str:
         raise ProviderError("the address must be a plain URL with no password, query or spaces")
     if parts.scheme == "http" and parts.hostname not in LOCAL_HOSTS:
         raise ProviderError("only https:// addresses are allowed, except for a model running on this computer (localhost)")
+    try:
+        ip = ipaddress.ip_address(parts.hostname)
+        if parts.hostname not in LOCAL_HOSTS and not ip.is_global:
+            raise ProviderError("that address is a private or internal network address, not a model service")
+    except ValueError:
+        pass  # a normal host name
     return url
 
 
