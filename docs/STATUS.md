@@ -195,3 +195,10 @@ see); prompt_text: style everywhere, context only in DMs; clean() drops rule-lik
 generation counter so clear/removal during a learn wins; team.remove deletes it. Endpoints /api/me/profile, /api/me/profile/save (member,
 always self). UI: Settings > General top card (extras.js wraps SETTINGS_PANELS.general), 👍/👎 on agent messages. Tests:
 tests/test_workspace_personal.py (5), tests/ui/personal.js.
+
+## Research batch 1 finished (2026-10-22)
+Run 39824205006 completed 17:36-19:24 UTC; results committed (benchmark notes, RESULTS.md, research/README.md Results). The last run (allam-2-7b,
+loop+memory,full) hit Groq's 500k tokens/day for that model mid-loop+memory. ARCHIVE STEP (git mv benchmark/results/RESULTS.md under research/) NOT done:
+waiting for the user's yes (it reshuffles the repo right before the merge to main).
+Batch 2 plan (not started, needs the user's go): benchmark/run.config RUNS=('openai/gpt-oss-20b|4096|3|loop+memory|0.6|{"reasoning_effort":"low"}|split.json')
+so loop+memory (3 repeats) can be compared with batch 1's loop mode (same split, settings), then allam-2-7b loop+memory,full again once its daily quota resets.
