@@ -47,15 +47,17 @@ jobs:
           fi
           set -a; . benchmark/run.config; set +a
           status=0
-          # One run per "model|max_tokens|repeats|modes" entry in RUNS, one after the other (shared rate limit).
-          # repeats and modes are optional; modes are comma separated, e.g. baseline,loop,full.
+          # One run per "model|max_tokens|repeats|modes|temperature|extra_json|split" entry in RUNS, one after
+          # the other (shared rate limit). Everything after max_tokens is optional (leave it empty to skip it).
+          # modes are comma separated, e.g. baseline,loop,full; extra_json is added to every request,
+          # e.g. {"reasoning_effort":"low"}; split is a file in benchmark/ (default split.json).
           for entry in "${RUNS[@]}"; do
-            IFS='|' read -r model tokens repeats modes <<< "$entry"
+            IFS='|' read -r model tokens repeats modes temperature extra split <<< "$entry"
             modes="${modes:-${MODES:-baseline loop loop+memory full}}"
-            echo "=== $model (max_tokens $tokens, repeats ${repeats:-${REPEATS:-1}}, modes ${modes//,/ }) ==="
-            KINTSUGI_MODEL="$model" KINTSUGI_MAX_TOKENS="$tokens" \
+            echo "=== $model (max_tokens $tokens, repeats ${repeats:-${REPEATS:-1}}, modes ${modes//,/ }, temperature ${temperature:-0}, extra ${extra:-none}, split ${split:-split.json}) ==="
+            KINTSUGI_MODEL="$model" KINTSUGI_MAX_TOKENS="$tokens" KINTSUGI_TEMPERATURE="${temperature:-0}" KINTSUGI_EXTRA="$extra" \
               python benchmark/run_benchmark.py --model openai --repeats "${repeats:-${REPEATS:-1}}" --sleep "${SLEEP:-0}" \
-                --modes ${modes//,/ } || status=1
+                --split "${split:-split.json}" --modes ${modes//,/ } || status=1
           done
           exit $status
 
