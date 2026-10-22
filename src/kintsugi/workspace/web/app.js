@@ -1141,10 +1141,12 @@ async function redeemSignin(code) {
     } catch (e) { toast(e.message, true); }
     poll(true);
   };
-  if (!S.token) { await go(); return; }
-  // this browser is already signed in as someone: a link must never swap that silently (and the code is only used up if they agree)
-  dialog("Switch account?", "This browser is signed in already. This link signs you in as another person and replaces that. Only continue if the link was made for you.", h("div", {}),
-    (close) => [h("button", {class: "btn", onclick: () => { close(); poll(true); }}, "Keep my current sign-in"), h("button", {class: "btn primary", onclick: async () => { close(); await go(); }}, "Sign in with this link")], () => poll(true));
+  // a link must never decide who this browser is without a yes (someone could send you a link to THEIR account and later read what you type);
+  // the one-time code is only used up if the person agrees
+  const had = !!S.token; let agreed = false;
+  dialog(had ? "Switch account?" : "Sign in with this link?", (had ? "This browser is signed in already. This link signs you in as another person and replaces that. " : "This link signs this browser in as the person it was made for. ")
+    + "Only continue if the link was made for you. If someone you do not know sent it, you would be using their account and they could read what you type here.", h("div", {}),
+    (close) => [h("button", {class: "btn", onclick: () => { close(); poll(true); }}, had ? "Keep my current sign-in" : "Cancel"), h("button", {class: "btn primary", onclick: async () => { agreed = true; close(); await go(); }}, "Sign in with this link")], () => { if (!agreed) poll(true); });
 }
 const lowerName = (e) => { e.target.value = e.target.value.toLowerCase().replace(/\s+/g, "-"); };  // names are lowercase everywhere: fix it as people type
 function joinDialog(code) {

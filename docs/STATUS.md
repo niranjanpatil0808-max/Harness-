@@ -234,7 +234,7 @@ the composer, 5xx/429/401 keep waiting (8 tries), /api/say takes a cid so a retr
 deleted messages disappear from other open screens (state.deleted, table deleted_messages); task title scrubbed on delete; names with old messages cannot be
 re-registered; draft preview hides TOOL-case fences, unfenced calls, <thinking>/<|channel|> and no longer backtracks; link label check is exact host;
 refused /task keeps its text. Tests: tests/test_workspace_review4.py, extended test_workspace_standing.py, tests/ui/review4.js.
-Not fixed (documented): sign-in code redemption is refused while an address is throttled (shared-address lockout); #signin= link signs in without a confirm
+Not fixed (documented): sign-in code redemption is refused while an address is throttled (shared-address lockout); (FIXED later: #signin= now asks first)
 dialog when the browser has no token (a person with their own reset code could sign a victim browser into their account: consider a confirm dialog);
 history LIMIT 50 skips older messages after a very long offline; repeating-task label uses the server clock unless the time zone is set; any website can
 prefill the composer via /?share_text= (never auto-sent).

@@ -65,10 +65,14 @@ const OWNER = 'tok123';
   await member.waitForSelector('input[aria-label="Access token"]', { timeout: 8000 }).catch(() => errs.push('old sign-in still works after reset'));
   const sam2 = await (await b.newContext()).newPage();
   await sam2.goto(fresh);
+  await sam2.waitForSelector('.dialog:has-text("Sign in with this link?")');  // a link never signs a browser in without a yes
+  if (await sam2.locator('#sidebar .item:has-text("team")').count()) errs.push('the browser was signed in before anyone agreed');
+  await sam2.click('.dialog .btn.primary:has-text("Sign in with this link")');
   await sam2.waitForSelector('#sidebar .item:has-text("team")', { state: 'attached', timeout: 10000 }).catch(() => errs.push('the sign-in link does not load the workspace'));
   if (await sam2.locator('input[aria-label="Access token"]').count()) errs.push('new sign-in link does not work');
   const again2 = await (await b.newContext()).newPage();
   await again2.goto(fresh);
+  await again2.click('.dialog .btn.primary:has-text("Sign in with this link")');
   await again2.waitForSelector('#toast.err', { timeout: 8000 }).catch(() => errs.push('a used sign-in link was not refused'));
   await owner.click('.card:has-text("sam") .btn.danger:has-text("Remove")'); await owner.click('.overlay:last-child .btn.primary');
   await owner.waitForSelector('text=sam removed', { timeout: 6000 }).catch(() => {});
