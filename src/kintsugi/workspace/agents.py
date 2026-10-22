@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from kintsugi.memory import MemoryStore
+from kintsugi.memory import MemoryStore, tokens
 
 from .tools import Ctx, describe_tools, execute
 
@@ -39,6 +39,31 @@ block: that text is posted to the room (reply DONE if you already said everythin
 Use only the tools below. Never print, guess or repeat secrets.
 Tools:
 {tools}"""
+
+
+TOOL_REFLECT_PROMPT = """One of your tool calls just failed.
+
+Request you were handling: {request}
+
+Failed call and error:
+```
+{output}
+```
+
+Write ONE short, general lesson (max 2 sentences) that would help you avoid this kind of mistake on OTHER
+requests. Do not mention file names or values from this request. Start with "When". Reply with the lesson only."""
+
+
+class AgentMemory(MemoryStore):
+    """The benchmark's MemoryStore, with a reflection prompt that fits tool calls instead of bug fixes."""
+
+    def reflect(self, model, task, files, result):
+        reply = model.complete([{"role": "user", "content": TOOL_REFLECT_PROMPT.format(
+            request=task.description[:500], output=result.output[-1000:])}])
+        text = reply.strip().strip('"').strip()
+        if len(text) < 15:
+            return None
+        return self.add(text, result.error_type, tokens(task.description), task.id)
 
 
 @dataclass
@@ -101,7 +126,7 @@ def run_agent(ws: "Workspace", name: str, room: str, message_id: int, hops: int)
     agent = ws.get_agent(name)
     trigger = ws.db.one("SELECT * FROM messages WHERE id = ?", (message_id,))
     situation = Situation(id=f"{room}#{message_id}", description=trigger["text"])
-    memory = MemoryStore.load(ws.lessons_path(name))
+    memory = AgentMemory.load(ws.lessons_path(name))
     lessons = memory.retrieve(situation)
     shown = [lesson.id for lesson in lessons]
     model = ws.model_for(name)
@@ -114,6 +139,13 @@ def run_agent(ws: "Workspace", name: str, room: str, message_id: int, hops: int)
         {"role": "user", "content": build_context(ws, room, message_id, memory.format(lessons),
                                                   ws.search_notes(name, trigger["text"], limit=3))},
     ]
+    try:
+        _loop(ws, name, room, hops, model, ctx, memory, situation, messages, shown)
+    finally:
+        memory.save()  # a lesson learned just before a model outage is still kept
+
+
+def _loop(ws, name, room, hops, model, ctx, memory, situation, messages, shown) -> None:
     finished = False
     waiting = False
     last_step_failed = False
@@ -157,4 +189,3 @@ def run_agent(ws: "Workspace", name: str, room: str, message_id: int, hops: int)
 
     if not waiting:  # a run that is waiting for a human has no outcome yet
         memory.record_outcome(shown, finished and not last_step_failed, situation.id)
-    memory.save()

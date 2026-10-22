@@ -47,8 +47,7 @@ class TestServer(unittest.TestCase):
         self.assertEqual(json.loads(data)["agents"][0]["name"], "alice")
         status, _, _ = self.call("POST", "/api/say", {"room": "general", "text": "@alice hi"})
         self.assertEqual(status, 200)
-        self.ws._pool.shutdown(wait=True)  # let the agent finish
-        self.ws._pool = None
+        self.assertTrue(self.ws.wait_idle(10))  # let the agent finish
         _, data, _ = self.call("GET", "/api/messages?room=general")
         self.assertEqual([m["sender"] for m in json.loads(data)], ["you", "alice"])
 
@@ -88,6 +87,50 @@ class TestServer(unittest.TestCase):
         approval = json.loads(data)["approvals"][0]
         status, data, _ = self.call("POST", "/api/approve", {"id": approval["id"], "approve": True})
         self.assertEqual((status, json.loads(data)["output"]), (200, "42"))
+
+    def test_state_reports_busy_agents_apps_and_secret_names_but_never_values(self):
+        self.ws.keychain.set("alice", "DEMO_KEY", "sk-very-secret-value")
+        app = self.ws.www_dir("alice") / "todo"
+        app.mkdir()
+        (app / "index.html").write_text("x")
+        _, data, _ = self.call("GET", "/api/state")
+        state = json.loads(data)
+        alice = state["agents"][0]
+        self.assertEqual((alice["secrets"], alice["apps"], state["busy"]), (["DEMO_KEY"], ["todo"], []))
+        self.assertNotIn("sk-very-secret-value", data.decode())
+
+    def test_file_endpoint_reads_inside_the_folder_only(self):
+        (self.ws.files_dir("alice") / "a.txt").write_text("hello")
+        (self.ws.agent_dir("alice") / "lessons.json").write_text("{}")
+        status, data, _ = self.call("GET", "/api/file?agent=alice&path=a.txt")
+        self.assertEqual((status, json.loads(data)["text"]), (200, "hello"))
+        for bad in ("../lessons.json", "/etc/passwd", "nope.txt"):
+            self.assertEqual(self.call("GET", f"/api/file?agent=alice&path={bad}")[0], 400, bad)
+
+    def test_garbage_input_gets_an_error_not_a_dropped_connection(self):
+        self.assertEqual(self.call("GET", "/api/messages?room=general&after=abc")[0], 400)
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        conn.request("POST", "/api/say", "{not json", {"X-Token": "secret-token", "Content-Length": "9"})
+        self.assertEqual(conn.getresponse().status, 400)
+        status, _, _ = self.call("POST", "/api/approve", {"id": "x", "approve": True})
+        self.assertEqual(status, 400)
+
+    def test_unexpected_bugs_become_a_500_and_an_audit_entry(self):
+        from unittest import mock
+
+        with mock.patch.object(self.ws, "list_agents", side_effect=RuntimeError("boom")):
+            status, data, _ = self.call("GET", "/api/state")
+        self.assertEqual(status, 500)
+        self.assertNotIn("boom", data.decode())
+        self.assertTrue(any(r["event"] == "server-error" for r in self.ws.audit_log()))
+
+    def test_token_can_come_from_the_environment(self):
+        from unittest import mock
+
+        from kintsugi.workspace.server import load_token
+
+        with mock.patch.dict("os.environ", {"KINTSUGI_TOKEN": "chosen-by-me"}):
+            self.assertEqual(load_token(self.ws), "chosen-by-me")
 
 
 if __name__ == "__main__":

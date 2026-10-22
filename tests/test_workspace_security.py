@@ -7,6 +7,7 @@ from unittest import mock
 
 from kintsugi.model import MockModel
 from kintsugi.workspace import Workspace, perms
+from kintsugi.workspace.core import WorkspaceError
 from kintsugi.workspace.keychain import Keychain
 from kintsugi.workspace.sandbox import PathError, run_python, safe_path
 from kintsugi.workspace.tools import Ctx, execute
@@ -183,7 +184,7 @@ class TestToolExecution(unittest.TestCase):
         approval = self.ws.approvals()[0]
         self.assertEqual(self.ws.decide(approval["id"], True, by="niranjan"), "42")
         self.assertEqual(self.ws.approvals(), [])
-        self.assertIn("42", self.ws.history("general")[-1]["text"])
+        self.assertTrue(any(m["sender"] == "system" and "42" in m["text"] for m in self.ws.history("general")))
         with self.assertRaises(Exception):
             self.ws.decide(approval["id"], True)  # a decision can only be made once
 
@@ -242,3 +243,59 @@ class TestToolExecution(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHardening(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.ws = Workspace(self.tmp.name, model_factory=lambda n: MockModel(["ok"]), encrypt_keychain=False)
+        self.ws.create_agent("alice")
+        self.ws.create_room("general", ["alice", "you"])
+
+    def tearDown(self):
+        self.ws.close()
+        self.tmp.cleanup()
+
+    def test_nobody_can_post_as_the_workspace_or_a_cron_job(self):
+        for name in ("system", "cron-3"):
+            with self.assertRaises(WorkspaceError):
+                self.ws.post("general", name, "hi", human=True)
+        with self.assertRaises(WorkspaceError):
+            self.ws.create_agent("system")
+
+    def test_an_agent_cannot_post_a_secret_it_was_given(self):
+        self.ws.keychain.set("alice", "DEMO_KEY", "sk-very-secret-value")
+        self.ws.post("general", "alice", "the key is sk-very-secret-value")
+        self.assertEqual(self.ws.history("general")[-1]["text"], "the key is [secret:DEMO_KEY]")
+
+    def test_keychain_files_are_private(self):
+        import os
+        import stat
+
+        self.ws.keychain.set("alice", "DEMO_KEY", "sk-very-secret-value")
+        mode = stat.S_IMODE(os.stat(self.ws.keychain._path("alice")).st_mode)
+        self.assertEqual(mode, 0o600)
+
+    def test_denied_approval_wakes_the_agent_so_it_can_adapt(self):
+        model = MockModel(["Understood, I will not run it."])
+        self.ws._models["alice"] = model
+        approval = self.ws.request_approval("alice", "general", "run_python", {"code": "print(1)"})
+        self.ws.decide(approval, False)
+        self.assertEqual(self.ws.history("general")[-1]["text"], "Understood, I will not run it.")
+        self.assertIn("denied it", model.prompts[0][1]["content"])
+
+    def test_timeout_values_are_clamped(self):
+        from kintsugi.workspace.sandbox import run_python
+
+        folder = Path(self.tmp.name) / "run"
+        for bad in (-5, 0, float("nan")):
+            ok, out = run_python(folder, "print('fine')", timeout=bad)
+            self.assertEqual((ok, out), (True, "fine"))
+
+    def test_an_internal_bug_is_reported_in_the_room_not_swallowed(self):
+        def boom(name):
+            raise ZeroDivisionError("oops")
+
+        self.ws.model_factory = boom
+        self.ws.post("general", "you", "@alice hi")
+        self.assertIn("internal error", self.ws.history("general")[-1]["text"])

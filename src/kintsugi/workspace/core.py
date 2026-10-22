@@ -53,6 +53,10 @@ class Workspace:
         self._models: dict[str, Model] = {}
         self._agent_locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
         self._recent_runs: dict[str, deque] = defaultdict(deque)
+        self._lock = threading.Lock()  # guards the rate limiter and the busy set
+        self._busy: set[str] = set()
+        self._inflight = 0  # runs submitted to the pool and not finished yet
+        self._closing = False
         self._pending: deque = deque()  # sync mode: wake-ups queued so that runs never nest
         self._draining = False
         self._pool = None if sync else ThreadPoolExecutor(max_workers=4, thread_name_prefix="kintsugi-agent")
@@ -74,8 +78,8 @@ class Workspace:
     # --- agents ----------------------------------------------------------
 
     def create_agent(self, name: str, persona: str = "", tier: str = "auto", tools: list[str] | None = None) -> None:
-        if not NAME_RE.match(name):
-            raise WorkspaceError("names are lowercase letters, digits, '-' and '_' and start with a letter")
+        if not NAME_RE.match(name) or name == "system":
+            raise WorkspaceError("names are lowercase letters, digits, '-' and '_', start with a letter, and cannot be 'system'")
         if tier not in perms.TIERS:
             raise WorkspaceError(f"tier must be one of {', '.join(perms.TIERS)}")
         if self.get_agent(name, missing_ok=True):
@@ -173,7 +177,9 @@ class Workspace:
         if len(text) > MAX_MESSAGE_CHARS:
             raise WorkspaceError(f"messages are limited to {MAX_MESSAGE_CHARS} characters")
         is_agent = self.get_agent(sender, missing_ok=True) is not None
-        if human and (is_agent or not HUMAN_RE.match(sender)):
+        if is_agent:
+            text = self.keychain.redact(sender, text)  # an agent can never post a secret it has been given
+        if human and (is_agent or not HUMAN_RE.match(sender) or sender == "system" or sender.startswith("cron-")):
             raise WorkspaceError("that sender name is not available to people")
         if is_agent and sender not in self.members(room):
             raise WorkspaceError(f"agent '{sender}' is not a member of '{room}'")
@@ -195,15 +201,22 @@ class Workspace:
 
     def _dispatch(self, agent: str, room: str, message_id: int, hops: int) -> None:
         now = self.clock()
-        recent = self._recent_runs[agent]
-        while recent and now - recent[0] > 60:
-            recent.popleft()
-        if len(recent) >= MAX_RUNS_PER_MINUTE:
+        with self._lock:
+            recent = self._recent_runs[agent]
+            while recent and now - recent[0] > 60:
+                recent.popleft()
+            limited = len(recent) >= MAX_RUNS_PER_MINUTE
+            if not limited:
+                recent.append(now)
+        if limited:
             self.audit(agent, "rate-limited", room)
             return
-        recent.append(now)
         if not self.sync:
-            self._pool.submit(self._run, agent, room, message_id, hops)
+            with self._lock:
+                if self._closing:
+                    return
+                self._inflight += 1
+            self._pool.submit(self._run_async, agent, room, message_id, hops)
             return
         # Single-threaded mode: an agent's reply may wake another agent (or the same one again). Queue
         # the wake-up and let the outermost call work through the queue, so runs never nest.
@@ -220,13 +233,46 @@ class Workspace:
     def _run(self, agent: str, room: str, message_id: int, hops: int) -> None:
         from .agents import run_agent
 
-        with self._agent_locks[agent]:
-            try:
-                run_agent(self, agent, room, message_id, hops)
-            except (ModelInfraError, QuotaExhausted, ModelRequestError, RuntimeError) as err:
-                self.audit(agent, "run-error", f"{type(err).__name__}: {err}"[:300])
-                self.db.execute("INSERT INTO messages (room, sender, text, ts, hops) VALUES (?, 'system', ?, ?, ?)",
-                                (room, f"{agent} could not get an answer from the model: {err}"[:400], self.clock(), hops))
+        with self._lock:
+            self._busy.add(agent)
+        try:
+            with self._agent_locks[agent]:
+                try:
+                    run_agent(self, agent, room, message_id, hops)
+                except (ModelInfraError, QuotaExhausted, ModelRequestError, RuntimeError) as err:
+                    self._run_failed(agent, room, hops, f"{agent} could not get an answer from the model: {err}", err)
+                except Exception as err:  # a bug must show up in the room, never vanish on a worker thread
+                    self._run_failed(agent, room, hops, f"{agent} hit an internal error: {type(err).__name__}: {err}", err)
+        finally:
+            with self._lock:
+                self._busy.discard(agent)
+
+    def _run_async(self, agent: str, room: str, message_id: int, hops: int) -> None:
+        try:
+            self._run(agent, room, message_id, hops)
+        finally:
+            with self._lock:
+                self._inflight -= 1
+
+    def wait_idle(self, timeout: float = 30.0) -> bool:
+        """Block until no agent run is queued or running (worker-pool mode). Returns False on timeout."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            with self._lock:
+                if self._inflight == 0:
+                    return True
+            time.sleep(0.02)
+        return False
+
+    def _run_failed(self, agent: str, room: str, hops: int, notice: str, err: Exception) -> None:
+        self.audit(agent, "run-error", f"{type(err).__name__}: {err}"[:300])
+        self.db.execute("INSERT INTO messages (room, sender, text, ts, hops) VALUES (?, 'system', ?, ?, ?)",
+                        (room, notice[:400], self.clock(), hops))
+
+    def busy(self) -> list[str]:
+        """Agents that are working on a message right now."""
+        with self._lock:
+            return sorted(self._busy)
 
     # --- approvals -------------------------------------------------------
 
@@ -253,15 +299,20 @@ class Workspace:
                             (by, approval_id))
             self.audit(row["agent"], "approval-denied", f"#{approval_id} {row['tool']}")
             self.post_system(row["room"], f"#{approval_id}: {row['agent']} was not allowed to run {row['tool']}.")
+            self._resume(row, "A person denied it. Carry on without it, or ask what else would help.")
             return "denied"
         self.db.execute("UPDATE approvals SET status = 'approved', decided_by = ? WHERE id = ?", (by, approval_id))
         ctx = Ctx(self, row["agent"], row["room"], hops=0, situation=f"approval#{approval_id}")
         outcome = execute(ctx, row["tool"], json.loads(row["args"]), approved=True)
         self.db.execute("UPDATE approvals SET result = ? WHERE id = ?", (outcome.output[:2000], approval_id))
         self.audit(row["agent"], "approval-granted", f"#{approval_id} {row['tool']} -> {outcome.status}")
-        self.post_system(row["room"], f"#{approval_id}: {row['agent']} ran {row['tool']} ({outcome.status}): "
-                                      f"{outcome.output[:600]}")
+        self._resume(row, f"A person approved it and it finished ({outcome.status}). Output:\n{outcome.output[:1500]}")
         return outcome.output
+
+    def _resume(self, approval: dict, news: str) -> None:
+        """Wake the agent that asked, so it can use the result instead of leaving the task half done."""
+        text = f"@{approval['agent']} Your request to run {approval['tool']} (approval #{approval['id']}). {news}"
+        self.post(approval["room"], "system", text[:MAX_MESSAGE_CHARS])
 
     def post_system(self, room: str, text: str) -> None:
         """A notice from the workspace itself. It never wakes an agent."""
@@ -316,5 +367,8 @@ class Workspace:
 
     def close(self) -> None:
         if self._pool is not None:
+            self.wait_idle(15)  # let running conversations finish before refusing new wake-ups
+            with self._lock:
+                self._closing = True
             self._pool.shutdown(wait=True)
         self.db.close()

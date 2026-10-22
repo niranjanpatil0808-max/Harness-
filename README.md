@@ -89,14 +89,14 @@ export KINTSUGI_API_KEY=anything
 export KINTSUGI_MAX_TOKENS=4096                      # keep prompt + max_tokens under your per-minute limit
 ```
 
-**The workspace.**
+**The workspace** (agents with rooms, files, permissions, a keychain, schedules and web apps).
 
 ```bash
-python examples/workspace_demo.py            # offline tour
-kintsugi workspace init && kintsugi workspace agent alice && kintsugi workspace room team alice you
-kintsugi workspace say team "@alice hello"   # needs a model key, or add --mock before the subcommand
-kintsugi workspace serve                     # web UI on http://127.0.0.1:8765
+python examples/workspace_demo.py            # offline tour, no key needed (recording: docs/demo.html)
+kintsugi workspace serve                     # creates a starter team, prints a URL with your access token
 ```
+
+No computer? Open the repository in a **GitHub Codespace** (Code > Codespaces). It installs everything, starts the workspace and opens it in your browser, phone included. Add your model key as a Codespaces secret named `KINTSUGI_API_KEY` first (and `KINTSUGI_TOKEN` to choose your own access token). Details in [docs/WORKSPACE.md](docs/WORKSPACE.md).
 
 **Running the benchmark without a computer.** `.github/workflows/benchmark.yml` runs it on GitHub's servers. Add your key as the repository secret `KINTSUGI_API_KEY`, edit `benchmark/run.config` (base URL, then one `model|max_tokens|repeats|modes` entry per model) and push: the run starts and commits its results to `results/`. Rebuild the all-runs page with `python benchmark/build_results_md.py`.
 
@@ -185,7 +185,7 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 src/kintsugi/   model.py  verifier.py  loop.py  memory.py  graph.py  cli.py
 src/kintsugi/workspace/   core.py  agents.py  tools.py  perms.py  sandbox.py  keychain.py
                 scheduler.py  server.py  db.py  cli.py  web/index.html
-docs/WORKSPACE.md   examples/workspace_demo.py
+docs/WORKSPACE.md   docs/demo.html   examples/workspace_demo.py   .devcontainer/
 benchmark/      tasks/  solutions/  split.json  check_tasks.py  run_benchmark.py
                 run.config  build_results_md.py  run_notes.json
 results/        every measured run (JSON + table + lessons learned)

@@ -37,7 +37,7 @@ def scripted(replies):
 
 def show(ws, room, start=0):
     for m in ws.history(room, limit=100)[start:]:
-        print(f"  {m['sender']:>8}: {m['text']}")
+        print(f"  {m['sender']:>8}: {' '.join(m['text'].split())}")
     return len(ws.history(room, limit=100))
 
 
@@ -63,20 +63,23 @@ with tempfile.TemporaryDirectory() as tmp:
     print(f"  -> alice's lessons: {[l.text for l in lessons]}")
 
     print("\n2. A risky tool waits for approval; the secret is used but never shown")
-    script(tool("run_python", code="import os; print('key length', len(os.environ['DEMO_KEY']))", secrets=["DEMO_KEY"]))
+    script(tool("run_python", code="import os; print('key length', len(os.environ['DEMO_KEY']))", secrets=["DEMO_KEY"]),
+           "The demo key is 26 characters long.")
     ws.post("team", "you", "@alice check how long the demo key is")
+    pos = show(ws, "team", pos)
     approval = ws.approvals()[0]
     print(f"  -> approval #{approval['id']}: {approval['tool']} {approval['args'][:60]}...")
-    ws.decide(approval["id"], True)
+    ws.decide(approval["id"], True)  # the tool runs, then alice is woken with the result
     pos = show(ws, "team", pos)
     assert "sk-demo-super-secret-value" not in json.dumps(ws.history("team"))
 
     print("\n3. A web app published by an agent")
-    script(tool("publish_app", name="hello", html="<h1>Hello from alice</h1>"))
+    script(tool("publish_app", name="hello", html="<h1>Hello from alice</h1>"),
+           "Published. It is at /apps/alice/hello/.")
     ws.post("team", "you", "@alice publish a hello app")
     ws.decide(ws.approvals()[0]["id"], True)
     pos = show(ws, "team", pos)
-    print(f"  -> served at /apps/alice/hello/ ; file exists: {(ws.www_dir('alice') / 'hello' / 'index.html').exists()}")
+    print(f"  -> file exists: {(ws.www_dir('alice') / 'hello' / 'index.html').exists()}")
 
     print("\n4. Two agents talking in a room")
     script("@bob please review plan.txt")
@@ -84,9 +87,11 @@ with tempfile.TemporaryDirectory() as tmp:
     pos = show(ws, "team", pos)
 
     print("\n5. A scheduled job")
-    script(tool("schedule", cron="0 9 * * 1-5", prompt="post the daily standup"))
+    script(tool("schedule", cron="0 9 * * 1-5", prompt="post the daily standup"),
+           "Done: I will post the standup every weekday at 09:00.")
     ws.post("team", "you", "@alice schedule a weekday standup")
     ws.decide(ws.approvals()[0]["id"], True)
+    pos = show(ws, "team", pos)
     script("Good morning, standup time!")
     Scheduler(ws).tick(datetime(2026, 10, 26, 9, 0, 3).timestamp())
     pos = show(ws, "team", pos)

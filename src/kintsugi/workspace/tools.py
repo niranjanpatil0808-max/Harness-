@@ -154,7 +154,8 @@ def run_python_tool(ctx: Ctx, args: dict) -> str:
         env = ctx.ws.keychain.env_for(ctx.agent, names)
     except KeyError as err:
         raise ToolError(str(err.args[0])) from None
-    timeout = min(float(args.get("timeout", 10)), 30.0)
+    timeout = float(args.get("timeout", 10))
+    timeout = 10.0 if timeout != timeout else min(max(timeout, 1.0), 30.0)
     ok, output = run_python(ctx.ws.files_dir(ctx.agent), code, timeout=timeout, extra_env=env)
     if not ok:
         raise ToolError(output)
@@ -167,6 +168,9 @@ def publish_app(ctx: Ctx, args: dict) -> str:
         raise ToolError("app names are lowercase letters, digits, '-' and '_'")
     html = _text(args, "html")
     folder = ctx.ws.www_dir(ctx.agent) / name
+    existing = (folder / "index.html").stat().st_size if (folder / "index.html").is_file() else 0
+    if folder_size(ctx.ws.www_dir(ctx.agent)) - existing + len(html.encode()) > MAX_FOLDER_BYTES:
+        raise ToolError("your apps folder is full (5 MB limit)")
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "index.html").write_text(html)
     return f"published at /apps/{ctx.agent}/{name}/"

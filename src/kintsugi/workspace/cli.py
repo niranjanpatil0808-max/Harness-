@@ -14,7 +14,19 @@ from .core import Workspace, WorkspaceError
 
 def _open(args: argparse.Namespace) -> Workspace:
     factory = (lambda name: MockModel(["(mock model: I cannot really answer)"])) if args.mock else None
-    return Workspace(args.dir, model_factory=factory)
+    # the server must not run agents inside its request threads, so it uses a worker pool
+    return Workspace(args.dir, model_factory=factory, sync=args.wcmd != "serve")
+
+
+def seed(ws: Workspace) -> bool:
+    """A starter team so the first run is not an empty screen. Does nothing if agents already exist."""
+    if ws.list_agents():
+        return False
+    ws.create_agent("alice", persona="You are a friendly, careful general assistant.")
+    ws.create_agent("bob", persona="You review work and point out mistakes politely.")
+    ws.create_room("team", ["alice", "bob", "you"])
+    ws.post_system("team", "Welcome! Try: @alice write a short todo list into todo.txt   (risky tools wait for your approval)")
+    return True
 
 
 def add_parser(sub) -> None:
@@ -23,7 +35,7 @@ def add_parser(sub) -> None:
     ws.add_argument("--mock", action="store_true", help="offline mock model (answers are canned)")
     cmds = ws.add_subparsers(dest="wcmd", required=True)
 
-    cmds.add_parser("init", help="create the workspace folder")
+    cmds.add_parser("init", help="create the workspace folder with a starter team (alice, bob, room 'team')")
     serve = cmds.add_parser("serve", help="start the web UI and API")
     serve.add_argument("--port", type=int, default=8765)
     serve.add_argument("--host", default="127.0.0.1")
@@ -74,10 +86,12 @@ def run(args: argparse.Namespace) -> int:
     try:
         cmd = args.wcmd
         if cmd == "init":
-            print(f"workspace ready in {args.dir}")
+            print(f"workspace ready in {args.dir}" + (" with agents alice and bob in room 'team'" if seed(ws) else ""))
         elif cmd == "serve":
             from .server import serve
 
+            if seed(ws):
+                print("Empty workspace: created the starter team (alice, bob, room 'team').")
             serve(ws, args.host, args.port)
             return 0
         elif cmd == "agent":
@@ -114,7 +128,7 @@ def run(args: argparse.Namespace) -> int:
             for row in ws.audit_log(50):
                 print(f"{row['agent'] or '-':10} {row['event']:20} {row['detail']}")
         return 0
-    except WorkspaceError as err:
+    except (WorkspaceError, ValueError) as err:
         print(f"error: {err}")
         return 1
     finally:

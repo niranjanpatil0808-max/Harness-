@@ -1,0 +1,13 @@
+{
+  "name": "Kintsugi workspace",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12",
+  "postCreateCommand": "pip install -e . && python -m unittest discover -s tests 2>&1 | tail -3",
+  "postStartCommand": "nohup kintsugi workspace serve > /tmp/kintsugi.log 2>&1 &",
+  "forwardPorts": [8765],
+  "portsAttributes": {
+    "8765": { "label": "Kintsugi workspace", "onAutoForward": "openBrowser" }
+  },
+  "remoteEnv": {
+    "KINTSUGI_API_KEY": "${localEnv:KINTSUGI_API_KEY}"
+  }
+}

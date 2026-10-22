@@ -24,6 +24,16 @@ NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]{1,40}$")
 MIN_REDACT_LENGTH = 4
 
 
+def _write_private(path: Path, data: bytes) -> None:
+    """Write a file that is never readable by other users, not even for a moment."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.write(fd, data)
+    finally:
+        os.close(fd)
+    os.chmod(path, 0o600)  # also tightens a file that already existed
+
+
 class Keychain:
     def __init__(self, folder: Path, encrypt: bool | None = None) -> None:
         self.folder = Path(folder)
@@ -33,8 +43,7 @@ class Keychain:
         if self.encrypted:
             key_path = self.folder / ".key"
             if not key_path.exists():
-                key_path.write_bytes(Fernet.generate_key())
-                os.chmod(key_path, 0o600)
+                _write_private(key_path, Fernet.generate_key())
             self._fernet = Fernet(key_path.read_bytes())
 
     def _path(self, agent: str) -> Path:
@@ -53,9 +62,7 @@ class Keychain:
         raw = json.dumps(secrets).encode()
         if self._fernet is not None:
             raw = self._fernet.encrypt(raw)
-        path = self._path(agent)
-        path.write_bytes(raw)
-        os.chmod(path, 0o600)
+        _write_private(self._path(agent), raw)
 
     def set(self, agent: str, name: str, value: str) -> None:
         if not NAME_RE.match(name):

@@ -9,6 +9,7 @@ from __future__ import annotations
 import hmac
 import json
 import mimetypes
+import os
 import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -25,11 +26,20 @@ APP_CSP = ("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline
 
 
 def load_token(ws: Workspace) -> str:
+    """KINTSUGI_TOKEN if set (handy for Codespaces secrets), else a random one kept in the workspace folder."""
+    env = os.environ.get("KINTSUGI_TOKEN", "").strip()
+    if env:
+        return env
     path = ws.root / "token"
     if not path.exists():
         path.write_text(secrets.token_urlsafe(24))
         path.chmod(0o600)
     return path.read_text().strip()
+
+
+def _apps(ws: Workspace, agent: str) -> list[str]:
+    base = ws.www_dir(agent)
+    return sorted(p.name for p in base.iterdir() if (p / "index.html").is_file()) if base.is_dir() else []
 
 
 def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token: str | None = None) -> ThreadingHTTPServer:
@@ -77,27 +87,35 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8")
             if not self._authorized(query):
                 return self._json(401, {"error": "missing or wrong access token"})
-            try:
-                if url.path.startswith("/apps/"):
-                    return self._app(url.path)
-                self._json(200, self._get(url.path, query))
-            except (WorkspaceError, KeyError) as err:
-                self._json(400, {"error": str(err)})
+            self._guard(lambda: self._app(url.path) if url.path.startswith("/apps/")
+                        else self._json(200, self._get(url.path, query)))
 
         def do_POST(self):
             url = urlparse(self.path)
             if not self._authorized(parse_qs(url.query)):
                 return self._json(401, {"error": "missing or wrong access token"})
+            self._guard(lambda: self._json(200, self._post(url.path, self._body())))
+
+        def _guard(self, action) -> None:
+            """Turn every failure into a JSON error: 400 for bad requests, 500 (and an audit entry) for bugs."""
             try:
-                self._json(200, self._post(url.path, self._body()))
-            except (WorkspaceError, KeyError, ValueError) as err:  # json errors are ValueErrors too
-                self._json(400, {"error": str(err)})
+                action()
+            except (WorkspaceError, PathError, ValueError, KeyError, TypeError) as err:  # json errors are ValueErrors
+                message = f"missing field: {err}" if isinstance(err, KeyError) else str(err)
+                self._json(400, {"error": message})
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            except Exception as err:  # never drop the connection without an answer
+                ws.audit(None, "server-error", f"{type(err).__name__}: {err}")
+                self._json(500, {"error": "internal error (see the audit log)"})
 
         def _get(self, path: str, query: dict):
             if path == "/api/state":
-                return {"agents": [{k: a[k] for k in ("name", "persona", "tier", "tools")} for a in ws.list_agents()],
+                return {"agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools")},
+                                    "secrets": ws.keychain.names(a["name"]), "apps": _apps(ws, a["name"])}
+                                   for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"])} for r in ws.list_rooms()],
-                        "approvals": ws.approvals(), "jobs": ws.list_jobs()}
+                        "approvals": ws.approvals(), "jobs": ws.list_jobs(), "busy": ws.busy()}
             if path == "/api/messages":
                 room = query["room"][0]
                 return ws.history(room, after=int((query.get("after") or ["0"])[0]))
@@ -108,6 +126,13 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 ws.get_agent(agent)
                 base = ws.files_dir(agent)
                 return sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file())[:200]
+            if path == "/api/file":
+                agent = query["agent"][0]
+                ws.get_agent(agent)
+                target = safe_path(ws.files_dir(agent), query["path"][0])
+                if not target.is_file():
+                    raise WorkspaceError("no such file")
+                return {"path": query["path"][0], "text": target.read_text(errors="replace")[:100_000]}
             if path == "/api/lessons":
                 from kintsugi.memory import MemoryStore
 
@@ -171,8 +196,9 @@ def serve(ws: Workspace, host: str = "127.0.0.1", port: int = 8765) -> None:
     server = make_server(ws, host, port)
     scheduler = Scheduler(ws)
     scheduler.start()
-    print(f"Kintsugi workspace on http://{host}:{server.server_port}/")
-    print(f"Access token (also saved in {ws.root / 'token'}): {server.token}")  # type: ignore[attr-defined]
+    url = f"http://{host}:{server.server_port}/"
+    print(f"Kintsugi workspace is running.\n  Open: {url}#token={server.token}")  # type: ignore[attr-defined]
+    print(f"  (the access token is also saved in {ws.root / 'token'}; set KINTSUGI_TOKEN to choose your own)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

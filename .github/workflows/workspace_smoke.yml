@@ -1,0 +1,45 @@
+# Runs the workspace against a real model: a few tasks judged by files and numbers (see examples/workspace_smoke.py).
+# Needs the repository secret KINTSUGI_API_KEY. Starts when examples/smoke.config is pushed to this branch.
+name: workspace-smoke
+
+on:
+  push:
+    branches: [claude/ecstatic-cray-g930so]
+    paths: [examples/smoke.config]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install and run the offline tests
+        run: |
+          pip install -e .
+          python -m unittest discover -s tests
+      - name: Smoke test on the real model
+        env:
+          KINTSUGI_API_KEY: ${{ secrets.KINTSUGI_API_KEY }}
+        run: |
+          if [ -z "$KINTSUGI_API_KEY" ]; then
+            echo "Secret KINTSUGI_API_KEY is not set." >&2
+            exit 1
+          fi
+          set -a; . examples/smoke.config; set +a
+          python examples/workspace_smoke.py --out results/workspace_smoke.md || true
+      - name: Save the report to the branch
+        if: always()
+        run: |
+          git config user.name "kintsugi-smoke"
+          git config user.email "actions@users.noreply.github.com"
+          git add -f results/workspace_smoke.md
+          git commit -m "Add workspace smoke test report from run ${{ github.run_id }}" || exit 0
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"

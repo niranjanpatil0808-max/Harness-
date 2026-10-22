@@ -43,29 +43,35 @@ def folder_size(folder: Path) -> int:
     return sum(p.stat().st_size for p in folder.rglob("*") if p.is_file() and not p.is_symlink())
 
 
-def _limits(cpu_seconds: int, memory_mb: int):
-    """Resource limits applied in the child process (POSIX only)."""
-    def apply() -> None:
-        import resource
-
-        resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
-        resource.setrlimit(resource.RLIMIT_AS, (memory_mb * 1024 * 1024, memory_mb * 1024 * 1024))
-        resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_FILE_BYTES * 5, MAX_FILE_BYTES * 5))
-        os.setsid()
-    return apply
+# Starts the user's script after lowering this process's own limits. Done in the child instead of with
+# subprocess's preexec_fn, which Python documents as unsafe in a multi-threaded program (the server is one).
+LAUNCHER = """import resource, runpy, sys
+cpu, mem, fsize, script = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + 1))
+resource.setrlimit(resource.RLIMIT_AS, (mem, mem))
+resource.setrlimit(resource.RLIMIT_FSIZE, (fsize, fsize))
+sys.argv = [script]
+runpy.run_path(script, run_name="__main__")
+"""
 
 
 def run_python(folder: Path, source: str, timeout: float = 10.0, extra_env: dict[str, str] | None = None,
                memory_mb: int = 1024) -> tuple[bool, str]:
     """Run `source` with the agent's folder as the working directory. Returns (ok, output)."""
     folder.mkdir(parents=True, exist_ok=True)
+    timeout = min(max(float(timeout), 1.0), 60.0) if timeout == timeout else 10.0  # also handles NaN
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(folder), "LANG": "C.UTF-8",
            "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1", **(extra_env or {})}
     with tempfile.TemporaryDirectory(prefix="kw-run-") as tmp:
         script = Path(tmp) / "main.py"
         script.write_text(source)
-        kwargs = {"preexec_fn": _limits(int(timeout) + 2, memory_mb)} if os.name == "posix" else {}
-        proc = subprocess.Popen([sys.executable, "-B", str(script)], cwd=folder, env=env, text=True,
+        if os.name == "posix":
+            command = [sys.executable, "-B", "-c", LAUNCHER, str(int(timeout) + 2), str(memory_mb * 1024 * 1024),
+                       str(MAX_FILE_BYTES * 5), str(script)]
+            kwargs = {"start_new_session": True}  # its own process group, so a timeout can kill the whole tree
+        else:
+            command, kwargs = [sys.executable, "-B", str(script)], {}
+        proc = subprocess.Popen(command, cwd=folder, env=env, text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
         try:
             output, _ = proc.communicate(timeout=timeout)

@@ -121,7 +121,10 @@ class TestAgentRuns(unittest.TestCase):
         self.assertIn("I need approval", ws.history("general")[-1]["text"])
         approval = ws.approvals()[0]
         self.assertEqual(ws.decide(approval["id"], True), "42")
-        self.assertIn("42", ws.history("general")[-1]["text"])
+        self.assertTrue(any(m["sender"] == "system" and "42" in m["text"] for m in ws.history("general")))
+        # the agent is woken with the result and finishes the job
+        self.assertEqual(ws.history("general")[-1]["sender"], "alice")
+        self.assertIn("approved it", model.prompts[-1][1]["content"])
         # a run that is waiting has no outcome, so nothing was learned or punished
         self.assertEqual(MemoryStore.load(ws.lessons_path("alice")).lessons, [])
         ws.close()
@@ -159,6 +162,29 @@ class TestAgentRuns(unittest.TestCase):
         self.assertEqual(len(ws.search_notes("alice", "tea")), 1)
         self.assertNotEqual(ws.files_dir("alice"), ws.files_dir("bob"))
         ws.close()
+
+
+class TestConcurrency(unittest.TestCase):
+    def test_two_agents_pinging_each_other_in_worker_mode_stop_by_themselves(self):
+        import threading
+
+        with tempfile.TemporaryDirectory() as tmp:
+            models = {"a": MockModel(lambda m: "@b ping"), "b": MockModel(lambda m: "@a pong"), "c": MockModel(lambda m: "ok")}
+            ws = Workspace(tmp, model_factory=lambda n: models[n], sync=False, encrypt_keychain=False)
+            for name in "abc":
+                ws.create_agent(name)
+            ws.create_room("r", ["a", "b", "c", "you"])
+            threads = [threading.Thread(target=lambda i=i: ws.post("r", "you", f"@a @c hello {i}", human=True))
+                       for i in range(15)]
+            [t.start() for t in threads]
+            [t.join() for t in threads]
+            self.assertTrue(ws.wait_idle(20))
+            messages = ws.history("r", limit=1000)
+            self.assertLessEqual(max(m["hops"] for m in messages), 4)
+            self.assertLessEqual(sum(1 for m in messages if m["sender"] == "a"), 20)  # rate limit per minute
+            self.assertEqual(sum(1 for m in messages if m["sender"] == "c"), 15)  # others are not starved
+            self.assertEqual([m for m in messages if m["sender"] == "system"], [])  # no errors
+            ws.close()
 
 
 class TestCron(unittest.TestCase):
