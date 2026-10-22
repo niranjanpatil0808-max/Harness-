@@ -110,8 +110,33 @@ def decrypt(blob: bytes, passphrase: str) -> bytes:
 
 # --- packing the workspace -------------------------------------------------------------
 
-def snapshot(ws: "Workspace") -> bytes:
+META_NAME = "backup.meta.json"
+STALE_SECONDS = 6 * 3600  # a backup this much older than the newest one in GitHub looks like a replayed old file
+
+
+def next_counter(ws: "Workspace") -> int:
+    try:
+        return int(ws.get_setting("backup_counter", "0") or 0) + 1
+    except ValueError:
+        return 1
+
+
+def read_meta(data: bytes) -> dict | None:
+    """The backup number and time stored inside a (decrypted) backup, or None for one made before this existed."""
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
+            member = next((m for m in tar.getmembers() if m.name == META_NAME and m.isreg() and m.size < 4096), None)
+            if member is None:
+                return None
+            meta = json.loads(tar.extractfile(member).read())
+        return {"counter": int(meta["counter"]), "created": float(meta["created"])} if isinstance(meta, dict) else None
+    except (tarfile.TarError, OSError, ValueError, KeyError, TypeError, EOFError):
+        return None
+
+
+def snapshot(ws: "Workspace", counter: int | None = None) -> bytes:
     """One consistent tar.gz of the workspace: a safe copy of the database plus every folder (not the access token)."""
+    counter = next_counter(ws) if counter is None else counter
     with tempfile.TemporaryDirectory(prefix="kw-backup-") as tmp:
         copy = Path(tmp) / "workspace.db"
         target = sqlite3.connect(str(copy))
@@ -121,6 +146,10 @@ def snapshot(ws: "Workspace") -> bytes:
         buffer = io.BytesIO()
         with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
             tar.add(copy, arcname="workspace.db")
+            meta = json.dumps({"counter": counter, "created": ws.clock()}).encode()
+            info = tarfile.TarInfo(META_NAME)
+            info.size, info.mtime, info.mode = len(meta), int(ws.clock()), 0o600
+            tar.addfile(info, io.BytesIO(meta))
             for item in sorted(ws.root.iterdir()):
                 if item.name in SKIP or item.name.startswith("workspace.db") or item.is_symlink():
                     continue
@@ -142,7 +171,7 @@ def _safe_members(tar: tarfile.TarFile):
 def unpack(data: bytes, root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
-        members = list(_safe_members(tar))
+        members = [m for m in _safe_members(tar) if m.name != META_NAME]
         tar.extractall(root, members=members, filter="data") if hasattr(tarfile, "data_filter") else tar.extractall(root, members=members)  # noqa: S202 - every member was checked above (no links, devices or escapes)
     lock_down(root)
 
@@ -219,6 +248,18 @@ def download(cfg: dict) -> bytes | None:
     return _api(cfg, "GET", f"/repos/{cfg['repo']}/contents/{cfg['path']}", raw=True, timeout=120.0)
 
 
+def remote_modified(cfg: dict) -> float | None:
+    """When GitHub last committed the backup file (best effort: None if it cannot be told)."""
+    from datetime import datetime
+
+    try:
+        commits = _api(cfg, "GET", f"/repos/{cfg['repo']}/commits?path={cfg['path']}&per_page=1")
+        stamp = commits[0]["commit"]["committer"]["date"]
+        return datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
+    except (BackupError, KeyError, IndexError, TypeError, ValueError):
+        return None
+
+
 def restore_if_empty(root: Path, say=print) -> bool:
     """At startup: if this workspace folder is empty and backups are configured, bring the backup back. Returns True if restored."""
     cfg = config()
@@ -229,7 +270,21 @@ def restore_if_empty(root: Path, say=print) -> bool:
         if blob is None:
             say("Backups are on, but there is no backup in the repository yet. Starting fresh.")
             return False
-        unpack(decrypt(blob, cfg["passphrase"]), Path(root))
+        data = decrypt(blob, cfg["passphrase"])
+        meta = read_meta(data)
+        newest = remote_modified(cfg)
+        if meta and newest and newest - meta["created"] > STALE_SECONDS and os.environ.get("KINTSUGI_BACKUP_ACCEPT_OLD") != "1":
+            raise BackupError(f"the backup file in GitHub was made {time.strftime('%Y-%m-%d %H:%M', time.gmtime(meta['created']))} UTC but was committed much later "
+                              f"({time.strftime('%Y-%m-%d %H:%M', time.gmtime(newest))} UTC): it may be an old copy put back. Nothing was restored. "
+                              "If you are sure, set KINTSUGI_BACKUP_ACCEPT_OLD=1 and start again")
+        unpack(data, Path(root))
+        if meta:
+            conn = sqlite3.connect(str(Path(root) / "workspace.db"))
+            try:
+                conn.execute("INSERT INTO settings (key, value) VALUES ('backup_counter', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", (str(meta["counter"]),))
+                conn.commit()
+            finally:
+                conn.close()
     except (BackupError, OSError, tarfile.TarError, EOFError, ValueError) as err:  # a damaged backup must never stop the server from starting
         say(f"Could not restore the backup: {err}. Starting fresh; nothing was overwritten.")
         return False
@@ -267,7 +322,7 @@ class Backups:
     def fingerprint(self) -> str:
         """Cheap 'has anything changed?' value: newest rows plus the size and age of every file."""
         db = self.ws.db
-        settings = db.query("SELECT key, value FROM settings WHERE key != 'backup_last' ORDER BY key")
+        settings = db.query("SELECT key, value FROM settings WHERE key NOT IN ('backup_last', 'backup_counter') ORDER BY key")
         parts = [db.one("SELECT COALESCE(MAX(id), 0) AS n FROM messages")["n"], db.one("SELECT COUNT(*) AS n FROM notes")["n"],
                  db.one("SELECT COALESCE(MAX(id), 0) AS n FROM audit WHERE event NOT LIKE 'backup%'")["n"],
                  [(r["key"], r["value"]) for r in settings], [tuple(r.values()) for r in db.query("SELECT * FROM agents ORDER BY name")]]
@@ -276,6 +331,23 @@ class Backups:
                 stat = path.stat()
                 parts.append((path.name, stat.st_size, int(stat.st_mtime)))
         return repr(parts)
+
+    def _check_remote(self, cfg: dict, counter: int) -> None:
+        """Do not overwrite a backup that is newer than anything this workspace has written, or one it cannot read: that means another
+        copy of the workspace is writing to the same place, or this one is a fresh start about to erase a real backup."""
+        if os.environ.get("KINTSUGI_BACKUP_OVERWRITE") == "1":
+            return
+        remote = download(cfg)
+        if remote is None:
+            return
+        try:
+            meta = read_meta(decrypt(remote, cfg["passphrase"]))
+        except BackupError:
+            raise BackupError("the backup already in GitHub cannot be read with this passphrase, so it was not overwritten. Use the same passphrase, "
+                              "or set KINTSUGI_BACKUP_OVERWRITE=1 to replace it on purpose") from None
+        if meta and meta["counter"] >= counter:
+            raise BackupError(f"the backup in GitHub (#{meta['counter']}) is newer than this workspace's last one (#{counter - 1}); another copy of the workspace may "
+                              "be writing to it, or this workspace is a fresh start. It was not overwritten. Restore from it, or set KINTSUGI_BACKUP_OVERWRITE=1 to replace it on purpose")
 
     def run(self, force: bool = False) -> dict:
         """Back up now (blocking). Records the outcome; never raises."""
@@ -287,8 +359,11 @@ class Backups:
             if not force and self.fingerprint() == self._last_print:
                 return {**result, "ok": True, "error": "nothing changed since the last backup"}
             before = self.fingerprint()  # taken first: anything that changes during the upload triggers the next backup
-            blob = encrypt(snapshot(self.ws), cfg["passphrase"])
+            counter = next_counter(self.ws)
+            self._check_remote(cfg, counter)
+            blob = encrypt(snapshot(self.ws, counter), cfg["passphrase"])
             upload(cfg, blob)
+            self.ws.set_setting("backup_counter", str(counter))
             self._last_print = before
             result.update(ok=True, bytes=len(blob))
             self.ws.audit(None, "backup-ok", f"{len(blob)} bytes")

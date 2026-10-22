@@ -76,7 +76,15 @@ function md(text) {
   // Text from a model or a person must never be able to restyle or imitate the app (hide an approval card, cover the screen, fake a form):
   // no <style>, forms, frames or inline styles, and no ids/classes that the app's own styles or scripts could be matched by.
   box.innerHTML = DOMPurify.sanitize(marked.parse(text, {gfm: true, breaks: true}), {FORBID_TAGS: ["style", "form", "input", "button", "select", "textarea", "link", "meta", "iframe", "frame", "object", "embed", "svg", "math", "base", "title"], FORBID_ATTR: ["style", "id", "name", "class", "form", "formaction"]});
-  box.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener noreferrer"; });
+  box.querySelectorAll("a").forEach((a) => {
+    a.target = "_blank"; a.rel = "noopener noreferrer nofollow";
+    let url; try { url = new URL(a.getAttribute("href") || "", location.href); } catch (e) { url = null; }
+    if (!url || !/^https?:$/.test(url.protocol)) { a.removeAttribute("href"); return; }  // mailto:, tel:, data: and the like are not followed from chat text
+    // a link whose words differ from where it goes (the way a phishing link hides) shows its real host
+    const said = (a.textContent || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "");
+    const host = url.hostname.replace(/^www\./, "");
+    if (url.origin !== location.origin && !said.startsWith(host)) a.after(h("span", {class: "linkhost", title: url.href}, " (" + host + ")"));
+  });
   box.querySelectorAll("pre").forEach((pre) => {
     const code = pre.textContent;
     pre.append(h("button", {class: "copy", "aria-label": "Copy code", onclick: async (e) => {
@@ -610,10 +618,10 @@ function inviteLinkDialog(made) {
   dialog("Invite link ready", "Send it privately to one person. It works once, for " + Math.round((made.expires - Date.now() / 1000) / 86400) + " days, and joins them as " + made.role + (made.rooms.length ? " in: " + made.rooms.join(", ") : "") + ". Anyone who has the link can join, so do not post it publicly.",
     h("div", {}, box), (close) => [h("button", {class: "btn", onclick: async () => { try { await navigator.clipboard.writeText(link); toast("Copied"); } catch (e) { box.select(); toast("Press copy on your keyboard"); } }}, "Copy link"), h("button", {class: "btn primary", onclick: close}, "Done")]);
 }
-function signInLinkDialog(name, token) {
-  const link = location.origin + "/#token=" + encodeURIComponent(token);
+function signInLinkDialog(name, code) {
+  const link = location.origin + "/#signin=" + encodeURIComponent(code);
   const box = h("input", {type: "text", readonly: true, value: link, "aria-label": "Sign-in link", onfocus: (e) => e.target.select()});
-  dialog("New sign-in for " + name, "Send this link to " + name + " privately. It is shown only once; anyone with it can sign in as them.", box,
+  dialog("New sign-in for " + name, "Send this link to " + name + " privately. It works once and expires in a day; their old sign-in already stopped working.", box,
     (c) => [h("button", {class: "btn", onclick: () => copyText(link)}, "Copy link"), h("button", {class: "btn primary", onclick: c}, "Done")]);
 }
 async function teamPanel() {
@@ -621,7 +629,7 @@ async function teamPanel() {
   const rows = [h("div", {class: "card", style: "display:flex;gap:8px;align-items:center"}, h("strong", {style: "flex:1"}, isOwner() ? "you" : "the owner"), h("span", {class: "muted"}, "owner"))].concat(d.users.map((u) => h("div", {class: "card", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"},
     h("strong", {style: "flex:1"}, u.name), isOwner() ? h("select", {"aria-label": "Role of " + u.name, onchange: async (e) => { await act(() => api("/api/team/role", {name: u.name, role: e.target.value}), u.name + " is now " + e.target.value); await refresh(); }}, ["member", "admin"].map((r) => h("option", {value: r, selected: u.role === r}, r))) : h("span", {class: "muted"}, u.role),
     h("span", {class: "muted", style: "font-size:12px"}, u.last_seen ? "seen " + new Date(u.last_seen * 1000).toLocaleDateString() : "not yet"),
-    isOwner() ? h("button", {class: "btn", onclick: () => confirmDialog("Reset " + u.name + "'s sign-in?", "Their current sign-in stops working at once. You get a new private link to send them.", "Reset", async () => { try { const r = await api("/api/team/reset", {name: u.name}); signInLinkDialog(u.name, r.token); } catch (e) { toast(e.message, true); } })}, "Reset sign-in") : null,
+    isOwner() ? h("button", {class: "btn", onclick: () => confirmDialog("Reset " + u.name + "'s sign-in?", "Their current sign-in stops working at once. You get a new private link to send them.", "Reset", async () => { try { const r = await api("/api/team/reset", {name: u.name}); signInLinkDialog(u.name, r.code); } catch (e) { toast(e.message, true); } })}, "Reset sign-in") : null,
     (isOwner() || u.role === "member") ? h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + u.name + "?", "Their sign-in stops working at once. Their messages stay in the rooms.", "Remove", async () => { await act(() => api("/api/team/remove", {name: u.name}), u.name + " removed"); await refresh(); })}, "Remove") : null)));
   const role = h("select", {"aria-label": "Invite as"}, [["member", "Member"]].concat(isOwner() ? [["admin", "Admin"]] : []).map(([v, l]) => h("option", {value: v}, l)));
   const rooms = d.rooms.map((r) => h("label", {style: "display:flex;gap:8px;align-items:center;font-weight:400"}, h("input", {type: "checkbox", value: r, checked: r === "team", style: "width:auto", "aria-label": "Add to " + r}), r));
@@ -1092,6 +1100,20 @@ async function confirmSignIn(incoming) {
     (close) => [h("button", {class: "btn", onclick: () => { close(); poll(true); }}, S.firstSignIn ? "Cancel" : "Keep my current sign-in"), h("button", {class: "btn primary", onclick: () => { S.token = incoming; store.set("kt-token", incoming); try { sessionStorage.setItem("kt", incoming); } catch (e) { /* ok */ } close(); poll(true); }}, "Sign in as " + who)],
     () => poll(true));
 }
+async function redeemSignin(code) {
+  const go = async () => {
+    try {
+      const r = await api("/api/signin", {code});
+      S.token = r.token; store.set("kt-token", r.token); try { sessionStorage.setItem("kt", r.token); } catch (e) { /* ok */ }
+      toast("Signed in as " + r.name);
+    } catch (e) { toast(e.message, true); }
+    poll(true);
+  };
+  if (!S.token) { await go(); return; }
+  // this browser is already signed in as someone: a link must never swap that silently (and the code is only used up if they agree)
+  dialog("Switch account?", "This browser is signed in already. This link signs you in as another person and replaces that. Only continue if the link was made for you.", h("div", {}),
+    (close) => [h("button", {class: "btn", onclick: () => { close(); poll(true); }}, "Keep my current sign-in"), h("button", {class: "btn primary", onclick: async () => { close(); await go(); }}, "Sign in with this link")], () => poll(true));
+}
 const lowerName = (e) => { e.target.value = e.target.value.toLowerCase().replace(/\s+/g, "-"); };  // names are lowercase everywhere: fix it as people type
 function joinDialog(code) {
   const name = h("input", {type: "text", placeholder: "your name, e.g. sam", "aria-label": "Your name", autocapitalize: "none", autocomplete: "off", oninput: lowerName});
@@ -1115,6 +1137,8 @@ function init() {
   const inv = location.hash.match(/invite=([^&]+)/);
   if (inv) { S.invite = decodeURIComponent(inv[1]); history.replaceState(null, "", location.pathname); }
   if (new URLSearchParams(location.search).get("action") === "new") { S.wantNew = true; history.replaceState(null, "", location.pathname + location.hash); }
+  const sc = location.hash.match(/signin=([^&]+)/);
+  if (sc) { S.signinCode = decodeURIComponent(sc[1]); history.replaceState(null, "", location.pathname); }
   const m = location.hash.match(/token=([^&]+)/);
   S.token = store.get("kt-token") || "";
   if (m) {
@@ -1130,6 +1154,7 @@ function init() {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { syncUnread(); poll(true); } });
   buildComposer(); syncVoiceButtons(); $("#sidebar").replaceChildren(h("div", {class: "brand"}, h("img", {src: "/static/logo.svg", alt: ""}), "Kintsugi"));
   if (S.invite) { S.token = ""; joinDialog(S.invite); return; }  // an invite link: choose a name first
+  if (S.signinCode) { redeemSignin(S.signinCode); return; }
   if (S.pendingToken) { confirmSignIn(S.pendingToken); return; }
   poll(true);
 }

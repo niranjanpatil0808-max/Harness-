@@ -56,19 +56,20 @@ const OWNER = 'tok123';
   // the owner can remove sam, who is then locked out
   await owner.click('button[aria-label="Settings"]'); await owner.click('.set-item:has-text("Team")');
   await owner.waitForSelector('strong:has-text("sam")');
-  // reset sam's sign-in: the old token stops, the new link works
+  // reset sam's sign-in: the old key stops, the link carries a one-time code (never a key), and works once
   await owner.click('.card:has-text("sam") .btn:has-text("Reset sign-in")'); await owner.click('.overlay:last-child .btn.primary');
   const fresh = await owner.inputValue('input[aria-label="Sign-in link"]');
+  if (!/#signin=sc_/.test(fresh) || /token=/.test(fresh)) errs.push('sign-in link should carry a one-time code: ' + fresh);
   await owner.click('.overlay:last-child .btn.primary:has-text("Done")');
   await member.reload();
   await member.waitForSelector('input[aria-label="Access token"]', { timeout: 8000 }).catch(() => errs.push('old sign-in still works after reset'));
   const sam2 = await (await b.newContext()).newPage();
-  await sam2.goto(fresh); await sam2.waitForSelector('#sidebar .brand', { state: 'attached' });
-  // a link never signs you in silently as someone else: it names the account first
-  await sam2.waitForSelector('.dialog[aria-label^="Sign in as sam"]', { timeout: 8000 }).catch(() => errs.push('no confirmation before signing in from a link'));
-  await sam2.click('.dialog .btn.primary:has-text("Sign in as sam")');
-  await sam2.waitForSelector('#sidebar .item:has-text("team")', { state: 'attached', timeout: 8000 }).catch(() => errs.push('new sign-in link does not load the workspace'));
+  await sam2.goto(fresh);
+  await sam2.waitForSelector('#sidebar .item:has-text("team")', { state: 'attached', timeout: 10000 }).catch(() => errs.push('the sign-in link does not load the workspace'));
   if (await sam2.locator('input[aria-label="Access token"]').count()) errs.push('new sign-in link does not work');
+  const again2 = await (await b.newContext()).newPage();
+  await again2.goto(fresh);
+  await again2.waitForSelector('#toast.err', { timeout: 8000 }).catch(() => errs.push('a used sign-in link was not refused'));
   await owner.click('.card:has-text("sam") .btn.danger:has-text("Remove")'); await owner.click('.overlay:last-child .btn.primary');
   await owner.waitForSelector('text=sam removed', { timeout: 6000 }).catch(() => {});
   await sam2.reload();

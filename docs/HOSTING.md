@@ -52,6 +52,7 @@ you control sets `X-Forwarded-For`.
 | `KINTSUGI_DAILY_CALLS` | Model calls per day for the whole workspace (default 500, `0` = no cap). |
 | `KINTSUGI_SANDBOX` | `auto` (default) or `require` (disable `run_python` when code cannot be isolated). |
 | `KINTSUGI_BACKUP_REPO`, `KINTSUGI_BACKUP_TOKEN`, `KINTSUGI_BACKUP_PASSPHRASE`, `KINTSUGI_BACKUP_EVERY_MINUTES`, `KINTSUGI_BACKUP_PATH` | Encrypted backup to a private GitHub repo (see above). |
+| `KINTSUGI_BACKUP_OVERWRITE=1`, `KINTSUGI_BACKUP_ACCEPT_OLD=1` | Only for emergencies: replace a newer or unreadable backup on purpose, or restore a backup that looks like an old copy put back (see "Backup safety checks"). |
 | `KINTSUGI_WORKSPACE` | Where data lives (`/data` in the image). |
 | `PORT`, `KINTSUGI_HOST` | Where to listen (`0.0.0.0` in the image). |
 
@@ -86,3 +87,17 @@ How it behaves, honestly:
 - Back up with Details > Safety > Download everything. Delete data any time from the same place.
 - If you see "not isolated", the platform blocked the isolation tools; either accept that (you approve every run),
   or set `KINTSUGI_SANDBOX=require` so `run_python` stays off.
+
+
+## Backup safety checks
+
+Each backup carries a number and a time inside the encrypted file. Because of that:
+
+- **A second copy cannot silently overwrite your backup.** If the backup in GitHub is newer than this workspace's last one (for example an old
+  Render service you forgot is still running, or a fresh workspace pointed at a repository that already holds a real backup), the upload is
+  refused and the Backup panel says so. Restore from it, or set `KINTSUGI_BACKUP_OVERWRITE=1` to replace it on purpose. A backup that cannot be
+  read with the current passphrase is not overwritten either.
+- **An old backup put back is noticed.** On an empty disk, a restore refuses a backup that GitHub shows as committed much more than 6 hours
+  after the time written inside it (a sign someone put an older file in its place). Set `KINTSUGI_BACKUP_ACCEPT_OLD=1` to restore anyway.
+- Limits: someone with write access to the backup repository *and* the passphrase can still do harm, and the date check relies on GitHub's
+  commit dates. Backups made before this check existed carry no number and are accepted as before.

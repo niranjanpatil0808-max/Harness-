@@ -193,6 +193,7 @@ class Team:
             if room["kind"] == "dm" and name in self.ws.members(room["name"]):
                 self.ws.delete_room(room["name"])
         self.ws.db.execute("DELETE FROM invites WHERE created_by = ? AND used_by IS NULL", (name,))  # their open invites must not outlive them
+        self.ws.db.execute("DELETE FROM signin_codes WHERE user = ?", (name,))
         self.ws.db.execute("DELETE FROM users WHERE name = ?", (name,))
         self.ws.db.execute("DELETE FROM members WHERE member = ?", (name,))
         self.ws.db.execute("DELETE FROM push_subs WHERE user = ?", (name,))
@@ -214,17 +215,42 @@ class Team:
             self.ws.db.execute("DELETE FROM invites WHERE created_by = ? AND used_by IS NULL", (name,))  # a demoted admin's open invites (some for admins) go too
         self.ws.audit(None, "role-changed", f"{name} -> {role}")
 
+    SIGNIN_TTL = 24 * 3600
+
     def reset_token(self, by: Identity, name: str) -> str:
-        """Give a person a new sign-in (they lost theirs or signed out everywhere). Admins can do this for members; the owner for anyone."""
+        """Make a person's current sign-in stop working and return a one-time code that signs them in again (they lost theirs or signed out
+        everywhere). The code works once, expires in a day, and is never their key: redeeming it makes a fresh key that appears only in the
+        person's own browser, so a link left in chat or history is useless afterwards. Only the owner can do this."""
         user = self.get(name)
         if user is None:
             raise TeamError("no such person")
         if by.role != "owner":  # a new sign-in opens the person's private chats, so only the owner (who can read them anyway) may make one
             raise TeamError("only the owner can reset someone's sign-in")
-        token = self._new_token()
-        self.ws.db.execute("UPDATE users SET token_hash = ? WHERE name = ?", (_hash(token), name))
+        code = "sc_" + secrets.token_urlsafe(24)
+        now = self.ws.clock()
+        self.ws.db.execute("UPDATE users SET token_hash = ? WHERE name = ?", (_hash(self._new_token()), name))  # nobody knows this key: the old one is dead
+        self.ws.db.execute("DELETE FROM signin_codes WHERE user = ?", (name,))
+        self.ws.db.execute("INSERT INTO signin_codes (code_hash, user, created_by, created, expires) VALUES (?, ?, ?, ?, ?)",
+                           (_hash(code), name, by.name, now, now + self.SIGNIN_TTL))
         self.ws.audit(None, "token-reset", f"{name} by {by.name}")
-        return token
+        return code
+
+    def redeem_signin(self, code: str) -> dict:
+        row = self.ws.db.one("SELECT * FROM signin_codes WHERE code_hash = ?", (_hash(code or ""),))
+        if row is None or row["used"] or row["expires"] <= self.ws.clock():
+            raise TeamError("this sign-in link is not valid any more (it was used or expired). Ask the owner for a new one")
+        user = self.get(row["user"])
+        if user is None:
+            raise TeamError("this sign-in link is not valid any more")
+        token = self._new_token()
+        with self.ws.db.lock:  # claim the code and set the new key together: a link can never be used twice
+            claimed = self.ws.db.conn.execute("UPDATE signin_codes SET used = 1 WHERE code_hash = ? AND used = 0", (row["code_hash"],)).rowcount
+            if not claimed:
+                raise TeamError("this sign-in link was just used")
+            self.ws.db.conn.execute("UPDATE users SET token_hash = ? WHERE name = ?", (_hash(token), row["user"]))
+            self.ws.db.conn.commit()
+        self.ws.audit(None, "signin-redeemed", row["user"])
+        return {"name": row["user"], "role": user["role"], "token": token}
 
     def rotate_token(self, name: str) -> str:
         if self.get(name) is None:

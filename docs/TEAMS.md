@@ -65,9 +65,12 @@ real models yet.
 
 ## Signing in again
 
-If someone loses their sign-in, the **owner** opens Settings > Team > *Reset sign-in* for that person and sends them the new link
-privately (shown once). Admins cannot do this, because a new sign-in would let them read that person's private chats. A sign-in link
-opened in a browser names the account and asks before signing in (except the owner's own link on a new device).
+If someone loses their sign-in, the **owner** opens Settings > Team > *Reset sign-in* for that person. Their old sign-in stops working at
+once, and the owner gets a link to send them privately. The link carries a **one-time code**, not their key: it works once, expires in a
+day, and opening it makes a fresh key that exists only in that person's browser, so a link left in a chat or browser history is useless
+afterwards. Admins cannot do this, because a new sign-in would let them read that person's private chats. If a browser is already signed in
+as someone, opening a link asks before switching accounts. (The owner's own link, printed when the server starts, is still the permanent
+owner key: keep it private.)
 
 ## Who can approve a risky action
 

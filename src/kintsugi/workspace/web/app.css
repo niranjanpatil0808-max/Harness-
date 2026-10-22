@@ -264,3 +264,4 @@ kbd{margin-left:auto;font:600 11px var(--sans);color:var(--muted);border:1px sol
 @media(max-width:700px){.task-row{grid-template-columns:1fr}}
 .bubble.shared{white-space:normal}.bubble.shared blockquote{margin:6px 0 0;padding-left:10px;border-left:3px solid var(--accent)}
 .mini.rate.on{background:color-mix(in srgb,var(--accent) 22%,transparent);border-color:var(--accent)}
+.linkhost{font-size:12px;color:var(--muted);white-space:nowrap}

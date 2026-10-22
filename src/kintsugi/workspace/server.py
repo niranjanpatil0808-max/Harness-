@@ -194,8 +194,10 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
 
         def do_POST(self):
             url = urlparse(self.path)
-            if url.path == "/api/join":  # the one call that needs no token: an invite code turns into a person
+            if url.path == "/api/join":  # the calls that need no token: an invite code turns into a person, a sign-in code into a sign-in
                 return self._guard(lambda: self._json(200, self._join(self._body())))
+            if url.path == "/api/signin":
+                return self._guard(lambda: self._json(200, self._signin(self._body())))
             if not self._authorized():
                 return self._json(401, {"error": "missing or wrong access token"})
             self._guard(lambda: self._json(200, self._post(url.path, self._body(2_200_000 if url.path == "/api/upload" else MAX_BODY))), url.path)
@@ -251,6 +253,25 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 raise Forbidden("you are not in that room")
             if agent not in ws.members(room) and ws._require_room(room)["kind"] != "dm":
                 raise WorkspaceError(f"{agent} is not in that room")
+
+        def _throttled(self, redeem):
+            """Public endpoints: wrong codes count against the same per-client throttle as wrong tokens."""
+            client, now = self._client(), time.time()
+            with failure_lock:
+                recent = [t for t in failures.get(client, []) if now - t < FAILURE_WINDOW]
+                failures[client] = recent
+                if len(recent) >= MAX_FAILURES:
+                    raise Forbidden("too many tries; wait a minute")
+            try:
+                return redeem()
+            except TeamError:
+                with failure_lock:
+                    failures.setdefault(client, []).append(now)
+                raise
+
+        def _signin(self, body: dict) -> dict:
+            """Public endpoint: redeem a one-time sign-in code (made by the owner's Reset sign-in)."""
+            return self._throttled(lambda: ws.team.redeem_signin(str(body.get("code", ""))))
 
         def _join(self, body: dict) -> dict:
             """Public endpoint: redeem an invite. Wrong codes count against the same per-client throttle as wrong tokens."""
@@ -484,7 +505,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
 
                 return templates.apply(ws, str(body["id"]), self.who.name)
             if path == "/api/team/reset":
-                return {"token": ws.team.reset_token(self.who, str(body["name"]))}
+                return {"code": ws.team.reset_token(self.who, str(body["name"]))}
             if path == "/api/me/profile/save":
                 me_name = "you" if self.who.role == "owner" else self.who.name
                 action = str(body.get("action") or "save")
@@ -688,7 +709,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     raise WorkspaceError(str(err))
                 return {"started": ws.improver.start(kind)}
             if path == "/api/improve/decide":
-                return ws.improver.decide(int(body["id"]), bool(body["accept"]), by="web")
+                return ws.improver.decide(int(body["id"]), bool(body["accept"]), by=self.who.name if self.who.role != "owner" else "you")
             if path == "/api/improve/revert":
                 return {"reverted": ws.improver.revert(str(body["agent"]), str(body["kind"]))}
             if path == "/api/agent/model":

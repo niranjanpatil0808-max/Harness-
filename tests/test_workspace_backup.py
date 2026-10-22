@@ -21,6 +21,7 @@ class FakeGitHub:
 
     def __init__(self, private=True, reject=False):
         self.private, self.reject, self.files, self.requests = private, reject, {}, []
+        self.commit_date = None  # ISO time the fake says the backup file was last committed
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -41,6 +42,10 @@ class FakeGitHub:
                 parts = self.path.split("/", 5)  # '', repos, owner, repo, 'contents', path
                 if len(parts) == 4:
                     return self._send(200, {"private": outer.private})
+                if parts[4].startswith("commits"):  # the newest commit of the backup file
+                    if outer.commit_date is None:
+                        return self._send(404, {})
+                    return self._send(200, [{"commit": {"committer": {"date": outer.commit_date}}}])
                 path = parts[5]
                 if method == "GET":
                     if path not in outer.files:
@@ -291,3 +296,56 @@ class BackupApiTests(BackupTests):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(backup.available(), "needs the cryptography package")
+class RollbackAndClobberTests(BackupTests):
+    def test_a_second_copy_cannot_overwrite_a_newer_backup(self):
+        a = self.seeded("a")
+        self.assertTrue(a.backups.run(force=True)["ok"])  # backup #1
+        b = self.seeded("b")  # a different, fresh workspace pointed at the same repository (a forgotten second server)
+        result = b.backups.run(force=True)
+        self.assertFalse(result["ok"])
+        self.assertIn("newer", result["error"])
+        self.assertTrue(a.backups.run(force=True)["ok"])  # the owner of the backup can keep going (#2)
+        os.environ["KINTSUGI_BACKUP_OVERWRITE"] = "1"
+        try:
+            self.assertTrue(b.backups.run(force=True)["ok"])  # on purpose
+        finally:
+            del os.environ["KINTSUGI_BACKUP_OVERWRITE"]
+
+    def test_a_backup_that_cannot_be_read_is_not_overwritten(self):
+        a = self.seeded("a")
+        self.assertTrue(a.backups.run(force=True)["ok"])
+        os.environ["KINTSUGI_BACKUP_PASSPHRASE"] = "a completely different passphrase"
+        result = self.seeded("b").backups.run(force=True)
+        self.assertFalse(result["ok"])
+        self.assertIn("cannot be read", result["error"])
+
+    def test_restore_continues_the_count_and_refuses_a_replayed_old_backup(self):
+        a = self.seeded("a")
+        a.backups.run(force=True)
+        a.post("team", "you", "more", human=True)
+        a.backups.run(force=True)  # #2 is what GitHub holds
+        a.close()
+        self.gh.commit_date = "2099-01-01T00:00:00Z"  # committed far later than the backup says it was made: a replay
+        fresh = self.root / "fresh"
+        self.assertFalse(backup.restore_if_empty(fresh, say=lambda *_: None))
+        self.assertFalse((fresh / "workspace.db").exists())
+        os.environ["KINTSUGI_BACKUP_ACCEPT_OLD"] = "1"
+        try:
+            self.assertTrue(backup.restore_if_empty(fresh, say=lambda *_: None))
+        finally:
+            del os.environ["KINTSUGI_BACKUP_ACCEPT_OLD"]
+        ws = make_ws(fresh)
+        self.assertEqual(ws.get_setting("backup_counter"), "2")  # a restored workspace carries on from #2, so it may write #3
+        self.assertTrue(ws.backups.run(force=True)["ok"])
+        self.assertFalse((fresh / "backup.meta.json").exists())  # the label is not unpacked into the workspace
+
+    def test_a_normal_restore_is_not_refused_when_dates_agree(self):
+        a = self.seeded("a")
+        a.backups.run(force=True)
+        a.close()
+        import time as _t
+        self.gh.commit_date = _t.strftime("%Y-%m-%dT%H:%M:%SZ", _t.gmtime())
+        self.assertTrue(backup.restore_if_empty(self.root / "fresh", say=lambda *_: None))

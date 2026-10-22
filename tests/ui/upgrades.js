@@ -9,6 +9,11 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8804';
   p.on('pageerror', e => errs.push('pageerror ' + e.message));
   p.on('console', m => { if (m.type() === 'error') errs.push('console ' + m.text()); });
   await p.goto(BASE + '/#token=tok123'); await p.waitForSelector('.sys');
+  // 0. links in agent text: a look-alike link shows its real host, and non-web links are inert
+  const links = await p.evaluate(() => md('[Your bank](https://evil.example.com/login) [example.com](https://example.com/a) [call](tel:123) [x](javascript:alert(1))').innerHTML);
+  if (!/\(evil\.example\.com\)/.test(links)) errs.push('look-alike link does not show its host: ' + links);
+  if (/example\.com\/a<\/a><span/.test(links)) errs.push('an honest link got a host label');
+  if (/href="(tel|javascript)/.test(links)) errs.push('a non-web link kept its destination');
   // 1. settings is a page with grouped sections; the owner sees every section including Usage
   await p.click('button[aria-label="Settings"]');
   await p.waitForSelector('.set-nav .set-item.on');

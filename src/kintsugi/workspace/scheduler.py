@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
@@ -89,6 +89,7 @@ def cron_next(expression: str, after: datetime, max_days: int = 8) -> datetime |
 class Scheduler:
     def __init__(self, ws: "Workspace", clock: Callable[[], float] = time.time) -> None:
         self.ws = ws
+        self._last = None  # (timestamp, local datetime) of the previous tick
         self.clock = clock
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -107,20 +108,50 @@ class Scheduler:
             self.ws.backups.maybe_run(now)  # an encrypted backup, if configured and something changed
         except Exception as err:
             self.ws.audit(None, "backup-error", f"{type(err).__name__}: {str(err)[:200]}")
+        skipped = self._skipped_minutes(now, when)  # wall-clock minutes that did not exist (clocks jumped forward) since the last tick
         for job in self.ws.list_jobs():
             if not job["enabled"] or job["last_run_minute"] == minute_number:
                 continue
             try:
-                due = cron_matches(job["cron"], when)
+                due = cron_matches(job["cron"], when) or any(cron_matches(job["cron"], m) for m in skipped)
             except ValueError:
                 continue
             if not due:
+                continue
+            if self._ran_this_wall_minute(job, when):  # clocks went back and this wall-clock minute is happening a second time
                 continue
             self.ws.mark_job_run(job["id"], minute_number, now)
             self.ws.audit(job["agent"], "cron-fired", f"job {job['id']}")
             self.ws.post(job["room"], f"cron-{job['id']}", f"@{job['agent']} {job['prompt']}")
             fired += 1
         return fired
+
+    def _skipped_minutes(self, now: float, when: datetime) -> list[datetime]:
+        """When the clock jumps forward (daylight saving starts), a job set for the hour that vanished would never run that day. Return the
+        local minutes that were skipped since the previous tick so those jobs run once, right after the jump."""
+        last, self._last = self._last, (now, when)
+        if last is None or not (0 < now - last[0] <= 300) or when.utcoffset() is None or last[1].utcoffset() is None:
+            return []
+        if when.utcoffset() <= last[1].utcoffset():
+            return []
+        start = last[1].replace(tzinfo=None) + timedelta(minutes=1)
+        end = when.replace(tzinfo=None)
+        out = []
+        while start < end and len(out) < 180:
+            out.append(start)
+            start += timedelta(minutes=1)
+        return out
+
+    def _ran_this_wall_minute(self, job: dict, when: datetime) -> bool:
+        """The job already ran at this same wall-clock minute within the last two hours (the repeated hour when clocks go back)."""
+        ts = job.get("last_run_ts")
+        if not ts or when.utcoffset() is None:
+            return False
+        now_ts = when.timestamp()
+        if not (0 < now_ts - ts <= 7200):
+            return False
+        before = self.ws.local_datetime(ts)
+        return before.replace(tzinfo=None, second=0, microsecond=0) == when.replace(tzinfo=None, second=0, microsecond=0)
 
     def start(self) -> None:
         if self._thread is not None:

@@ -215,17 +215,43 @@ class TestUploads(Base):
 
 
 class TestResetSignIn(Base):
-    def test_only_the_owner_resets_sign_ins_and_the_old_token_dies(self):
+    def test_only_the_owner_resets_sign_ins_with_a_one_time_code(self):
         self.join("sam")
         self.join("ada", "admin")
         old = self.tokens["sam"]
         # an admin must not be able to mint a member's sign-in: it would open that member's private chats
         self.assertEqual(self.call("ada", "POST", "/api/team/reset", {"name": "sam"})[0], 403)
-        new = self.call("owner", "POST", "/api/team/reset", {"name": "sam"})[1]["token"]
-        self.assertEqual(self.call(old, "GET", "/api/me")[0], 401)
-        self.assertEqual(self.call(new, "GET", "/api/me")[1]["name"], "sam")
+        code = self.call("owner", "POST", "/api/team/reset", {"name": "sam"})[1]["code"]
+        self.assertEqual(self.call(old, "GET", "/api/me")[0], 401)  # the old key stopped at once
+        self.assertTrue(code.startswith("sc_"))
+        status, who = self.call(None, "POST", "/api/signin", {"code": code})
+        self.assertEqual((status, who["name"], who["role"]), (200, "sam", "member"))
+        self.assertNotEqual(who["token"], code)
+        self.assertEqual(self.call(who["token"], "GET", "/api/me")[1]["name"], "sam")
+        self.assertEqual(self.call(None, "POST", "/api/signin", {"code": code})[0], 400)  # works once
+        stored = [r["token_hash"] for r in self.ws.db.query("SELECT token_hash FROM users")] + [r["code_hash"] for r in self.ws.db.query("SELECT code_hash FROM signin_codes")]
+        self.assertNotIn(code, stored)  # only hashes are kept
         self.assertEqual(self.call("owner", "POST", "/api/team/reset", {"name": "ada"})[0], 200)
-        self.assertEqual(self.call(new, "POST", "/api/team/reset", {"name": "sam"})[0], 403)
+        self.assertEqual(self.call(who["token"], "POST", "/api/team/reset", {"name": "sam"})[0], 403)
+
+    def test_codes_expire_die_with_the_person_and_wrong_guesses_are_throttled(self):
+        self.join("sam")
+        code = self.call("owner", "POST", "/api/team/reset", {"name": "sam"})[1]["code"]
+        self.ws.db.execute("UPDATE signin_codes SET expires = 1")
+        self.assertEqual(self.call(None, "POST", "/api/signin", {"code": code})[0], 400)  # expired
+        code = self.call("owner", "POST", "/api/team/reset", {"name": "sam"})[1]["code"]
+        self.call("owner", "POST", "/api/team/remove", {"name": "sam"})
+        self.assertEqual(self.call(None, "POST", "/api/signin", {"code": code})[0], 400)  # the person is gone
+        self.assertIsNone(self.ws.db.one("SELECT 1 FROM signin_codes"))
+        statuses = [self.call(None, "POST", "/api/signin", {"code": "sc_wrong%d" % i})[0] for i in range(25)]
+        self.assertIn(403, statuses)  # guessing is throttled like wrong tokens
+
+    def test_a_second_reset_replaces_the_first_code(self):
+        self.join("sam")
+        first = self.call("owner", "POST", "/api/team/reset", {"name": "sam"})[1]["code"]
+        second = self.call("owner", "POST", "/api/team/reset", {"name": "sam"})[1]["code"]
+        self.assertEqual(self.call(None, "POST", "/api/signin", {"code": first})[0], 400)
+        self.assertEqual(self.call(None, "POST", "/api/signin", {"code": second})[0], 200)
 
 
 class TestProviderTesting(Base):
