@@ -339,12 +339,19 @@ class Plugins:
 
     # --- what an agent sees and can call -----------------------------------------------------
 
+    def skill_catalog(self, agent: str) -> list[tuple[str, str, str]]:
+        """(skill name, description, plugin id) for every skill this agent may load. Only this short list goes in the prompt."""
+        return [(s["name"], s["description"], pid) for pid in self.enabled_for(agent) for s in self.get(pid)["skills"]]
+
     def skills_text(self, agent: str) -> str:
-        blocks = []
+        return "\n".join(f"- {name}: {desc or 'no description'} (plugin {pid})" for name, desc, pid in self.skill_catalog(agent))[:3000]
+
+    def load_skill(self, agent: str, name: str) -> str:
         for pid in self.enabled_for(agent):
             for skill in self.get(pid)["skills"]:
-                blocks.append(f"### {skill['name']} (from plugin {pid})\n{skill['text']}")
-        return "\n\n".join(blocks)[:12000]
+                if skill["name"] == name:
+                    return skill["text"]
+        raise PluginError("no such skill; the available ones are: " + ", ".join(n for n, _, _ in self.skill_catalog(agent)))
 
     def tool_names(self, agent: str) -> list[tuple[str, dict, dict]]:
         out = []

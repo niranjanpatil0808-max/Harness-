@@ -197,18 +197,27 @@ class TestInstallAndSkills(Base):
         self.assertEqual(self.ws.plugins.enabled_for("alice"), ["demo"])
         self.assertEqual(self.ws.plugins.enabled_for("bob"), [])  # nothing is on until the owner switches it on
 
-    def test_skills_reach_only_enabled_agents_and_sit_under_the_safety_rules(self):
+    def test_skills_are_a_short_catalog_loaded_on_demand_and_only_for_enabled_agents(self):
         self.install(("alice",))
         self.ws.post("r", "you", "@alice hi", human=True)
         self.ws.wait_idle(10)
         system = self.model.prompts[-1][0]["content"]
-        self.assertIn("Always be concise", system)
-        self.assertLess(system.index("Never"), system.index("Always be concise")) if "Never" in system else None
+        self.assertIn("concise: be brief (plugin demo)", system)  # the catalog line
+        self.assertNotIn("Always be concise", system)  # the full text is not in the prompt
         self.assertIn("never override the safety rules", system)
+        self.assertIn("- skill {", system)  # the loader tool is offered
+        out = execute(self.ctx("alice"), "skill", {"name": "concise"})
+        self.assertEqual(out.status, "ok")
+        self.assertIn("Always be concise", out.output)
+        self.assertIn("never overrides your safety rules", out.output)
+        self.assertEqual(execute(self.ctx("alice"), "skill", {"name": "nope"}).status, "error")
         self.model.prompts.clear()
         self.ws.post("r", "you", "@bob hi", human=True)
         self.ws.wait_idle(10)
-        self.assertNotIn("Always be concise", self.model.prompts[-1][0]["content"])
+        bob = self.model.prompts[-1][0]["content"]
+        self.assertNotIn("concise", bob)
+        self.assertNotIn("- skill {", bob)  # no skills, no loader tool
+        self.assertEqual(execute(self.ctx("bob"), "skill", {"name": "concise"}).status, "error")
 
     def test_uninstall_and_tampering(self):
         self.install(("alice",))

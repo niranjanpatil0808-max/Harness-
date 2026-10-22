@@ -179,7 +179,11 @@ class TestPrivateAddressesAreBlocked(unittest.TestCase):
                     mock.patch.dict(os.environ, {"KINTSUGI_FETCH_ALLOW_LOCAL": ""}):
                 with self.assertRaises(webfetch.FetchError) as cm:
                     webfetch.fetch(f"http://hop1.test:{port}/to-internal")
-            self.assertIn("not on the public internet", str(cm.exception))
+            self.assertIn("different site", str(cm.exception))  # a cross-site redirect is never followed automatically
+            with mock.patch.object(webfetch, "resolve", fake), mock.patch.dict(os.environ, {"KINTSUGI_FETCH_ALLOW_LOCAL": ""}):
+                with self.assertRaises(webfetch.FetchError) as direct:
+                    webfetch.fetch("http://internal.test/secret")  # and asking for it directly is refused by the address rules
+            self.assertIn("not on the public internet", str(direct.exception))
         finally:
             site.shutdown()
             site.server_close()

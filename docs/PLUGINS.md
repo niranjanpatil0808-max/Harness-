@@ -33,7 +33,7 @@ agent (Settings > Plugins, or the agent's Details).
 }
 ```
 
-- **Skills**: `text` inline, or `"file": "skills/tip.md"` when the plugin comes from a GitHub repository. Up to 8 skills, 6,000 characters each.
+- **Skills**: `text` inline, or `"file": "skills/tip.md"` when the plugin comes from a GitHub repository. Up to 8 skills, 6,000 characters each. The agent's prompt carries only a one-line catalog (name and description); the full text is loaded on demand with the `skill` tool, which saves your API tokens (an idea from DeepSeek Harness).
 - **Tools**: up to 8. The agent calls them as `<plugin_id>__<tool>` (dashes become underscores), for example `open_meteo__now`, so a
   plugin can never replace a built-in tool.
 - **Parameters** are typed (`string`, `number`, `integer`, `boolean`), length-limited, may have an `enum`, and are put into the URL's

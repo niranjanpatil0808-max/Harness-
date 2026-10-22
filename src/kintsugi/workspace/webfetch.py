@@ -7,7 +7,8 @@ orders. So this module is deliberately narrow:
   * the host is resolved here and EVERY address it resolves to must be public (no loopback, private, link-local,
     cloud-metadata, multicast or reserved ranges); the connection then goes to that exact address, so a DNS answer
     cannot change between the check and the connection (DNS rebinding)
-  * redirects are followed at most 3 times and every hop is checked again
+  * same-site redirects are followed (at most 3, each checked again); a redirect to a different site is refused so the next address
+    needs its own request (an idea from DeepSeek Harness's fetch policy)
   * GET only, no cookies, no credentials, short timeout, a hard size cap, text-like content only
   * the result is plain text (scripts and styles removed) labelled as untrusted data, never as instructions
 
@@ -170,7 +171,11 @@ def roundtrip(url: str, method: str = "GET", headers: dict | None = None, body: 
                 target = response.getheader("Location")
                 if not can_redirect or not target:
                     raise FetchError("the site redirected, which is not allowed for this kind of request")
-                url = urllib.parse.urljoin(url, target)
+                new = urllib.parse.urljoin(url, target)
+                old_parts, new_parts = urllib.parse.urlsplit(url), urllib.parse.urlsplit(new)
+                if (old_parts.scheme, old_parts.hostname, old_parts.port) != (new_parts.scheme, new_parts.hostname, new_parts.port):
+                    raise FetchError(f"the page moved to a different site ({new[:200]}). Fetch that address as a new request if you want it")
+                url = new
                 continue
             if response.status >= 400:
                 raise FetchError(f"the site answered with an error ({response.status})")
