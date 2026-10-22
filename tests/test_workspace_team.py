@@ -4,6 +4,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 from kintsugi.model import MockModel
 from kintsugi.workspace import Workspace
@@ -344,3 +345,47 @@ class TestTimezoneAndPush(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHardening(Base):
+    def test_removing_a_person_removes_their_private_chats_and_schedules(self):
+        self.invite_and_join("sam")
+        room = self.call("sam", "POST", "/api/dm", {"b": "alice"})[1]["room"]
+        self.call("sam", "POST", "/api/say", {"room": room, "text": "private note"})
+        self.call("sam", "POST", "/api/jobs", {"agent": "alice", "room": "team", "cron": "0 9 * * *", "prompt": "x"})
+        self.call("owner", "POST", "/api/team/remove", {"name": "sam"})
+        self.assertIsNone(self.ws.db.one("SELECT 1 FROM rooms WHERE name = ?", (room,)))
+        self.assertEqual(self.ws.db.query("SELECT 1 FROM messages WHERE text = 'private note'"), [])
+        self.assertEqual(self.ws.list_jobs(), [])
+        # a new person who takes the same name starts with nothing of the old person's
+        self.invite_and_join("sam")
+        self.assertEqual([r["name"] for r in self.call("sam", "GET", "/api/state")[1]["rooms"]], ["team"])
+        self.assertNotIn(room, [r["name"] for r in self.ws.list_rooms()])
+
+    def test_an_admin_cannot_approve_code_that_would_run_with_the_servers_rights(self):
+        self.invite_and_join("ada", "admin")
+        approval = self.ws.request_approval("alice", "team", "fix_code", {"path": "x"}, None)
+        row = self.ws.db.one("SELECT * FROM approvals WHERE id = ?", (approval,))
+        self.assertFalse(self.ws.team.can_decide(Identity("ada", "admin"), row))
+        self.assertEqual(self.call("ada", "POST", "/api/approve", {"id": approval, "approve": True})[0], 403)
+        self.assertTrue(self.ws.team.can_decide(Identity("you", "owner"), row))
+        with mock.patch("kintsugi.workspace.sandbox.status", return_value={"isolated": False}):
+            py = self.ws.request_approval("alice", "team", "run_python", {"code": "print(1)"}, None)
+            self.assertEqual(self.call("ada", "POST", "/api/approve", {"id": py, "approve": True})[0], 403)  # not isolated: owner only
+        with mock.patch("kintsugi.workspace.sandbox.status", return_value={"isolated": True}):
+            row = self.ws.db.one("SELECT * FROM approvals WHERE id = ?", (py,))
+            self.assertTrue(self.ws.team.can_decide(Identity("ada", "admin"), row))  # isolated: an admin may
+
+    def test_only_the_owner_can_make_an_agent_that_never_asks(self):
+        self.invite_and_join("ada", "admin")
+        self.assertEqual(self.call("ada", "POST", "/api/tier", {"agent": "alice", "tier": "dangerous"})[0], 403)
+        self.assertEqual(self.call("ada", "POST", "/api/agents", {"name": "zed", "tier": "dangerous"})[0], 403)
+        self.assertEqual(self.call("ada", "POST", "/api/tier", {"agent": "alice", "tier": "strict"})[0], 200)
+        self.assertEqual(self.call("owner", "POST", "/api/tier", {"agent": "alice", "tier": "dangerous"})[0], 200)
+
+    def test_one_person_cannot_flood_the_workspace(self):
+        self.invite_and_join("sam")
+        codes = [self.call("sam", "POST", "/api/say", {"room": "team", "text": f"m{i}"})[0] for i in range(35)]
+        self.assertEqual(codes[:30], [200] * 30)
+        self.assertEqual(codes[30:], [429] * 5)
+        self.assertEqual(self.call("owner", "POST", "/api/say", {"room": "team", "text": "still fine"})[0], 200)  # someone else is unaffected

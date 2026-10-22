@@ -26,6 +26,7 @@ import os
 import re
 import socket
 import ssl
+import time
 import urllib.parse
 from html.parser import HTMLParser
 
@@ -34,6 +35,7 @@ MAX_BYTES = 400_000
 MAX_TEXT = 8000
 MAX_REDIRECTS = 3
 TIMEOUT = 12.0
+TOTAL_SECONDS = 30.0  # per-read timeouts are not enough: a trickle of bytes must not hold a thread for hours
 PORTS = {80, 443, 8080, 8443}
 TEXT_TYPES = ("text/", "application/json", "application/xml", "application/xhtml+xml", "application/rss+xml", "application/atom+xml")
 
@@ -182,7 +184,16 @@ def roundtrip(url: str, method: str = "GET", headers: dict | None = None, body: 
             content_type = (response.getheader("Content-Type") or "").split(";")[0].strip().lower()
             if text_only and not content_type.startswith(TEXT_TYPES):
                 raise FetchError(f"that is not a text page (it is '{content_type or 'unknown'}'); downloads are not allowed")
-            raw = response.read(max_bytes + 1)
+            chunks, got, deadline = [], 0, time.monotonic() + TOTAL_SECONDS
+            while got <= max_bytes:
+                chunk = response.read1(min(16384, max_bytes + 1 - got))  # returns what has arrived, so the deadline below is checked often
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                got += len(chunk)
+                if time.monotonic() > deadline:
+                    raise FetchError("the site was too slow to answer")
+            raw = b"".join(chunks)
             charset_header = response.getheader("Content-Type") or ""
         except (OSError, http.client.HTTPException, ssl.SSLError) as err:
             raise FetchError(f"could not read the page ({type(err).__name__})") from None

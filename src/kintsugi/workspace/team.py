@@ -189,9 +189,15 @@ class Team:
             raise TeamError("no such person")
         if RANK[user["role"]] >= RANK[by.role] and by.role != "owner":
             raise TeamError("you cannot remove someone with the same or a higher role")
+        for room in self.ws.list_rooms():  # their private chats go with them: a new person must never inherit them
+            if room["kind"] == "dm" and name in self.ws.members(room["name"]):
+                self.ws.delete_room(room["name"])
         self.ws.db.execute("DELETE FROM users WHERE name = ?", (name,))
         self.ws.db.execute("DELETE FROM members WHERE member = ?", (name,))
         self.ws.db.execute("DELETE FROM push_subs WHERE user = ?", (name,))
+        self.ws.db.execute("DELETE FROM jobs WHERE owner = ?", (name,))
+        self.ws.db.execute("DELETE FROM settings WHERE key = ?", (f"tone:{name}",))
+        self.ws.db.execute("UPDATE approvals SET requested_by = NULL WHERE requested_by = ?", (name,))
         self.ws.audit(None, "person-removed", f"{name} by {by.name}")
 
     def set_role(self, name: str, role: str) -> None:
@@ -223,8 +229,19 @@ class Team:
         self.ws.audit(None, "approval-policy", policy)
         return policy
 
+    @staticmethod
+    def owner_only_tool(tool: str) -> bool:
+        """Code that could run with the server's own rights (fix_code always; run_python when it is not isolated) can only be approved
+        by the owner: otherwise an admin could read the keychain and the owner token and take over the workspace."""
+        from . import sandbox
+
+        return tool == "fix_code" or (tool == "run_python" and not sandbox.status()["isolated"])
+
     def can_decide(self, who: Identity, approval: dict) -> bool:
-        """Owners and admins can always decide. Members can when the policy says so AND they belong to the room it came from."""
+        """Owners can always decide, admins too (except for code that would run unisolated). Members only when the policy says so AND
+        they belong to the room it came from."""
+        if self.owner_only_tool(approval["tool"]) and who.role != "owner":
+            return False
         if who.at_least("admin"):
             return True
         if who.name not in self.ws.members(approval["room"]):

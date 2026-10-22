@@ -133,6 +133,41 @@ class TestFetching(WithSite):
         self.assertEqual(self.ws.internet_settings()["fetched_today"], 2)
 
 
+class TestSlowSites(unittest.TestCase):
+    def test_a_site_that_trickles_bytes_cannot_hold_a_fetch_open(self):
+        import time
+
+        class Trickle(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", "100000")
+                self.end_headers()
+                try:
+                    for _ in range(200):
+                        self.wfile.write(b"x")
+                        self.wfile.flush()
+                        time.sleep(0.1)
+                except OSError:
+                    pass
+
+        site = ThreadingHTTPServer(("127.0.0.1", 0), Trickle)
+        threading.Thread(target=site.serve_forever, daemon=True).start()
+        started = time.time()
+        try:
+            with mock.patch.dict(os.environ, {"KINTSUGI_FETCH_ALLOW_LOCAL": "1"}), mock.patch.object(webfetch, "TOTAL_SECONDS", 1.0):
+                with self.assertRaises(webfetch.FetchError) as cm:
+                    webfetch.fetch(f"http://127.0.0.1:{site.server_port}/")
+            self.assertIn("too slow", str(cm.exception))
+            self.assertLess(time.time() - started, 6)
+        finally:
+            site.shutdown()
+            site.server_close()
+
+
 class TestPrivateAddressesAreBlocked(unittest.TestCase):
     """No local-address switch here: the real rules."""
 

@@ -38,6 +38,10 @@ APP_CSP = ("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline
            "style-src 'unsafe-inline'; img-src data:")
 
 
+class RateLimited(Exception):
+    """Too many requests from one person (HTTP 429)."""
+
+
 class Forbidden(Exception):
     """The caller is who they say they are but is not allowed to do this (HTTP 403)."""
 
@@ -86,6 +90,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                          f"must be a long random string (at least {MIN_PUBLIC_TOKEN} characters).")
     failures: dict[str, list[float]] = {}
     failure_lock = threading.Lock()
+    sent_times: dict[str, list[float]] = {}
     trust_proxy = os.environ.get("KINTSUGI_TRUST_PROXY") == "1"
 
     def sign(agent: str, app: str, expires: int) -> str:
@@ -194,6 +199,17 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return self._json(401, {"error": "missing or wrong access token"})
             self._guard(lambda: self._json(200, self._post(url.path, self._body())), url.path)
 
+        def _rate_limit(self, name: str, limit: int = 30, window: float = 60.0) -> None:
+            """One person cannot spend the whole team's model quota with a flood of messages."""
+            now = time.time()
+            with failure_lock:
+                recent = [t for t in sent_times.get(name, []) if now - t < window]
+                if len(recent) >= limit:
+                    sent_times[name] = recent
+                    raise RateLimited(f"slow down: at most {limit} messages a minute")
+                recent.append(now)
+                sent_times[name] = recent
+
         def _known_name(self, name: str) -> None:
             if not (ws.get_agent(name, missing_ok=True) or ws.team.is_person(name)):
                 raise WorkspaceError(f"'{name}' is not an agent or a person in this workspace")
@@ -234,6 +250,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 action()
             except Forbidden as err:
                 self._json(403, {"error": str(err)})
+            except RateLimited as err:
+                self._json(429, {"error": str(err)})
             except (TeamError, WorkspaceError, PathError, ValueError, KeyError, TypeError) as err:  # json errors are ValueErrors
                 message = f"missing field: {err}" if isinstance(err, KeyError) else str(err)
                 self._json(400, {"error": message})
@@ -366,6 +384,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
 
         def _post(self, path: str, body: dict):
             if path == "/api/say":
+                self._rate_limit(self.who.name)
                 room = str(body["room"])
                 if self.who.role == "owner":
                     sender = str(body.get("as") or "you")
@@ -375,6 +394,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     sender = self.who.name
                 return {"id": ws.post(room, sender, str(body["text"]), human=True)}
             if path == "/api/agents":
+                if str(body.get("tier", "auto")) == "dangerous" and self.who.role != "owner":
+                    raise Forbidden("only the owner can create an agent that never asks")
                 ws.create_agent(str(body["name"]), str(body.get("persona", "")), str(body.get("tier", "auto")))
                 return {"ok": True}
             if path == "/api/rooms":
@@ -566,6 +587,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 ws.set_playbook(str(body["agent"]), cleaned)
                 return {"playbook": cleaned}
             if path == "/api/tier":
+                if str(body.get("tier")) == "dangerous" and self.who.role != "owner":
+                    raise Forbidden("only the owner can switch an agent to 'never ask'")
                 ws.set_tier(str(body["agent"]), str(body["tier"]))
                 return {"ok": True}
             if path == "/api/approve":
