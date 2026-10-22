@@ -76,27 +76,27 @@ Times in cron schedules use the **server's** clock and time zone (a Codespace is
 | **Memory** | Two kinds: notes (`remember` / `search_memory`, keyword search) and lessons (written automatically from failed tool calls, via `MemoryStore.reflect`). |
 | **`fix_code`** | An agent can call the Kintsugi loop itself on a folder with `task.json` and tests. |
 
-## What the permission and sandbox layers do, and do not do
+## Safety and privacy in short
 
-Done and tested: file tools cannot leave the agent's folder (absolute paths, `..`, `~`, backslashes, NUL
-bytes and symlinks are refused); a folder is capped at 5 MB; `run_python` runs in a separate process with a
-scrubbed environment, a wall-clock timeout, CPU and memory limits (POSIX `rlimit`), and its process group is
-killed on timeout; API keys of the harness are not passed to it; secrets are redacted from tool output;
-people cannot post under an agent's name; the API needs the access token and binds to 127.0.0.1.
+The full list, with what is tested and what is not, is in [SECURITY.md](../SECURITY.md). The essentials:
 
-**Not done:** `run_python` runs with your user's permissions. It can read files outside the agent's folder,
-use the network and run other programs. Do not approve code you would not run yourself, and do not run the
-workspace on a machine with secrets you cannot lose. A real sandbox needs a container or VM.
-Without the optional `cryptography` package the keychain is a mode-600 file, **not encrypted**; with it, values
-are encrypted with a key stored next to them (which protects against casual reading, not against someone
-with access to the folder). The web page and API have no user accounts, only one shared token.
+- Risky tools wait for you. The approval card shows the whole code and whether it runs isolated.
+- On Linux, approved code runs in a **namespace sandbox**: only its own folder, read-only system, no network, own
+  process list. In containers where that is blocked it falls back to running as a separate unprivileged user per
+  agent (network open). If neither works, it says **not isolated** and you can disable code running entirely with
+  `KINTSUGI_SANDBOX=require`. Check with `kintsugi workspace status` or Details > Safety.
+- A **daily cap** on model calls (`KINTSUGI_DAILY_CALLS`, default 500) protects your API quota.
+- Your conversation text goes to your model provider; everything else stays on the server. You can download or delete
+  your data from Details > Safety.
+- Not a hardened container, no user accounts, no built-in TLS, keychain not encrypted by default. Read SECURITY.md.
 
 ## HTTP API (all calls need header `X-Token`)
 
 `GET /api/state`, `GET /api/messages?room=&after=`, `GET /api/lessons?agent=`, `GET /api/files?agent=`,
 `GET /api/audit`, `POST /api/say {room,text}`, `/api/agents`, `/api/rooms`, `/api/dm`, `/api/tier`,
-`/api/approve {id,approve}`, `/api/jobs`, `/api/jobs/delete`. Secrets can only be set from the CLI so that
-they never travel through a chat message.
+`/api/approve {id,approve}`, `/api/jobs`, `/api/jobs/delete`, `/api/secret` (write-only: values are never returned),
+`/api/applink` (expiring links to published apps), `/api/export`, `/api/purge`, `/api/agent/delete`, `/api/room/delete`.
+`GET /healthz` needs no token and reveals nothing. See [HOSTING.md](HOSTING.md) to run it somewhere you can reach.
 
 ## Credits
 

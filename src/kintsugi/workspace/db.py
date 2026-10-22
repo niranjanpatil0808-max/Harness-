@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     id INTEGER PRIMARY KEY AUTOINCREMENT, agent TEXT NOT NULL, room TEXT NOT NULL, tool TEXT NOT NULL,
     args TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', ts REAL NOT NULL,
     decided_by TEXT, result TEXT);
+CREATE TABLE IF NOT EXISTS usage (day TEXT PRIMARY KEY, calls INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, agent TEXT, event TEXT NOT NULL,
     detail TEXT NOT NULL DEFAULT '');
@@ -38,6 +39,7 @@ class Database:
 
     def __init__(self, path: Path | str) -> None:
         self.lock = threading.RLock()
+        Path(path).touch(mode=0o600)  # created private before SQLite (and its -wal/-shm files) copy the mode
         self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         with self.lock:

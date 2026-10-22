@@ -2,6 +2,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from kintsugi.model import MockModel
 from kintsugi.workspace import Workspace
@@ -13,6 +14,9 @@ TASK = "s03_binary_search"
 
 class TestToolsThatWrapKintsugi(unittest.TestCase):
     def setUp(self):
+        patcher = mock.patch.dict("os.environ", {"KINTSUGI_ALLOW_FIX_CODE_AS_ROOT": "1"})  # tests may run as root
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.tmp = tempfile.TemporaryDirectory()
         fixed = (ROOT / "benchmark" / "solutions" / TASK / "search.py").read_text()
         self.fixed_reply = f"```python\n# file: search.py\n{fixed}```"
@@ -29,6 +33,14 @@ class TestToolsThatWrapKintsugi(unittest.TestCase):
 
     def run_tool(self, tool, **args):
         return execute(Ctx(self.ws, "alice", "general", 0, "t"), tool, args)
+
+    def test_fix_code_is_refused_when_running_as_root(self):
+        from unittest import mock
+
+        with mock.patch("os.geteuid", return_value=0), mock.patch.dict("os.environ", {"KINTSUGI_ALLOW_FIX_CODE_AS_ROOT": "0"}):
+            out = self.run_tool("fix_code", path="proj")
+        self.assertEqual(out.status, "error")
+        self.assertIn("disabled while the server runs as root", out.output)
 
     def test_fix_code_repairs_the_file_with_the_kintsugi_loop(self):
         before = (self.project / "search.py").read_text()
@@ -65,7 +77,7 @@ class TestToolsThatWrapKintsugi(unittest.TestCase):
 
     def test_map_project_on_an_empty_folder_is_a_clear_error(self):
         (self.ws.files_dir("alice") / "empty").mkdir()
-        self.assertEqual(self.run_tool("map_project", path="empty").output, "no .py files there")
+        self.assertTrue(self.run_tool("map_project", path="empty").output.startswith("no .py files there"))
 
     def test_notes_round_trip_through_the_tools(self):
         self.run_tool("remember", text="the customer prefers metric units")
@@ -83,6 +95,48 @@ class TestToolsThatWrapKintsugi(unittest.TestCase):
         self.assertIn("error", statuses)
         self.assertLessEqual(sum(p.stat().st_size for p in self.ws.www_dir("alice").rglob("*") if p.is_file()),
                              5_000_000)
+
+
+class TestSmallModelTolerance(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.ws = Workspace(self.tmp.name, model_factory=lambda n: MockModel(["ok"]), encrypt_keychain=False)
+        self.ws.create_agent("alice", tier="dangerous")
+        self.ws.create_room("general", ["alice", "you"])
+
+    def tearDown(self):
+        self.ws.close()
+        self.tmp.cleanup()
+
+    def run_tool(self, tool, **args):
+        return execute(Ctx(self.ws, "alice", "general", 0, "t"), tool, args)
+
+    def test_alternative_argument_names_are_accepted(self):
+        self.assertEqual(self.run_tool("write_file", filename="a.txt", text="hi").status, "ok")
+        self.assertEqual((self.ws.files_dir("alice") / "a.txt").read_text(), "hi")
+        self.assertEqual(self.run_tool("read_file", file="a.txt").output, "hi")
+        self.assertEqual(self.run_tool("run_python", script="print(6 * 7)").output, "42")
+        self.assertEqual(self.run_tool("remember", content="likes tea").status, "ok")
+
+    def test_real_names_win_over_aliases(self):
+        self.assertEqual(self.run_tool("write_file", path="b.txt", content="real", text="alias").status, "ok")
+        self.assertEqual((self.ws.files_dir("alice") / "b.txt").read_text(), "real")
+
+    def test_a_misspelled_tool_gets_a_helpful_answer(self):
+        out = self.run_tool("run_script", code="print(1)")
+        self.assertEqual(out.status, "error")
+        self.assertIn("run_python", out.output)
+        self.assertIn("Available tools", out.output)
+
+    def test_errors_remind_the_model_of_the_format(self):
+        out = self.run_tool("write_file", path="x.txt")  # content missing
+        self.assertEqual(out.status, "error")
+        self.assertIn("Usage: write_file", out.output)
+
+    def test_secrets_never_reach_the_audit_log(self):
+        self.ws.keychain.set("alice", "DEMO_KEY", "sk-very-secret-value")
+        self.run_tool("write_file", path="leak.txt", content="the key is sk-very-secret-value")
+        self.assertFalse(any("sk-very-secret-value" in r["detail"] for r in self.ws.audit_log(200)))
 
 
 if __name__ == "__main__":

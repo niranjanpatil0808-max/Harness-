@@ -185,6 +185,13 @@ function renderThread(msgs) {
   if (msgs.length) { if (wasNear) { sc.scrollTop = sc.scrollHeight; $("#jump").hidden = true; } else $("#jump").hidden = false; }
   S.stick = false;
 }
+function sandboxLine(tool) {
+  const sb = S.state && S.state.sandbox;
+  if (tool !== "run_python" && tool !== "fix_code") return "Read it before you allow it.";
+  if (tool === "fix_code") return "Read it before you allow it. This tool runs code outside the isolated sandbox.";
+  return sb && sb.isolated ? "Read it before you allow it. It runs isolated: only this agent's folder, " + (sb.network_blocked ? "no network." : "network is not blocked.")
+    : "Read it before you allow it. NOT isolated here: it runs with the server's permissions, files and network.";
+}
 function renderInline() {
   const r = curRoom(), pend = pendingFor(S.room), busy = busyIn(r);
   if (!sigChanged("inline", [S.room, pend, busy])) return;
@@ -194,7 +201,7 @@ function renderInline() {
       let args = {}; try { args = JSON.parse(a.args); } catch (e) { /* keep raw */ }
       const code = args.code !== undefined ? args.code : JSON.stringify(args, null, 2);
       return h("div", {class: "perm"}, h("h5", {}, a.agent + " wants to use " + a.tool),
-        h("div", {class: "meta"}, "Read it before you allow it. It runs with your computer's permissions."),
+        h("div", {class: "meta"}, sandboxLine(a.tool)),
         h("pre", {}, code.length > 20000 ? code.slice(0, 20000) + "\n…(truncated)" : code),
         h("div", {class: "actions"}, h("button", {class: "btn primary", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: true})); }}, "Allow once"),
           h("button", {class: "btn danger", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: false})); }}, "Deny")));
@@ -265,7 +272,7 @@ async function dmWith(agent) {
 }
 
 /* ---------- drawer ---------- */
-const TABS = [["agent", "Agent"], ["lessons", "Lessons"], ["files", "Files"], ["jobs", "Schedule"], ["apps", "Apps"], ["activity", "Log"]];
+const TABS = [["agent", "Agent"], ["lessons", "Lessons"], ["files", "Files"], ["jobs", "Schedule"], ["apps", "Apps"], ["safety", "Safety"], ["activity", "Log"]];
 function toggleDrawer(force) {
   S.drawer = force === undefined ? !S.drawer : force; $("#drawer").hidden = !S.drawer; S.sig.drawer = null; S.sig.top = null;
   renderTopbar(true); if (S.drawer) poll(true);
@@ -294,6 +301,11 @@ function renderDrawer() {
       onclick: () => { S.tab = k; S.sig.drawer = null; S.file = null; poll(true); }}, label))),
     h("div", {class: "d-body"}, a ? tabBody(a) : h("p", {class: "muted"}, "Create an agent to see its details.")));
 }
+function secretForm(a) {
+  const name = h("input", {type: "text", placeholder: "API_TOKEN", "aria-label": "Secret name", autocapitalize: "characters"}), value = h("input", {type: "password", placeholder: "value", "aria-label": "Secret value", autocomplete: "off"});
+  return h("div", {class: "stack"}, h("small", {class: "muted"}, "A secret goes into the keychain only. It is never shown again, never sent to the model, and agents can use it only by name when you approve code."), name, value,
+    h("button", {class: "btn", onclick: async () => { const ok = await act(() => api("/api/secret", {agent: a.name, name: name.value.trim(), value: value.value}), "Secret saved"); if (ok) { name.value = ""; value.value = ""; } }}, "Save secret"));
+}
 function tabBody(a) {
   const c = S.cache[S.tab];
   if (S.tab === "agent") {
@@ -304,8 +316,9 @@ function tabBody(a) {
       h("h4", {}, "Permissions"), h("div", {class: "seg", role: "group"}, tiers.map(([t]) => h("button", {class: a.tier === t ? "on" : "", "aria-pressed": a.tier === t,
         onclick: () => act(() => api("/api/tier", {agent: a.name, tier: t}), "Permission: " + t)}, t))),
       h("p", {class: "muted", style: "font-size:13px"}, tiers.find((t) => t[0] === a.tier)[1] + ". Tools outside its allow-list are always refused."),
-      h("h4", {}, "Secrets"), a.secrets.length ? a.secrets.map((n) => h("div", {class: "card"}, h("code", {}, n), " ", h("small", {}, "value hidden"))) : h("p", {class: "muted"}, "None."),
-      h("p", {class: "muted", style: "font-size:13px"}, "Add one from a terminal so it never passes through chat: ", h("code", {}, "kintsugi workspace secret " + a.name + " NAME")),
+      h("h4", {}, "Secrets"), a.secrets.length ? a.secrets.map((n) => h("div", {class: "card", style: "display:flex;align-items:center;gap:8px"}, h("code", {style: "flex:1"}, n), h("small", {}, "value hidden"),
+        h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + n + "?", "The agent will no longer be able to use it.", "Remove", () => act(() => api("/api/secret/delete", {agent: a.name, name: n}), "Removed"))}, "Remove"))) : h("p", {class: "muted"}, "None."),
+      secretForm(a),
       h("h4", {}, "Direct message"), h("button", {class: "btn", onclick: () => dmWith(a.name)}, "Message " + a.name)];
   }
   if (S.tab === "lessons") return [h("p", {class: "muted"}, "When a tool call fails, " + a.name + " writes a short lesson. Lessons are kept if they help later and dropped if they don't."),
@@ -322,10 +335,31 @@ function tabBody(a) {
       h("h4", {}, "New schedule in " + (S.room || "this room")), h("div", {class: "stack"}, preset, cron, what,
         h("button", {class: "btn primary", onclick: () => act(() => api("/api/jobs", {agent: a.name, room: S.room, cron: preset.value || cron.value.trim(), prompt: what.value.trim()}), "Scheduled")}, "Schedule"))];
   }
-  if (S.tab === "apps") return a.apps.length ? a.apps.map((n) => h("a", {class: "card", style: "display:block;color:inherit;text-decoration:none", target: "_blank", rel: "noopener",
-    href: "/apps/" + encodeURIComponent(a.name) + "/" + encodeURIComponent(n) + "/?token=" + encodeURIComponent(S.token)}, "▶ ", n)) : h("p", {class: "muted"}, "No apps yet. Ask " + a.name + " to publish one.");
+  if (S.tab === "apps") return a.apps.length ? [h("p", {class: "muted"}, "Apps run in a locked box: no network, no access to your workspace. Links open for one hour."), a.apps.map((n) => h("button", {class: "card item", style: "width:100%", onclick: async () => {
+    try { const r = await api("/api/applink?agent=" + encodeURIComponent(a.name) + "&app=" + encodeURIComponent(n)); window.open(r.url, "_blank", "noopener"); } catch (e) { toast(e.message, true); } }}, "▶ " + n))] : h("p", {class: "muted"}, "No apps yet. Ask " + a.name + " to publish one.");
+  if (S.tab === "safety") return safetyTab(a);
   if (S.tab === "activity") return c === undefined ? h("p", {class: "muted"}, "Loading…") : c.length ? c.map((x) => h("div", {class: "card"}, h("strong", {}, x.event), h("div", {}, h("small", {}, new Date(x.ts * 1000).toLocaleString() + (x.detail ? " · " + x.detail : ""))))) : h("p", {class: "muted"}, "Nothing yet.");
   return null;
+}
+function safetyTab(a) {
+  const st = S.state, sb = st.sandbox, u = st.usage, r = curRoom();
+  return [h("h4", {}, "Where your code runs"), h("div", {class: "card"}, h("strong", {}, sb.isolated ? "Isolated sandbox" : "Not isolated"), h("div", {}, sb.isolated
+      ? "Approved code sees only this agent's folder and a read-only system" + (sb.network_blocked ? ", with no network." : ". The network is not blocked here.")
+      : "Approved code runs with the server's permissions: it could read files and use the network. Only approve code you would run yourself."), h("small", {}, sb.backend + ": " + sb.note)),
+    h("h4", {}, "Where your messages go"), h("div", {class: "card"}, "Whenever an agent thinks, the conversation text (and tool results) is sent to ", h("strong", {}, st.provider), ". Files, secrets and your other chats stay on this server."),
+    h("h4", {}, "Cost guard"), h("div", {class: "card"}, u.calls + " model calls today" + (u.limit ? " of " + u.limit + " allowed (resets at midnight UTC)." : ", no limit set.")),
+    h("h4", {}, "Your data"), h("div", {class: "stack"},
+      h("button", {class: "btn", onclick: exportData}, "Download everything (JSON)"),
+      h("button", {class: "btn", onclick: () => confirmDialog("Delete old messages?", "Messages and log entries older than 30 days will be deleted for good.", "Delete", () => act(async () => { const r2 = await api("/api/purge", {days: 30}); toast("Deleted " + r2.deleted + " messages"); }))}, "Delete messages older than 30 days"),
+      r && r.kind !== "dm" ? h("button", {class: "btn danger", onclick: () => confirmDialog("Delete room " + r.name + "?", "Its messages, schedules and pending approvals are deleted for good.", "Delete room", async () => { await act(() => api("/api/room/delete", {name: r.name}), "Room deleted"); S.room = null; })}, "Delete this room") : null,
+      h("button", {class: "btn danger", onclick: () => confirmDialog("Delete " + a.name + "?", "Its files, apps, lessons, notes, secrets, schedules and chats are deleted for good. This cannot be undone.", "Delete " + a.name, async () => { await act(() => api("/api/agent/delete", {name: a.name}), "Agent deleted"); S.agent = null; S.room = null; })}, "Delete agent " + a.name))];
+}
+async function exportData() {
+  try { const d = await api("/api/export"); const url = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], {type: "application/json"}));
+    const a = h("a", {href: url, download: "kintsugi-export.json"}); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); } catch (e) { toast(e.message, true); }
+}
+function confirmDialog(title, text, label, run) {
+  dialog(title, text, h("div", {}), (close) => [h("button", {class: "btn", onclick: close}, "Cancel"), h("button", {class: "btn primary", onclick: () => { close(); run(); }}, label)]);
 }
 async function viewFile(agent, path) { try { S.file = await api("/api/file?agent=" + encodeURIComponent(agent) + "&path=" + encodeURIComponent(path)); S.sig.drawer = null; renderDrawer(); } catch (e) { toast(e.message, true); } }
 

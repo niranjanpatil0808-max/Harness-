@@ -96,6 +96,8 @@ python examples/workspace_demo.py            # offline tour, no key needed (reco
 kintsugi workspace serve                     # creates a starter team, prints a URL with your access token
 ```
 
+Safety and privacy: approvals show the full code, code runs in an isolated sandbox where Linux allows it, model calls have a daily cap, and you can download or delete your data ([SECURITY.md](SECURITY.md)). To run it somewhere you can reach from a phone, see [docs/HOSTING.md](docs/HOSTING.md) (Codespaces, Render, Docker).
+
 No computer? Open the repository in a **GitHub Codespace** (Code > Codespaces). It installs everything, starts the workspace and opens it in your browser, phone included. Add your model key as a Codespaces secret named `KINTSUGI_API_KEY` first (and `KINTSUGI_TOKEN` to choose your own access token). Details in [docs/WORKSPACE.md](docs/WORKSPACE.md).
 
 **Running the benchmark without a computer.** `.github/workflows/benchmark.yml` runs it on GitHub's servers. Add your key as the repository secret `KINTSUGI_API_KEY`, edit `benchmark/run.config` (base URL, then one `model|max_tokens|repeats|modes` entry per model) and push: the run starts and commits its results to `results/`. Rebuild the all-runs page with `python benchmark/build_results_md.py`.
@@ -171,7 +173,7 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 - **Memory retrieval is keyword overlap**, not embeddings.
 - **The model sees the tests.** That measures "fix to pass given tests", not "find an unknown bug".
 - **The workspace's learning is unmeasured.** Tests show the lesson mechanism works (a failed tool call produces a stored, retrieved, scored lesson); there is no experiment showing it makes agents better.
-- **The workspace sandbox is not a security sandbox.** Approved `run_python` code runs with your permissions (rlimits and a scrubbed environment, but it can still read files and use the network). The keychain is not encrypted unless the optional `cryptography` package is installed. One shared access token, no user accounts. See [docs/WORKSPACE.md](docs/WORKSPACE.md).
+- **The workspace sandbox is not a hardened container.** It isolates approved code with Linux namespaces where available (own folder only, no network); in containers that block that it falls back to a separate unprivileged user (network open), and if neither works it says "not isolated". The keychain is not encrypted unless the optional `cryptography` package is installed. One shared access token, no user accounts, no built-in TLS, not independently audited. See [SECURITY.md](SECURITY.md).
 - **Model code runs with your permissions.** The verifier uses a separate process, a temp directory and a timeout, but it is not a security sandbox.
 
 ## What's next
@@ -186,7 +188,7 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 src/kintsugi/   model.py  verifier.py  loop.py  memory.py  graph.py  cli.py
 src/kintsugi/workspace/   core.py  agents.py  tools.py  perms.py  sandbox.py  keychain.py
                 scheduler.py  server.py  db.py  cli.py  web/index.html
-docs/WORKSPACE.md   docs/demo.html   examples/workspace_demo.py   .devcontainer/
+SECURITY.md   Dockerfile   render.yaml   docs/WORKSPACE.md   docs/HOSTING.md   docs/demo.html   examples/workspace_demo.py   .devcontainer/
 benchmark/      tasks/  solutions/  split.json  check_tasks.py  run_benchmark.py
                 run.config  build_results_md.py  run_notes.json
 results/        every measured run (JSON + table + lessons learned)

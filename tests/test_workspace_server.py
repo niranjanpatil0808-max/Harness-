@@ -149,6 +149,74 @@ class TestServer(unittest.TestCase):
         self.assertEqual(self.ws.get_agent("alice")["persona"], "You are terse.")
         self.assertEqual(self.call("POST", "/api/persona", {"agent": "nobody", "persona": "x"})[0], 400)
 
+    def make_app(self):
+        app = self.ws.www_dir("alice") / "todo"
+        app.mkdir()
+        (app / "index.html").write_text("<h1>todo</h1>")
+
+    def test_app_links_are_signed_expire_and_work_for_one_app_only(self):
+        self.make_app()
+        other = self.ws.www_dir("alice") / "other"
+        other.mkdir()
+        (other / "index.html").write_text("other")
+        status, data, _ = self.call("GET", "/api/applink?agent=alice&app=todo")
+        link = json.loads(data)["url"]
+        self.assertNotIn("secret-token", link)  # the access token never goes into a URL
+        self.assertEqual(self.call("GET", link, token=None)[0], 200)
+        self.assertEqual(self.call("GET", link.replace("/todo/", "/other/"), token=None)[0], 401)  # not for another app
+        self.assertEqual(self.call("GET", link[:-3] + "000", token=None)[0], 401)  # tampered signature
+        expired = "/apps/alice/todo/?exp=1&sig=" + link.split("sig=")[1]
+        self.assertEqual(self.call("GET", expired, token=None)[0], 401)
+        self.assertEqual(self.call("GET", "/apps/alice/todo/?token=secret-token", token=None)[0], 401)  # no token in URLs
+        self.assertEqual(self.call("GET", "/api/applink?agent=alice&app=nope")[0], 400)
+
+    def test_security_headers_and_health_check(self):
+        status, data, resp = self.call("GET", "/", token=None)
+        self.assertIn("script-src 'self'", resp.getheader("Content-Security-Policy"))
+        self.assertIn("frame-ancestors 'none'", resp.getheader("Content-Security-Policy"))
+        self.assertEqual(resp.getheader("X-Frame-Options"), "DENY")
+        self.assertEqual(resp.getheader("Referrer-Policy"), "no-referrer")
+        status, data, _ = self.call("GET", "/healthz", token=None)
+        self.assertEqual((status, json.loads(data)), (200, {"ok": True}))
+
+    def test_many_wrong_tokens_get_a_client_turned_away_even_with_the_right_one(self):
+        for _ in range(10):
+            self.assertEqual(self.call("GET", "/api/state", token="guess")[0], 401)
+        self.assertEqual(self.call("GET", "/api/state")[0], 401)  # throttled: even the real token is refused for a while
+
+    def test_a_weak_token_is_refused_when_listening_on_a_network(self):
+        with self.assertRaises(SystemExit) as caught:
+            make_server(self.ws, host="0.0.0.0", port=0, token="short")
+        self.assertIn("KINTSUGI_TOKEN", str(caught.exception))
+        strong = make_server(self.ws, host="0.0.0.0", port=0, token="x" * 32)
+        strong.server_close()
+
+    def test_secrets_can_be_stored_but_never_come_back(self):
+        status, data, _ = self.call("POST", "/api/secret", {"agent": "alice", "name": "API_TOKEN", "value": "sk-very-secret-value"})
+        self.assertEqual(status, 200)
+        self.assertNotIn("sk-very-secret", data.decode())
+        everything = self.call("GET", "/api/state")[1].decode() + self.call("GET", "/api/export")[1].decode() + \
+            self.call("GET", "/api/audit")[1].decode()
+        self.assertNotIn("sk-very-secret-value", everything)
+        self.assertIn("API_TOKEN", self.call("GET", "/api/state")[1].decode())
+        self.assertEqual(self.call("POST", "/api/secret", {"agent": "alice", "name": "bad name", "value": "x"})[0], 400)
+        self.assertEqual(self.call("POST", "/api/secret/delete", {"agent": "alice", "name": "API_TOKEN"})[0], 200)
+        self.assertEqual(self.ws.keychain.names("alice"), [])
+
+    def test_state_tells_the_user_where_data_goes_and_how_code_is_isolated(self):
+        state = json.loads(self.call("GET", "/api/state")[1])
+        self.assertIn("backend", state["sandbox"])
+        self.assertTrue(state["provider"])
+        self.assertEqual(set(state["usage"]), {"calls", "limit"})
+
+    def test_delete_and_purge_endpoints(self):
+        self.ws.post_system("general", "old")
+        self.assertEqual(self.call("POST", "/api/purge", {"days": 0})[0], 200)
+        self.assertEqual(self.call("POST", "/api/room/delete", {"name": "general"})[0], 200)
+        self.assertEqual(self.call("POST", "/api/agent/delete", {"name": "alice"})[0], 200)
+        self.assertEqual(self.call("POST", "/api/agent/delete", {"name": "alice"})[0], 400)
+        self.assertEqual(json.loads(self.call("GET", "/api/state")[1])["agents"], [])
+
     def test_token_can_come_from_the_environment(self):
         from unittest import mock
 

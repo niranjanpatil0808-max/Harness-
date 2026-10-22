@@ -6,21 +6,31 @@ apps are served with a sandboxing Content-Security-Policy so they cannot reach t
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import mimetypes
 import os
 import secrets
+import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from . import sandbox
 from .core import Workspace, WorkspaceError
+from .keychain import _write_private
 from .sandbox import PathError, safe_path
 from .scheduler import Scheduler
 
 MAX_BODY = 64_000
 WEB = Path(__file__).parent / "web"
+PAGE_CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+            "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+APP_LINK_SECONDS = 3600
+MAX_FAILURES, FAILURE_WINDOW = 10, 60  # wrong tokens per client per minute before it is turned away
+MIN_PUBLIC_TOKEN = 24
 APP_CSP = ("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; "
            "style-src 'unsafe-inline'; img-src data:")
 
@@ -32,9 +42,19 @@ def load_token(ws: Workspace) -> str:
         return env
     path = ws.root / "token"
     if not path.exists():
-        path.write_text(secrets.token_urlsafe(24))
-        path.chmod(0o600)
+        _write_private(path, secrets.token_urlsafe(24).encode())
     return path.read_text().strip()
+
+
+def is_loopback(host: str) -> bool:
+    return host in ("127.0.0.1", "localhost", "::1")
+
+
+def _lessons(ws: Workspace, agent: str) -> list[dict]:
+    from kintsugi.memory import MemoryStore
+
+    store = MemoryStore.load(ws.lessons_path(agent))
+    return [{"text": l.text, "uses": l.uses, "wins": l.wins, "status": l.status} for l in store.lessons]
 
 
 def _apps(ws: Workspace, agent: str) -> list[str]:
@@ -44,6 +64,15 @@ def _apps(ws: Workspace, agent: str) -> list[str]:
 
 def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token: str | None = None) -> ThreadingHTTPServer:
     token = token or load_token(ws)
+    if not is_loopback(host) and len(token) < MIN_PUBLIC_TOKEN:
+        raise SystemExit(f"Refusing to listen on {host}: when the workspace is reachable from a network, KINTSUGI_TOKEN "
+                         f"must be a long random string (at least {MIN_PUBLIC_TOKEN} characters).")
+    failures: dict[str, list[float]] = {}
+    failure_lock = threading.Lock()
+    trust_proxy = os.environ.get("KINTSUGI_TRUST_PROXY") == "1"
+
+    def sign(agent: str, app: str, expires: int) -> str:
+        return hmac.new(token.encode(), f"{agent}/{app}/{expires}".encode(), hashlib.sha256).hexdigest()
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "Kintsugi"
@@ -57,7 +86,10 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Cache-Control", "no-store")
+            if "Content-Security-Policy" not in (extra or {}):
+                self.send_header("X-Frame-Options", "DENY")
             for key, value in (extra or {}).items():
                 self.send_header(key, value)
             self.end_headers()
@@ -66,9 +98,38 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
         def _json(self, status: int, data) -> None:
             self._send(status, json.dumps(data).encode())
 
-        def _authorized(self, query: dict) -> bool:
-            given = self.headers.get("X-Token") or (query.get("token") or [""])[0]
-            return hmac.compare_digest(given.encode(), token.encode())
+        def _client(self) -> str:
+            if trust_proxy:  # behind a hosting platform's proxy the real client is the last forwarded address
+                forwarded = self.headers.get("X-Forwarded-For", "")
+                if forwarded:
+                    return forwarded.split(",")[-1].strip()
+            return self.client_address[0]
+
+        def _authorized(self, query: dict = None) -> bool:
+            """Check the access token (header only, never the URL). Clients with many wrong tries are turned away."""
+            client, now = self._client(), time.time()
+            with failure_lock:
+                recent = [t for t in failures.get(client, []) if now - t < FAILURE_WINDOW]
+                failures[client] = recent
+                if len(recent) >= MAX_FAILURES:
+                    return False
+            given = self.headers.get("X-Token") or ""
+            if hmac.compare_digest(given.encode(), token.encode()):
+                return True
+            with failure_lock:
+                failures.setdefault(client, []).append(now)
+                if len(failures) > 5000:  # never let the table itself grow without bound
+                    failures.clear()
+            return False
+
+        def _app_link_ok(self, parts: list[str], query: dict) -> bool:
+            """A published app is opened with a link that expires and works for that one app only."""
+            try:
+                expires, signature = int((query.get("exp") or ["0"])[0]), (query.get("sig") or [""])[0]
+            except ValueError:
+                return False
+            return (len(parts) >= 4 and expires > time.time()
+                    and hmac.compare_digest(signature, sign(parts[2], parts[3], expires)))
 
         def _body(self) -> dict:
             length = int(self.headers.get("Content-Length") or 0)
@@ -83,18 +144,24 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
         def do_GET(self):
             url = urlparse(self.path)
             query = parse_qs(url.query)
+            if url.path == "/healthz":  # for hosting platforms; reveals nothing
+                return self._json(200, {"ok": True})
             if url.path in ("/", "/index.html"):
-                return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8")
+                return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8",
+                                  {"Content-Security-Policy": PAGE_CSP, "X-Frame-Options": "DENY"})
+            if url.path.startswith("/apps/"):
+                if not (self._app_link_ok(url.path.split("/"), query) or self._authorized()):
+                    return self._json(401, {"error": "this app link is missing, wrong or expired; open it from the workspace"})
+                return self._guard(lambda: self._app(url.path))
             if url.path.startswith("/static/"):  # the page's own scripts and styles; public, read-only
                 return self._static(url.path[len("/static/"):])
-            if not self._authorized(query):
+            if not self._authorized():
                 return self._json(401, {"error": "missing or wrong access token"})
-            self._guard(lambda: self._app(url.path) if url.path.startswith("/apps/")
-                        else self._json(200, self._get(url.path, query)))
+            self._guard(lambda: self._json(200, self._get(url.path, query)))
 
         def do_POST(self):
             url = urlparse(self.path)
-            if not self._authorized(parse_qs(url.query)):
+            if not self._authorized():
                 return self._json(401, {"error": "missing or wrong access token"})
             self._guard(lambda: self._json(200, self._post(url.path, self._body())))
 
@@ -117,7 +184,9 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                                     "secrets": ws.keychain.names(a["name"]), "apps": _apps(ws, a["name"])}
                                    for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"])} for r in ws.list_rooms()],
-                        "approvals": ws.approvals(), "jobs": ws.list_jobs(), "busy": ws.busy()}
+                        "approvals": ws.approvals(), "jobs": ws.list_jobs(), "busy": ws.busy(),
+                        "sandbox": sandbox.status(), "provider": ws.provider(),
+                        "usage": {"calls": ws.calls_today(), "limit": ws.daily_calls}}
             if path == "/api/messages":
                 room = query["room"][0]
                 return ws.history(room, after=int((query.get("after") or ["0"])[0]))
@@ -128,6 +197,18 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 ws.get_agent(agent)
                 base = ws.files_dir(agent)
                 return sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file())[:200]
+            if path == "/api/applink":
+                agent, app = query["agent"][0], query["app"][0]
+                if app not in _apps(ws, agent):
+                    raise WorkspaceError("no such app")
+                expires = int(time.time()) + APP_LINK_SECONDS
+                return {"url": f"/apps/{agent}/{app}/?exp={expires}&sig={sign(agent, app, expires)}"}
+            if path == "/api/export":  # everything except secret values, as one JSON document
+                return {"agents": [{k: a[k] for k in ("name", "persona", "tier", "tools")} for a in ws.list_agents()],
+                        "rooms": [{**r, "members": ws.members(r["name"]), "messages": ws.history(r["name"], limit=100000)}
+                                  for r in ws.list_rooms()],
+                        "notes": ws.db.query("SELECT agent, text, ts FROM notes"), "jobs": ws.list_jobs(),
+                        "lessons": {a["name"]: _lessons(ws, a["name"]) for a in ws.list_agents()}}
             if path == "/api/file":
                 agent = query["agent"][0]
                 ws.get_agent(agent)
@@ -136,11 +217,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     raise WorkspaceError("no such file")
                 return {"path": query["path"][0], "text": target.read_text(errors="replace")[:100_000]}
             if path == "/api/lessons":
-                from kintsugi.memory import MemoryStore
-
                 ws.get_agent(query["agent"][0])
-                store = MemoryStore.load(ws.lessons_path(query["agent"][0]))
-                return [{"text": l.text, "uses": l.uses, "wins": l.wins, "status": l.status} for l in store.lessons]
+                return _lessons(ws, query["agent"][0])
             raise WorkspaceError("unknown endpoint")
 
         def _post(self, path: str, body: dict):
@@ -159,6 +237,24 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/persona":
                 ws.set_persona(str(body["agent"]), str(body["persona"]))
                 return {"ok": True}
+            if path == "/api/secret":  # the value goes to the keychain only; it is never sent back or shown
+                ws.get_agent(str(body["agent"]))
+                ws.keychain.set(str(body["agent"]), str(body["name"]), str(body["value"]))
+                ws.audit(str(body["agent"]), "secret-set", str(body["name"]))
+                return {"ok": True}
+            if path == "/api/secret/delete":
+                ws.get_agent(str(body["agent"]))
+                ws.keychain.delete(str(body["agent"]), str(body["name"]))
+                ws.audit(str(body["agent"]), "secret-deleted", str(body["name"]))
+                return {"ok": True}
+            if path == "/api/agent/delete":
+                ws.delete_agent(str(body["name"]))
+                return {"ok": True}
+            if path == "/api/room/delete":
+                ws.delete_room(str(body["name"]))
+                return {"ok": True}
+            if path == "/api/purge":
+                return {"deleted": ws.purge_messages(float(body["days"]))}
             if path == "/api/tier":
                 ws.set_tier(str(body["agent"]), str(body["tier"]))
                 return {"ok": True}
@@ -212,9 +308,16 @@ def serve(ws: Workspace, host: str = "127.0.0.1", port: int = 8765) -> None:
     server = make_server(ws, host, port)
     scheduler = Scheduler(ws)
     scheduler.start()
-    url = f"http://{host}:{server.server_port}/"
-    print(f"Kintsugi workspace is running.\n  Open: {url}#token={server.token}")  # type: ignore[attr-defined]
-    print(f"  (the access token is also saved in {ws.root / 'token'}; set KINTSUGI_TOKEN to choose your own)")
+    info = sandbox.status()
+    if is_loopback(host):
+        print(f"Kintsugi workspace is running.\n  Open: http://{host}:{server.server_port}/#token={server.token}")  # type: ignore[attr-defined]
+        print(f"  (the access token is also saved in {ws.root / 'token'}; set KINTSUGI_TOKEN to choose your own)")
+    else:
+        print(f"Kintsugi workspace is listening on {host}:{server.server_port}. Open your service's address and sign in "
+              "with the KINTSUGI_TOKEN you set. (The token is not printed here.)")
+    print(f"  Code sandbox: {info['backend']}" + ("" if info["isolated"] else
+          " (NOT isolated: approved code runs with this program's permissions. Set KINTSUGI_SANDBOX=require to disable it.)"))
+    print(f"  Conversations are sent to: {ws.provider()}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

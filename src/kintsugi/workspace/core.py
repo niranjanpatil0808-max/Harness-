@@ -8,7 +8,9 @@ agents answering agents stops after MAX_HOPS, so two agents can never chat forev
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
 import threading
 import time
 from collections import defaultdict, deque
@@ -29,10 +31,31 @@ MENTION_RE = re.compile(r"(?<![\w@])@([a-z][a-z0-9_-]*)")
 MAX_HOPS = 4  # agent-to-agent replies in a row before the thread goes quiet
 MAX_RUNS_PER_MINUTE = 20  # per agent
 MAX_MESSAGE_CHARS = 4000
+MAX_AGENTS = 50
+MAX_ROOMS = 200
+DEFAULT_DAILY_CALLS = 500  # model calls per day for the whole workspace; KINTSUGI_DAILY_CALLS=0 turns the cap off
 
 
 class WorkspaceError(ValueError):
     """A request the workspace refuses (unknown agent, bad name, not a member...)."""
+
+
+class BudgetExceeded(RuntimeError):
+    """The workspace's daily model-call limit is used up (protects your API quota from runaway loops)."""
+
+
+class _Budgeted:
+    """Wraps a model so every call is counted against the daily limit. Everything else passes straight through."""
+
+    def __init__(self, model: Model, ws: "Workspace") -> None:
+        self._model, self._ws = model, ws
+
+    def complete(self, messages: list[dict]) -> str:
+        self._ws.spend_call()
+        return self._model.complete(messages)
+
+    def __getattr__(self, name: str):
+        return getattr(self._model, name)
 
 
 def default_model_factory(agent: str) -> Model:
@@ -45,8 +68,14 @@ class Workspace:
                  encrypt_keychain: bool | None = None) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        # Data is private to this user. When running as root (a container), the server's data stays root-only and
+        # only the path to each agent's own folder is traversable, so code run as the agent's user id cannot read it.
+        os.chmod(self.root, 0o711 if os.geteuid() == 0 else 0o700)
         self.db = Database(self.root / "workspace.db")
         self.keychain = Keychain(self.root / "keychain", encrypt=encrypt_keychain)
+        os.chmod(self.keychain.folder, 0o700)
+        raw = os.environ.get("KINTSUGI_DAILY_CALLS", "")
+        self.daily_calls = int(raw) if raw.strip().isdigit() else DEFAULT_DAILY_CALLS
         self.model_factory = model_factory or default_model_factory
         self.clock = clock
         self.sync = sync  # True: agents run inside post(); False: on a worker pool (the server)
@@ -78,6 +107,8 @@ class Workspace:
     # --- agents ----------------------------------------------------------
 
     def create_agent(self, name: str, persona: str = "", tier: str = "auto", tools: list[str] | None = None) -> None:
+        if len(self.list_agents()) >= MAX_AGENTS:
+            raise WorkspaceError(f"at most {MAX_AGENTS} agents")
         if not NAME_RE.match(name) or name == "system":
             raise WorkspaceError("names are lowercase letters, digits, '-' and '_', start with a letter, and cannot be 'system'")
         if tier not in perms.TIERS:
@@ -94,7 +125,18 @@ class Workspace:
                         (name, persona[:1000], tier, None if tools is None else json.dumps(tools), self.clock()))
         self.files_dir(name).mkdir(parents=True, exist_ok=True)
         self.www_dir(name).mkdir(parents=True, exist_ok=True)
+        self._lock_agent_dirs(name)
         self.audit(name, "agent-created", tier)
+
+    def _lock_agent_dirs(self, name: str) -> None:
+        """Private permissions for an agent's folders. (With the drop-user sandbox, run_python hands the folder to the
+        agent's own user id for the duration of a run.)"""
+        (self.root / "agents").mkdir(exist_ok=True)
+        root = os.geteuid() == 0
+        os.chmod(self.root / "agents", 0o711 if root else 0o700)
+        os.chmod(self.agent_dir(name), 0o711 if root else 0o700)
+        os.chmod(self.files_dir(name), 0o700)
+        os.chmod(self.www_dir(name), 0o755 if root else 0o700)
 
     def get_agent(self, name: str, missing_ok: bool = False) -> dict | None:
         row = self.db.one("SELECT * FROM agents WHERE name = ?", (name,))
@@ -122,12 +164,78 @@ class Workspace:
 
     def model_for(self, agent: str) -> Model:
         if agent not in self._models:
-            self._models[agent] = self.model_factory(agent)
+            self._models[agent] = _Budgeted(self.model_factory(agent), self)
         return self._models[agent]
+
+    def provider(self) -> str:
+        """Where conversation text is sent when an agent thinks: the model provider's host."""
+        if self.model_factory is not default_model_factory:
+            return "a custom model (not the default API)"
+        from kintsugi.model import DEFAULT_BASE_URL
+        from urllib.parse import urlparse
+
+        return urlparse(os.environ.get("KINTSUGI_BASE_URL") or DEFAULT_BASE_URL).netloc
+
+    # --- daily model-call budget ------------------------------------------
+
+    def _day(self) -> str:
+        return time.strftime("%Y-%m-%d", time.gmtime(self.clock()))
+
+    def calls_today(self) -> int:
+        row = self.db.one("SELECT calls FROM usage WHERE day = ?", (self._day(),))
+        return row["calls"] if row else 0
+
+    def spend_call(self) -> None:
+        """Count one model call; raise BudgetExceeded when the daily limit is used up."""
+        with self._lock:
+            if self.daily_calls and self.calls_today() >= self.daily_calls:
+                raise BudgetExceeded(f"the daily limit of {self.daily_calls} model calls is used up "
+                                     "(raise it with KINTSUGI_DAILY_CALLS, or wait until tomorrow, UTC)")
+            self.db.execute("INSERT INTO usage (day, calls) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET calls = calls + 1",
+                            (self._day(),))
+
+    # --- deleting data (privacy) ---------------------------------------------
+
+    def delete_agent(self, name: str) -> None:
+        """Remove an agent and everything it owns: files, apps, lessons, notes, secrets, jobs, approvals,
+        its direct messages and the messages it wrote."""
+        self.get_agent(name)
+        dms = [r["room"] for r in self.db.query("SELECT room FROM members WHERE member = ?", (name,))
+               if r["room"].startswith("dm-")]
+        for room in dms:
+            self.delete_room(room)
+        for table in ("notes", "jobs", "approvals"):
+            self.db.execute(f"DELETE FROM {table} WHERE agent = ?", (name,))
+        self.db.execute("DELETE FROM messages WHERE sender = ?", (name,))
+        self.db.execute("DELETE FROM members WHERE member = ?", (name,))
+        self.db.execute("DELETE FROM audit WHERE agent = ?", (name,))
+        self.db.execute("DELETE FROM agents WHERE name = ?", (name,))
+        shutil.rmtree(self.agent_dir(name), ignore_errors=True)
+        (self.keychain.folder / f"{name}.json").unlink(missing_ok=True)
+        self._models.pop(name, None)
+        self.audit(None, "agent-deleted", name)
+
+    def delete_room(self, room: str) -> None:
+        self._require_room(room)
+        for table in ("messages", "members", "jobs", "approvals"):
+            self.db.execute(f"DELETE FROM {table} WHERE room = ?", (room,))
+        self.db.execute("DELETE FROM rooms WHERE name = ?", (room,))
+        self.audit(None, "room-deleted", room)
+
+    def purge_messages(self, older_than_days: float) -> int:
+        """Delete messages older than the given number of days (and old audit entries). Returns how many messages."""
+        cutoff = self.clock() - older_than_days * 86400
+        count = self.db.one("SELECT COUNT(*) AS n FROM messages WHERE ts < ?", (cutoff,))["n"]
+        self.db.execute("DELETE FROM messages WHERE ts < ?", (cutoff,))
+        self.db.execute("DELETE FROM audit WHERE ts < ?", (cutoff,))
+        self.audit(None, "purged", f"{count} messages older than {older_than_days:g} days")
+        return count
 
     # --- rooms -----------------------------------------------------------
 
     def create_room(self, name: str, members: list[str] | tuple = ()) -> None:
+        if len(self.list_rooms()) >= MAX_ROOMS:
+            raise WorkspaceError(f"at most {MAX_ROOMS} rooms")
         if not NAME_RE.match(name) or name.startswith("dm-"):
             raise WorkspaceError("room names are lowercase letters, digits, '-' and '_' (and cannot start with 'dm-')")
         if self.db.one("SELECT 1 FROM rooms WHERE name = ?", (name,)):

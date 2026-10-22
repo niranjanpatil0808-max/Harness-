@@ -7,7 +7,9 @@ output and writes the audit trail.
 
 from __future__ import annotations
 
+import difflib
 import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -156,7 +158,7 @@ def run_python_tool(ctx: Ctx, args: dict) -> str:
         raise ToolError(str(err.args[0])) from None
     timeout = float(args.get("timeout", 10))
     timeout = 10.0 if timeout != timeout else min(max(timeout, 1.0), 30.0)
-    ok, output = run_python(ctx.ws.files_dir(ctx.agent), code, timeout=timeout, extra_env=env)
+    ok, output = run_python(ctx.ws.files_dir(ctx.agent), code, timeout=timeout, extra_env=env, agent=ctx.agent)
     if not ok:
         raise ToolError(output)
     return output
@@ -191,6 +193,9 @@ class _RecordingModel:
 
 def fix_code(ctx: Ctx, args: dict) -> str:
     """Run the Kintsugi loop (attempt, test, retry) on a task folder inside the agent's folder."""
+    if os.geteuid() == 0 and os.environ.get("KINTSUGI_ALLOW_FIX_CODE_AS_ROOT") != "1":
+        raise ToolError("fix_code is disabled while the server runs as root (for example in a container): it tests "
+                        "model-written code outside the sandbox. Run the workspace as a normal user to use it.")
     folder = _path(ctx, _text(args, "path", 300))
     if not (folder / "task.json").is_file():
         raise ToolError("that folder needs a task.json with a description, source files and test_*.py files")
@@ -242,6 +247,35 @@ TOOLS: dict[str, Tool] = {t.name: t for t in [
 ]}
 
 
+# Small models often use a different name for an argument. These are accepted so a harmless slip does not cost a step.
+ALIASES = {
+    "path": ("file", "filename", "file_name", "filepath", "file_path", "name"),
+    "content": ("text", "contents", "body", "data"),
+    "code": ("script", "source", "python", "python_code", "program"),
+    "text": ("message", "msg", "content", "note"),
+    "query": ("q", "search", "keywords", "text"),
+    "html": ("content", "code", "page", "source"),
+    "cron": ("schedule", "when", "expression"),
+    "prompt": ("task", "instruction", "message", "text"),
+}
+WANTED = {"send_message": ("text",), "read_file": ("path",), "write_file": ("path", "content"), "list_files": (),
+          "remember": ("text",), "search_memory": ("query",), "run_python": ("code",), "publish_app": ("name", "html"),
+          "fix_code": ("path",), "schedule": ("cron", "prompt"), "map_project": (), "list_secrets": ()}
+
+
+def normalize_args(tool: str, args: dict) -> dict:
+    """Map common alternative argument names onto the real ones (only when the real one is missing)."""
+    fixed = dict(args)
+    for want in WANTED.get(tool, ()):
+        if want in fixed:
+            continue
+        for alias in ALIASES.get(want, ()):
+            if alias in fixed and alias not in WANTED.get(tool, ()):
+                fixed[want] = fixed.pop(alias)
+                break
+    return fixed
+
+
 def describe_tools(allowed: list[str] | None) -> str:
     return "\n".join(f"- {t.doc}" for t in TOOLS.values() if allowed is None or t.name in allowed)
 
@@ -250,9 +284,12 @@ def execute(ctx: Ctx, name: str, args: object, approved: bool = False) -> Outcom
     """Apply the permission tier, then run the tool. `approved=True` skips the tier (a human said yes)."""
     spec = TOOLS.get(name)
     if spec is None:
-        return Outcome("error", f"unknown tool '{name}'")
+        near = difflib.get_close_matches(str(name), list(TOOLS), n=2, cutoff=0.5)
+        hint = f" Did you mean: {', '.join(near)}?" if near else ""
+        return Outcome("error", f"unknown tool '{name}'.{hint} Available tools: {', '.join(TOOLS)}.")
     if not isinstance(args, dict):
         return Outcome("error", "tool arguments must be a JSON object")
+    args = normalize_args(name, args)
     agent = ctx.ws.get_agent(ctx.agent)
     decision = perms.ALLOW if approved else perms.decide(agent["tier"], spec.risk, name, agent["tools"])
     if approved and agent["tools"] is not None and name not in agent["tools"]:
@@ -272,5 +309,7 @@ def execute(ctx: Ctx, name: str, args: object, approved: bool = False) -> Outcom
     except (OSError, ValueError, TypeError, KeyError) as err:
         output, status = f"{type(err).__name__}: {err}", "error"
     output = ctx.ws.keychain.redact(ctx.agent, output)
-    ctx.ws.audit(ctx.agent, f"tool-{status}", f"{name} {json.dumps(args)[:200]}")
+    if status == "error":
+        output += f"\nUsage: {spec.doc}"  # remind the model of the exact format after a mistake
+    ctx.ws.audit(ctx.agent, f"tool-{status}", ctx.ws.keychain.redact(ctx.agent, f"{name} {json.dumps(args)[:200]}"))
     return Outcome(status, output)

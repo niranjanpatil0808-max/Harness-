@@ -1,0 +1,11 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+results
+benchmark
+memory
+workspace
+docs
+tests

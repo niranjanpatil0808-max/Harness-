@@ -1,0 +1,20 @@
+# Deploys the workspace on Render (https://render.com) from this repository: New > Blueprint.
+# KINTSUGI_TOKEN is generated for you: open the service's Environment tab to read it, then use it to sign in.
+# The free plan sleeps when idle and does not keep files between deploys (see docs/HOSTING.md).
+services:
+  - type: web
+    name: kintsugi-workspace
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: KINTSUGI_TOKEN
+        generateValue: true
+      - key: KINTSUGI_API_KEY
+        sync: false          # you paste your model API key in Render's dashboard, never in the repository
+      - key: KINTSUGI_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: KINTSUGI_MODEL
+        value: openai/gpt-oss-20b
+      - key: KINTSUGI_DAILY_CALLS
+        value: "300"
