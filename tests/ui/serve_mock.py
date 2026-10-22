@@ -47,6 +47,20 @@ class _FakeSearch(BaseHTTPRequestHandler):  # a stand-in search provider so the 
         self.wfile.write(body)
 
 
+class _FakePush(BaseHTTPRequestHandler):  # a stand-in push service (the real ones cannot be reached from tests)
+    def log_message(self, *a):
+        pass
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        self.send_response(201)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+
+_push = ThreadingHTTPServer(("127.0.0.1", 8806), _FakePush)
+threading.Thread(target=_push.serve_forever, daemon=True).start()
+os.environ["KINTSUGI_PUSH_ALLOW_LOCAL"] = "1"
 _fake = ThreadingHTTPServer(("127.0.0.1", 0), _FakeSearch)
 threading.Thread(target=_fake.serve_forever, daemon=True).start()
 os.environ["KINTSUGI_SEARCH_BASE_URL"] = f"http://127.0.0.1:{_fake.server_port}"

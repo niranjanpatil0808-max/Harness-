@@ -13,6 +13,7 @@ dependencies = []
 
 [project.optional-dependencies]
 chart = ["matplotlib"]
+push = ["cryptography>=42"]  # phone notifications and encrypted backups (optional)
 
 [project.scripts]
 kintsugi = "kintsugi.cli:main"

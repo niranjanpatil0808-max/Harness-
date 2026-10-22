@@ -27,7 +27,7 @@ const ICONS = {
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', side: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15"/>',
   panel: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M14.5 4.5v15"/>', send: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   theme: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
-  close: '<path d="M6 6l12 12M18 6 6 18"/>', mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', speaker: '<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/>', gear: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>', plus: '<path d="M12 5v14M5 12h14"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', speaker: '<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/>', gear: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>', plus: '<path d="M12 5v14M5 12h14"/>',
 };
 function icon(name, size = 18) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -54,7 +54,7 @@ function toast(msg, bad) {
 }
 
 async function api(path, body) {
-  const r = await fetch(path, {method: body ? "POST" : "GET", headers: {"X-Token": S.token, "Content-Type": "application/json"},
+  const r = await fetch(path, {method: body ? "POST" : "GET", headers: {"X-Token": S.token, "Content-Type": "application/json", "X-Visible": document.visibilityState === "visible" ? "1" : "0"},
                                body: body ? JSON.stringify(body) : undefined});
   let d = {}; try { d = await r.json(); } catch (e) { /* empty */ }
   if (r.status === 401) { connectDialog(); throw new Error("Enter your access token"); }
@@ -98,10 +98,10 @@ function sigChanged(key, data) { const s = JSON.stringify(data); if (S.sig[key] 
 function renderSidebar() {
   const st = S.state; if (!st) return;
   const pend = {}; st.approvals.forEach((a) => (pend[a.room] = (pend[a.room] || 0) + 1));
-  if (!sigChanged("side", [st.rooms, st.agents.map((a) => a.name), st.busy, pend, S.room, st.improve, !!S.installEvent, IS_STANDALONE()])) return;
+  if (!sigChanged("side", [st.rooms, st.agents.map((a) => a.name), st.busy, pend, S.room, st.improve, !!S.installEvent, IS_STANDALONE(), st.jobs.map((j) => [j.id, j.enabled]), seen(), st.rooms.map((r) => r.last_other)])) return;
   const roomItem = (r) => h("button", {class: "item" + (r.name === S.room ? " on" : ""), onclick: () => openRoom(r.name)},
     r.kind === "dm" ? avatar(roomLabel(r)) : h("span", {class: "muted", style: "width:24px;text-align:center"}, "#"),
-    h("span", {class: "t"}, roomLabel(r)), busyIn(r).length ? h("span", {class: "dot", title: "working"}) : null,
+    h("span", {class: "t", style: isUnread(r) && r.name !== S.room ? "font-weight:700" : ""}, roomLabel(r)), busyIn(r).length ? h("span", {class: "dot", title: "working"}) : (isUnread(r) && r.name !== S.room ? h("span", {class: "dot", title: "new", style: "animation:none"}) : null),
     pend[r.name] ? h("span", {class: "badge"}, pend[r.name]) : null);
   const dms = st.rooms.filter((r) => r.kind === "dm"), grp = st.rooms.filter((r) => r.kind !== "dm");
   const side = $("#sidebar"); fill(side,
@@ -115,11 +115,28 @@ function renderSidebar() {
       st.agents.map((a) => h("button", {class: "item", title: a.persona || a.name, onclick: () => dmWith(a.name)},
         avatar(a.name), h("span", {class: "t"}, a.name), st.busy.includes(a.name) ? h("span", {class: "dot"}) : h("span", {class: "muted", style: "font-size:12px"}, a.tier))),
       h("button", {class: "item muted", onclick: newAgentDialog}, h("span", {style: "width:24px;text-align:center"}, "+"), "New agent"),
+      h("button", {class: "item muted", onclick: () => automationsDialog()}, h("span", {style: "width:24px;text-align:center"}, "⏰"), "Automations", jobBadge()),
       canInstall() ? h("button", {class: "item muted", onclick: installApp}, h("span", {style: "width:24px;text-align:center"}, "⤓"), "Install the app") : null),
     h("div", {class: "side-foot"}, avatar("you"), h("span", {class: "who"}, "you"),
       h("button", {class: "icon-btn", "aria-label": "Change theme", title: "Theme", onclick: cycleTheme}, icon("theme")),
       h("button", {class: "icon-btn", "aria-label": "Settings", title: "Settings: self-improvement", onclick: settingsDialog}, icon("gear"))));
 }
+/* what you have already seen in each room, kept on this device */
+const seen = () => { try { return JSON.parse(store.get("kt-seen") || "{}"); } catch (e) { return {}; } };
+const isUnread = (r) => (r.last_other || 0) > (seen()[r.name] || 0);
+function markSeen(room) {
+  const r = rooms().find((x) => x.name === room); if (!r || !r.last_other) return;
+  const s = seen(); if ((s[room] || 0) >= r.last_other) return;
+  s[room] = r.last_other; store.set("kt-seen", JSON.stringify(s)); S.sig.side = null;
+}
+function syncUnread() {
+  if (!S.state) return;
+  if (document.visibilityState === "visible" && S.room) markSeen(S.room);
+  const n = rooms().filter(isUnread).length;
+  document.title = (n ? "(" + n + ") " : "") + "Kintsugi";
+  try { if (navigator.setAppBadge) { if (n) navigator.setAppBadge(n); else navigator.clearAppBadge && navigator.clearAppBadge(); } } catch (e) { /* not supported */ }
+}
+const jobBadge = () => { const n = S.state ? S.state.jobs.filter((j) => j.enabled).length : 0; return n ? h("span", {class: "muted", style: "margin-left:auto;font-size:12px"}, n + " on") : null; };
 const canInstall = () => !IS_STANDALONE() && (!!S.installEvent || IS_IOS);
 async function installApp() {
   if (S.installEvent) {
@@ -173,7 +190,10 @@ function bodyOf(m) {
     }
     return h("div", {class: "sys"}, m.text);
   }
-  if (/^cron-\d+$/.test(m.sender)) return h("div", {class: "sys cron"}, "⏰ Scheduled: " + m.text.replace(/^@\S+\s*/, ""));
+  if (/^cron-\d+$/.test(m.sender)) {
+    const job = S.state && S.state.jobs.find((j) => "cron-" + j.id === m.sender), body = m.text.replace(/^@\S+\s*/, "");
+    return h("div", {class: "sys cron"}, "⏰ " + (job && job.title ? job.title : "Scheduled: " + body.slice(0, 90)));
+  }
   if (m.sender === "you") return h("div", {class: "row me", title: clock(m.ts)}, h("div", {class: "bubble"}, m.text));
   const agent = isAgent(m.sender);
   return h("div", {class: "row"}, avatar(m.sender, true),
@@ -331,7 +351,110 @@ function speak(text) {
 function stopSpeaking() { if (CAN_SPEAK) speechSynthesis.cancel(); }
 function maybeSpeak(msgs) { if (voice().speak) for (const m of msgs) if (isAgent(m.sender)) speak(m.text); }
 
-/* ---------- settings: general ---------- */
+/* ---------- automations ---------- */
+const DAYS = [["daily", "Every day"], ["weekdays", "Weekdays"], ["weekends", "Weekends"], ["mon", "Mondays"], ["tue", "Tuesdays"], ["wed", "Wednesdays"], ["thu", "Thursdays"], ["fri", "Fridays"], ["sat", "Saturdays"], ["sun", "Sundays"]];
+const KIND_INFO = {briefing: ["☀️", "Daily briefing", "News on your topics, summarised with sources."], monitor: ["👀", "Watch something", "Tell me only when something important changes."],
+  report: ["📄", "Research report", "A short sourced report, now or on a schedule."], custom: ["✍️", "Your own task", "Any instruction, on a schedule."]};
+const whenText = (ts) => { if (!ts) return ""; const d = new Date(ts * 1000), now = new Date(), t = d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+  const days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+  return (days === 0 ? "Today " : days === 1 ? "Tomorrow " : d.toLocaleDateString([], {weekday: "short"}) + " ") + t; };
+async function useMyTimezone() {
+  const name = Intl.DateTimeFormat().resolvedOptions().timeZone || "", offset = -new Date().getTimezoneOffset();
+  return act(() => api("/api/timezone", {name, offset_minutes: offset}), "Time zone set to " + (name || "your phone's offset"));
+}
+async function automationsDialog() {
+  let d;
+  try { d = await api("/api/automations"); } catch (e) { toast(e.message, true); return; }
+  const list = h("div", {id: "auto-list"}), top = h("div", {id: "auto-top"});
+  const draw = async () => {
+    try { d = await api("/api/automations"); } catch (e) { return; }
+    fill(top, h("div", {class: "card"}, d.timezone.set ? ["Times are in your time zone: ", h("strong", {}, d.timezone.name || "UTC" + (d.timezone.offset_minutes >= 0 ? "+" : "") + d.timezone.offset_minutes / 60), " (now " + d.server_time.slice(11) + ")."]
+        : ["Times use the server's clock until you set your time zone. ", h("button", {class: "btn", style: "margin-top:6px", onclick: async () => { await useMyTimezone(); draw(); }}, "Use my phone's time zone")]),
+      !d.search ? h("div", {class: "card"}, "Web search is off, so briefings and watchers can only use the agent's notes. ", h("button", {class: "btn", style: "margin-top:6px", onclick: () => settingsDialog("search")}, "Set up search")) : null);
+    fill(list, d.jobs.length ? d.jobs.map((j) => h("div", {class: "card"}, h("div", {style: "display:flex;gap:8px;align-items:baseline"}, h("strong", {style: "flex:1"}, (KIND_INFO[j.kind] ? KIND_INFO[j.kind][0] + " " : "") + (j.title || "Automation")),
+        h("small", {class: "muted"}, j.enabled ? "On" : "Paused")), h("div", {class: "muted", style: "font-size:13px"}, j.schedule + " · " + j.agent + " in " + (j.room.startsWith("dm-") ? "your chat" : "#" + j.room)),
+      h("div", {class: "muted", style: "font-size:13px"}, j.enabled ? "Next: " + (whenText(j.next_run_ts) || "soon") : "Paused", j.last_run_ts ? " · Last: " + whenText(j.last_run_ts) : "", j.runs ? " · ran " + j.runs + "×" : ""),
+      h("div", {style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"}, h("button", {class: "btn", onclick: async () => { await act(() => api("/api/automations/toggle", {id: j.id, enabled: !j.enabled}), j.enabled ? "Paused" : "Resumed"); draw(); }}, j.enabled ? "Pause" : "Resume"),
+        h("button", {class: "btn", onclick: async () => { await act(() => api("/api/automations/run", {id: j.id}), "Running now. The answer will appear in the chat."); }}, "Run now"),
+        h("button", {class: "btn danger", onclick: () => confirmDialog("Delete this automation?", j.title || "", "Delete", async () => { await act(() => api("/api/jobs/delete", {id: j.id}), "Deleted"); draw(); })}, "Delete")))) : h("p", {class: "muted"}, "No automations yet. Pick one below."));
+  };
+  const choices = h("div", {style: "display:grid;gap:8px"}, Object.entries(KIND_INFO).map(([k, [emoji, name, blurb]]) => h("button", {class: "card item", style: "width:100%;text-align:left;display:block;margin:0", onclick: () => newAutomationDialog(k, draw)},
+    h("strong", {}, emoji + " " + name), h("div", {class: "muted", style: "font-size:13px"}, blurb))));
+  const close = dialog("Automations", "Agents that work on a schedule and message you the result.", h("div", {}, top, list, h("h4", {style: "margin:16px 0 6px;font-size:13px;color:var(--muted)"}, "New automation"), choices),
+    (c) => [h("button", {class: "btn primary", onclick: c}, "Done")]);
+  close.dialog.style.width = "min(560px,100%)";
+  await draw();
+}
+function newAutomationDialog(kind, onDone) {
+  const [emoji, name] = KIND_INFO[kind];
+  const agentsList = agents();
+  if (!agentsList.length) { toast("Create an agent first", true); return; }
+  const agent = h("select", {"aria-label": "Agent"}, agentsList.map((a) => h("option", {value: a.name}, a.name)));
+  const time = h("input", {type: "time", value: "08:00", "aria-label": "Time"});
+  const days = h("select", {"aria-label": "Days"}, DAYS.map(([v, l]) => h("option", {value: v}, l)));
+  const topics = h("textarea", {rows: 3, placeholder: "One per line, e.g.\nAI news\nStartup funding", "aria-label": "Topics"});
+  const query = h("input", {type: "text", placeholder: "e.g. new electric scooter recalls", "aria-label": "What to watch"});
+  const topic = h("input", {type: "text", placeholder: "e.g. The electric scooter market in India", "aria-label": "Research topic"});
+  const prompt = h("textarea", {rows: 3, placeholder: "What should the agent do?", "aria-label": "Task"});
+  const when = h("label", {style: "display:flex;gap:8px;align-items:center;font-weight:400"}, h("input", {type: "checkbox", id: "auto-now", style: "width:auto"}), "Just run it once, now");
+  const row = (label, el) => h("div", {style: "margin:12px 0"}, h("label", {style: "margin:0 0 4px"}, label), el);
+  const fields = {briefing: [row("Topics", topics)], monitor: [row("What should I watch for?", query)], report: [row("What should I research?", topic)], custom: [row("Task", prompt)]}[kind];
+  const schedule = h("div", {id: "auto-when"}, row("Time", time), row("Days", days));
+  const content = h("div", {}, row("Which agent?", agent), ...fields, kind === "report" ? when : null, schedule);
+  if (kind === "report") when.querySelector("input").onchange = (e) => (schedule.hidden = e.target.checked);
+  dialog(emoji + " " + name, KIND_INFO[kind][2], content, (close) => [h("button", {class: "btn", onclick: close}, "Cancel"), h("button", {class: "btn primary", onclick: async () => {
+    try {
+      const a = state_agent_room(agent.value);
+      const body = {kind, agent: agent.value, room: await a, topics: topics.value.split("\n"), query: query.value, topic: topic.value, prompt: prompt.value};
+      const once = kind === "report" && when.querySelector("input").checked;
+      if (!once) { body.time = time.value; body.days = days.value; }
+      const r = await api("/api/automations", body);
+      close(); toast((once ? "Started. The report will appear in the chat." : "Automation created.") + (r.warning ? " " + r.warning : "")); await poll(true); if (onDone) onDone();
+    } catch (e) { toast(e.message, true); } }}, kind === "report" ? "Start" : "Create")]);
+}
+async function state_agent_room(agent) {
+  const r = rooms().find((x) => x.kind === "dm" && x.members.includes(agent) && x.members.includes("you")) || rooms().find((x) => x.members.includes(agent));
+  if (r) return r.name;
+  return (await api("/api/dm", {a: "you", b: agent})).room;
+}
+
+/* ---------- notifications (Web Push; the notification itself carries no text) ---------- */
+const b64uToBytes = (text) => { const pad = "=".repeat((4 - text.length % 4) % 4), raw = atob((text + pad).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); };
+async function pushState() {
+  const supported = "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
+  if (!supported) return {kind: "unsupported"};
+  if (IS_IOS && !IS_STANDALONE()) return {kind: "ios-install"};
+  const info = await api("/api/push");
+  if (!info.available) return {kind: "server-off"};
+  let sub = null;
+  try { const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((_, no) => setTimeout(() => no(new Error("slow")), 4000))]); sub = await reg.pushManager.getSubscription(); } catch (e) { return {kind: "unsupported"}; }
+  return {kind: sub ? "on" : "off", info, sub, permission: Notification.permission};
+}
+async function enableNotifications(info) {
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") { toast("Notifications are blocked. Allow them for this site in your browser or phone settings.", true); return; }
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: b64uToBytes(info.public_key)});
+  await api("/api/push/subscribe", sub.toJSON());
+  toast("Notifications are on");
+}
+async function disableNotifications(sub) { try { await api("/api/push/unsubscribe", {endpoint: sub.endpoint}); await sub.unsubscribe(); toast("Notifications are off"); } catch (e) { toast(e.message, true); } }
+async function pushRow() {
+  const draw = async () => fill($("#push-row"), await pushRow());
+  let st; try { st = await pushState(); } catch (e) { return h("p", {class: "muted"}, e.message); }
+  const say = (t) => h("p", {class: "muted", style: "margin:4px 0"}, t);
+  const privacy = h("small", {class: "muted", style: "display:block;margin-top:6px"}, "A notification only says “You have something new”. It never contains the message, and it is sent only when an agent wrote or something needs your approval and you are not using the app.");
+  if (st.kind === "unsupported") return h("div", {}, say("This browser cannot show notifications. Chrome on Android, and Safari on iPhone with the app added to the Home Screen, can."));
+  if (st.kind === "ios-install") return h("div", {}, say("On iPhone, first add the app to your Home Screen (Share, then Add to Home Screen), open it from there, and come back here."));
+  if (st.kind === "server-off") return h("div", {}, say("This server cannot send notifications yet (it needs the optional “cryptography” package)."));
+  if (st.kind === "on") return h("div", {}, say("Notifications are on for this device."), h("div", {style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"},
+    h("button", {class: "btn", onclick: async () => { try { const r = await api("/api/push/test", {}); toast(r.delivered ? "Sent. It should arrive in a moment." : "The push service did not accept it", !r.delivered); } catch (e) { toast(e.message, true); } }}, "Send a test"),
+    h("button", {class: "btn danger", onclick: async () => { await disableNotifications(st.sub); draw(); }}, "Turn off")), privacy);
+  return h("div", {}, say(st.permission === "denied" ? "Notifications are blocked for this site. Allow them in your browser or phone settings, then try again." : "Get a nudge on your phone when an agent finishes something or needs you."),
+    h("button", {class: "btn primary", style: "margin-top:6px", onclick: async () => { try { await enableNotifications(st.info); } catch (e) { toast("Could not turn on notifications: " + e.message, true); } draw(); }}, "Turn on notifications"), privacy);
+}
+const tzRow = (t) => h("div", {}, h("p", {class: "muted", style: "margin:4px 0"}, t.set ? "Automations run in " + (t.name || "your phone's offset") + " (now " + t.now.slice(11) + ")." : "Not set: the server's clock is used (now " + t.now.slice(11) + ")."),
+  h("button", {class: "btn", onclick: async () => { await useMyTimezone(); const r = await api("/api/timezone"); fill($("#tz-row"), tzRow(r)); }}, "Use my phone's time zone"));
 async function generalPanel() {
   const v = voice();
   let tone = {style: "fun", custom: "", labels: {}, examples: {}};
@@ -341,6 +464,9 @@ async function generalPanel() {
   const hint = h("small", {class: "muted", style: "display:block;margin-top:4px"}, tone.examples[tone.style] || "");
   const style = h("select", {"aria-label": "Reply style", onchange: () => { custom.hidden = style.value !== "custom"; hint.textContent = style.value === "custom" ? "Your own words. It can change how replies sound, never the safety rules." : (tone.examples[style.value] || ""); }},
     Object.entries(tone.labels).map(([k, l]) => h("option", {value: k, selected: tone.style === k}, l)));
+  const pushRowInitial = await pushRow();
+  let tzInfo = {name: "", offset_minutes: 0, set: false, now: ""};
+  try { tzInfo = await api("/api/timezone"); } catch (e) { /* shown by the poll */ }
   const saveStyle = () => act(() => api("/api/tone", {style: style.value, custom: custom.value}), "Style saved");
   const speakBox = h("input", {type: "checkbox", checked: v.speak, disabled: !CAN_SPEAK, style: "width:auto", onchange: (e) => { saveVoice({...voice(), speak: e.target.checked}); if (!e.target.checked) stopSpeaking(); }});
   const handsBox = h("input", {type: "checkbox", checked: v.handsfree, disabled: !SR || !CAN_SPEAK, style: "width:auto", onchange: (e) => { const nv = {...voice(), handsfree: e.target.checked}; if (e.target.checked) nv.speak = true; saveVoice(nv); speakBox.checked = nv.speak; }});
@@ -355,6 +481,8 @@ async function generalPanel() {
     h("h4", {style: "margin:18px 0 4px"}, "How replies sound"),
     h("div", {style: "margin:8px 0"}, style, hint, custom, h("button", {class: "btn", style: "margin-top:8px", onclick: saveStyle}, "Save style")),
     h("small", {class: "muted", style: "display:block"}, "Your choice affects the replies you get. It only changes the style: safety rules, approvals and the sandbox stay exactly the same."),
+    h("h4", {style: "margin:18px 0 4px"}, "Notifications"), h("div", {id: "push-row"}, pushRowInitial),
+    h("h4", {style: "margin:18px 0 4px"}, "Time zone"), h("div", {id: "tz-row"}, tzRow(tzInfo)),
     h("h4", {style: "margin:18px 0 4px"}, "Appearance"), row("Theme", theme),
     h("h4", {style: "margin:18px 0 4px"}, "This app"),
     canInstall() ? h("button", {class: "btn", onclick: installApp}, "Install on this device") : h("p", {class: "muted", style: "margin:4px 0"}, IS_STANDALONE() ? "You are using the installed app." : "To install: use your browser's menu and choose “Install app” or “Add to Home screen”."),
@@ -633,7 +761,7 @@ async function poll(now) {
   try {
     S.state = await api("/api/state");
     if (!S.room || !curRoom()) { const first = rooms().find((r) => r.kind !== "dm") || rooms()[0]; if (first) { S.room = first.name; S.last[S.room] = 0; S.stick = true; const ta = $("#msg"); if (ta) ta.value = store.get("kt-draft-" + S.room) || ""; } }
-    focusAgent(); renderSidebar(); renderTopbar(); updateComposer();
+    focusAgent(); syncUnread(); renderSidebar(); renderTopbar(); updateComposer();
     if (S.room) {
       const after = S.last[S.room] || 0, fresh = await api("/api/messages?room=" + encodeURIComponent(S.room) + "&after=" + after);
       const msgs = fresh.filter((m) => m.id > after);
@@ -698,7 +826,7 @@ function init() {
   $("#scroll").addEventListener("scroll", () => { const s = $("#scroll"); if (s.scrollHeight - s.scrollTop - s.clientHeight < 90) $("#jump").hidden = true; }, {passive: true});
   $("#jump").addEventListener("click", () => { const s = $("#scroll"); s.scrollTop = s.scrollHeight; $("#jump").hidden = true; });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#dialog-root .dialog")) { if (S.drawer) toggleDrawer(false); closeSidebarMobile(); } });
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(true); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { syncUnread(); poll(true); } });
   buildComposer(); syncVoiceButtons(); $("#sidebar").replaceChildren(h("div", {class: "brand"}, h("img", {src: "/static/logo.svg", alt: ""}), "Kintsugi"));
   poll(true);
 }

@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS proposals (
 CREATE TABLE IF NOT EXISTS studies (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
     summary TEXT NOT NULL DEFAULT '', report TEXT NOT NULL DEFAULT '', calls INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS push_subs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT NOT NULL UNIQUE, user TEXT NOT NULL DEFAULT 'you', created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS usage (day TEXT PRIMARY KEY, calls INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, agent TEXT, event TEXT NOT NULL,
@@ -63,6 +65,11 @@ class Database:
             self.conn.execute("ALTER TABLE agents ADD COLUMN model TEXT")
         if "playbook" not in columns:
             self.conn.execute("ALTER TABLE agents ADD COLUMN playbook TEXT NOT NULL DEFAULT ''")
+        job_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(jobs)")}
+        for column, ddl in (("kind", "TEXT NOT NULL DEFAULT 'custom'"), ("title", "TEXT NOT NULL DEFAULT ''"), ("last_run_ts", "REAL"),
+                            ("runs", "INTEGER NOT NULL DEFAULT 0"), ("owner", "TEXT NOT NULL DEFAULT 'you'")):
+            if column not in job_columns:
+                self.conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} {ddl}")
 
     def execute(self, sql: str, params: tuple = ()) -> int:
         """Run a write; returns the last inserted row id."""

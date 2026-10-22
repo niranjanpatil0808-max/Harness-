@@ -8,6 +8,11 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # lets `python -m unittest tests.<name>` find dojo_models too
+
 from dojo_models import ALL, factory, make_model
 from kintsugi.model import MockModel
 from kintsugi.workspace import Workspace, improve

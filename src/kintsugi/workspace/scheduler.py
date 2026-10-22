@@ -68,6 +68,24 @@ def cron_matches(expression: str, when: datetime) -> bool:
     return when.minute in minute and when.hour in hour and when.month in month and days
 
 
+def cron_next(expression: str, after: datetime, max_days: int = 8) -> datetime | None:
+    """The next time (after `after`) a cron expression fires, or None within `max_days`. Minute resolution."""
+    from datetime import timedelta
+
+    minute, hour, dom, month, dow = parse_cron(expression)
+    fields = expression.split()
+    restricted_both = fields[2] != "*" and fields[4] != "*"
+    moment = after.replace(second=0, microsecond=0) + timedelta(minutes=1)
+    for _ in range(max_days * 24 * 60):
+        cron_dow = (moment.weekday() + 1) % 7
+        day_ok, weekday_ok = moment.day in dom, cron_dow in dow
+        days = (day_ok or weekday_ok) if restricted_both else (day_ok and weekday_ok)
+        if moment.minute in minute and moment.hour in hour and moment.month in month and days:
+            return moment
+        moment += timedelta(minutes=1)
+    return None
+
+
 class Scheduler:
     def __init__(self, ws: "Workspace", clock: Callable[[], float] = time.time) -> None:
         self.ws = ws
@@ -79,7 +97,7 @@ class Scheduler:
         """Fire every enabled job due in the current minute (once per minute). Returns how many fired."""
         now = self.clock() if now is None else now
         minute_number = int(now // 60)
-        when = datetime.fromtimestamp(now)
+        when = self.ws.local_datetime(now)
         fired = 0
         try:
             self.ws.improver.maybe_start(now)  # a scheduled self-improvement study, if one is due and switched on
@@ -94,7 +112,7 @@ class Scheduler:
                 continue
             if not due:
                 continue
-            self.ws.mark_job_run(job["id"], minute_number)
+            self.ws.mark_job_run(job["id"], minute_number, now)
             self.ws.audit(job["agent"], "cron-fired", f"job {job['id']}")
             self.ws.post(job["room"], f"cron-{job['id']}", f"@{job['agent']} {job['prompt']}")
             fired += 1

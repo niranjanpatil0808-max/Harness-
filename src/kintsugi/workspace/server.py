@@ -126,6 +126,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     return False
             given = self.headers.get("X-Token") or ""
             if hmac.compare_digest(given.encode(), token.encode()):
+                if self.headers.get("X-Visible", "1") == "1":  # a hidden tab does not count as "looking at it"
+                    ws.touch()
                 return True
             with failure_lock:
                 failures.setdefault(client, []).append(now)
@@ -196,10 +198,13 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
 
         def _get(self, path: str, query: dict):
             if path == "/api/state":
+                # newest message per room, and newest one written by someone other than the reader: that drives "unread"
+                latest = {row["room"]: {"last_id": row["last_id"], "last_other": row["last_other"] or 0} for row in ws.db.query(
+                    "SELECT room, MAX(id) AS last_id, MAX(CASE WHEN sender != 'you' THEN id END) AS last_other FROM messages GROUP BY room")}
                 return {"agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools", "model", "playbook")},
                                     "secrets": ws.keychain.names(a["name"]), "apps": _apps(ws, a["name"])}
                                    for a in ws.list_agents()],
-                        "rooms": [{**r, "members": ws.members(r["name"])} for r in ws.list_rooms()],
+                        "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in ws.list_rooms()],
                         "approvals": ws.approvals(), "jobs": ws.list_jobs(), "busy": ws.busy(),
                         "sandbox": sandbox.status(), "provider": ws.provider(),
                         "improve": {k: v for k, v in ws.improver.status().items() if k != "last"},
@@ -214,6 +219,18 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 ws.get_agent(agent)
                 base = ws.files_dir(agent)
                 return sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file())[:200]
+            if path == "/api/push":
+                from . import push
+
+                return {"available": push.available(), "public_key": ws.pusher.public_key() if push.available() else None, "devices": ws.pusher.count()}
+            if path == "/api/automations":
+                from . import automations
+
+                return {"jobs": automations.listing(ws), "timezone": ws.get_timezone(), "search": ws.search_settings()["configured"],
+                        "server_time": ws.local_datetime(ws.clock()).strftime("%Y-%m-%d %H:%M")}
+            if path == "/api/timezone":
+                now = ws.local_datetime(ws.clock())
+                return {**ws.get_timezone(), "now": now.strftime("%Y-%m-%d %H:%M")}
             if path == "/api/search":
                 from .websearch import PROVIDERS
 
@@ -301,6 +318,26 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return {"ok": True}
             if path == "/api/purge":
                 return {"deleted": ws.purge_messages(float(body["days"]))}
+            if path == "/api/automations":
+                from . import automations
+
+                when = {"time": body.get("time"), "days": body.get("days", "daily")} if body.get("time") else None
+                return automations.create(ws, str(body["kind"]), str(body["agent"]), str(body["room"]), body, when)
+            if path == "/api/push/subscribe":
+                ws.pusher.subscribe(str(body["endpoint"]))
+                return {"devices": ws.pusher.count()}
+            if path == "/api/push/unsubscribe":
+                ws.pusher.unsubscribe(str(body["endpoint"]))
+                return {"devices": ws.pusher.count()}
+            if path == "/api/push/test":
+                return {"delivered": ws.pusher.notify("test", force=True)}
+            if path == "/api/automations/toggle":
+                ws.set_job_enabled(int(body["id"]), bool(body["enabled"]))
+                return {"ok": True}
+            if path == "/api/automations/run":
+                return {"message": ws.run_job_now(int(body["id"]))}
+            if path == "/api/timezone":
+                return ws.set_timezone(str(body.get("name", "")), int(body.get("offset_minutes", 0)))
             if path == "/api/search/settings":  # the key is write-only: it is never returned by any endpoint
                 return ws.set_search(str(body["provider"]), str(body.get("key") or "") or None, body.get("daily_cap"))
             if path == "/api/search/test":

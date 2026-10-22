@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends util-linux && r
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[push]"
 
 # The service listens on $PORT (hosting platforms set it). The access token MUST be provided: the server refuses
 # to listen on a network address with a short or missing KINTSUGI_TOKEN.

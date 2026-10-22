@@ -14,11 +14,16 @@
 | Mistake memory: a failed tool call becomes a lesson the agent remembers | **Works, but its benefit is not measured** |
 | Self-improvement: tests models and playbooks, proposes changes you review and can undo | **Works** ([docs/SELF_IMPROVEMENT.md](docs/SELF_IMPROVEMENT.md)); not yet run against real models |
 | Hosting recipes (Codespaces, Render, Docker) | **Written and checked locally**; not yet deployed |
-| Installable phone app, voice, a tone you choose, web search with your own key, automations (daily briefing, research report, change alerts) | **Planned: building now, Oct 22 to 25** |
+| **Phone app:** installable, works offline as a shell, thumb-friendly, edge-swipe sidebar | **Works** ([docs/PHONE.md](docs/PHONE.md)); tested in a phone-sized browser, not yet on real devices |
+| **Voice:** speak and hear replies with your browser's free speech, optional hands-free loop | **Works** in tests with faked speech engines; quality on real phones varies (iPhone is patchier) |
+| **A tone you choose** (Fun, Regular, Brief, Custom), per person | **Works**; style only, never the rules |
+| **Web search** with your own key (Tavily or Brave): cited snippets, no page fetching | **Works** against test servers; **not yet tried against the live services** |
+| **Automations:** daily briefing, change watcher that stays silent unless something matters, research report, your own task; your time zone | **Works** (scheduling and time zones tested incl. daylight saving); search-based ones need a search key |
+| **Notifications** that never contain your message, plus unread markers and an app badge | **Works** in tests with a fake push service; **not yet verified against Google's, Apple's or Mozilla's real push services** |
 | Teams: separate logins, roles for approvals, shared rooms plus private chats, saving your data on free hosting | **Planned, after Oct 25** |
 | Integrations: GitHub, then Slack, then Gmail and Calendar | **Planned, after teams** |
 
-Nothing in the "planned" rows exists yet. This table will be updated as each one lands.
+Rows marked planned do not exist yet. This table is updated as each one lands, and it says what has and has not been verified.
 
 ## What it is for
 
@@ -88,7 +93,7 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 src/kintsugi/workspace/   the product: core.py agents.py tools.py perms.py sandbox.py keychain.py scheduler.py
                           server.py db.py dojo.py improve.py cli.py  web/ (the interface)
 src/kintsugi/             engine modules the product reuses: model.py memory.py graph.py loop.py verifier.py
-SECURITY.md  Dockerfile  render.yaml  .devcontainer/  docs/ (WORKSPACE, HOSTING, SELF_IMPROVEMENT, demo.html)
+SECURITY.md  Dockerfile  render.yaml  .devcontainer/  docs/ (PHONE, WORKSPACE, HOSTING, SELF_IMPROVEMENT, demo.html)
 examples/                 workspace_demo.py, smoke and model-comparison scripts
 tests/                    offline tests (python -m unittest discover -s tests) and tests/ui (browser tests)
 research/                 the original weak-model experiment (write-up); benchmark/, results/ and RESULTS.md move here soon

@@ -95,6 +95,8 @@ class Workspace:
         self.sync = sync  # True: agents run inside post(); False: on a worker pool (the server)
         self._models: dict[str, Model] = {}
         self._improver = None
+        self._pusher = None
+        self.last_active = 0.0  # when the app last talked to the server (a person is probably looking at it)
         self.study_model_factory: Callable[[str | None], Model] | None = None  # tests/embedding; default uses the real API
         self._agent_locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
         self._recent_runs: dict[str, deque] = defaultdict(deque)
@@ -247,6 +249,27 @@ class Workspace:
         if self.model_factory is default_model_factory:
             return OpenAIAdapter(model=model_name) if model_name else OpenAIAdapter()
         return self.model_factory(model_name or "study")
+
+    @property
+    def pusher(self):
+        from .push import Push
+
+        if self._pusher is None:
+            self._pusher = Push(self)
+        return self._pusher
+
+    def touch(self) -> None:
+        self.last_active = time.time()
+
+    def notify_if_away(self, reason: str) -> None:
+        """Wake the owner's phone (text-free) when something needs them and they are not using the app right now."""
+        if time.time() - self.last_active < 90:
+            return
+        try:
+            if self.pusher.count():
+                threading.Thread(target=self.pusher.notify, args=(reason,), daemon=True).start()
+        except Exception as err:  # a notification problem must never break messaging
+            self.audit(None, "push-error", f"{type(err).__name__}: {str(err)[:150]}")
 
     @property
     def improver(self):
@@ -452,6 +475,8 @@ class Workspace:
             raise WorkspaceError(f"agent '{sender}' is not a member of '{room}'")
         message_id = self.db.execute("INSERT INTO messages (room, sender, text, ts, hops) VALUES (?, ?, ?, ?, ?)",
                                      (room, sender, text, self.clock(), hops))
+        if is_agent:
+            self.notify_if_away("message")
         for agent in self._targets(room, kind, sender, text):
             if hops >= MAX_HOPS:
                 self.audit(agent, "loop-guard", f"{room}: not waking {agent} after {hops} hops")
@@ -544,6 +569,7 @@ class Workspace:
     # --- approvals -------------------------------------------------------
 
     def request_approval(self, agent: str, room: str, tool: str, args: dict) -> int:
+        self.notify_if_away("approval")
         return self.db.execute("INSERT INTO approvals (agent, room, tool, args, ts) VALUES (?, ?, ?, ?, ?)",
                                (agent, room, tool, json.dumps(args), self.clock()))
 
@@ -603,14 +629,14 @@ class Workspace:
 
     # --- jobs ------------------------------------------------------------
 
-    def add_job(self, agent: str, room: str, cron: str, prompt: str) -> int:
+    def add_job(self, agent: str, room: str, cron: str, prompt: str, kind: str = "custom", title: str = "", owner: str = "you") -> int:
         from .scheduler import parse_cron
 
         self.get_agent(agent)
         self._require_room(room)
         parse_cron(cron)
-        return self.db.execute("INSERT INTO jobs (agent, room, cron, prompt) VALUES (?, ?, ?, ?)",
-                               (agent, room, cron, prompt))
+        return self.db.execute("INSERT INTO jobs (agent, room, cron, prompt, kind, title, owner) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                               (agent, room, cron, prompt, kind, title[:120], owner))
 
     def list_jobs(self, agent: str | None = None) -> list[dict]:
         if agent is None:
@@ -620,8 +646,67 @@ class Workspace:
     def remove_job(self, job_id: int) -> None:
         self.db.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
 
-    def mark_job_run(self, job_id: int, minute_number: int) -> None:
-        self.db.execute("UPDATE jobs SET last_run_minute = ? WHERE id = ?", (minute_number, job_id))
+    def mark_job_run(self, job_id: int, minute_number: int, ts: float | None = None) -> None:
+        self.db.execute("UPDATE jobs SET last_run_minute = ?, last_run_ts = ?, runs = runs + 1 WHERE id = ?",
+                        (minute_number, self.clock() if ts is None else ts, job_id))
+
+    def set_job_enabled(self, job_id: int, enabled: bool) -> None:
+        if not self.db.one("SELECT 1 FROM jobs WHERE id = ?", (job_id,)):
+            raise WorkspaceError(f"no such job: {job_id}")
+        self.db.execute("UPDATE jobs SET enabled = ? WHERE id = ?", (1 if enabled else 0, job_id))
+        self.audit(None, "job-enabled" if enabled else "job-paused", f"job {job_id}")
+
+    def run_job_now(self, job_id: int) -> int:
+        """Run an automation immediately, exactly as the schedule would (it is posted into its room)."""
+        job = self.db.one("SELECT * FROM jobs WHERE id = ?", (job_id,))
+        if job is None:
+            raise WorkspaceError(f"no such job: {job_id}")
+        now = self.clock()
+        self.mark_job_run(job_id, int(now // 60), now)
+        self.audit(job["agent"], "cron-fired", f"job {job_id} (run now)")
+        return self.post(job["room"], f"cron-{job_id}", f"@{job['agent']} {job['prompt']}")
+
+    # --- time zone (so "every morning at 8" means the owner's morning) ---------------
+
+    def get_timezone(self) -> dict:
+        raw = self.get_setting("timezone", "")
+        try:
+            saved = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            saved = {}
+        return {"name": str(saved.get("name", "")), "offset_minutes": int(saved.get("offset_minutes", 0)), "set": bool(saved)}
+
+    def set_timezone(self, name: str, offset_minutes: int = 0) -> dict:
+        name = str(name or "").strip()
+        offset = max(-840, min(840, int(offset_minutes)))
+        if name:
+            if len(name) > 64 or not re.fullmatch(r"[A-Za-z_]+(/[A-Za-z0-9_+-]+){0,2}|UTC", name):
+                raise WorkspaceError("time zone names look like Asia/Kolkata or Europe/Berlin")
+            try:
+                from zoneinfo import ZoneInfo
+
+                ZoneInfo(name)
+            except Exception:
+                pass  # no zone database on this system: the offset the phone reported is used instead
+        self.set_setting("timezone", json.dumps({"name": name, "offset_minutes": offset}))
+        self.audit(None, "timezone-changed", name or f"UTC{offset:+d}min")
+        return self.get_timezone()
+
+    def local_datetime(self, ts: float):
+        """`ts` as a clock time in the owner's time zone (the server's own zone if none was chosen)."""
+        from datetime import datetime, timedelta, timezone
+
+        tz = self.get_timezone()
+        if not tz["set"]:
+            return datetime.fromtimestamp(ts)
+        if tz["name"]:
+            try:
+                from zoneinfo import ZoneInfo
+
+                return datetime.fromtimestamp(ts, ZoneInfo(tz["name"]))
+            except Exception:
+                pass
+        return datetime.fromtimestamp(ts, timezone(timedelta(minutes=tz["offset_minutes"])))
 
     # --- audit and shutdown ---------------------------------------------
 

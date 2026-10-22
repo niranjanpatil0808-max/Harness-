@@ -6,6 +6,11 @@ import threading
 import unittest
 from unittest import mock
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # lets `python -m unittest tests.<name>` find dojo_models too
+
 from kintsugi.model import MockModel
 from kintsugi.workspace import Workspace
 from kintsugi.workspace.server import make_server
@@ -336,6 +341,18 @@ class TestServer(unittest.TestCase):
 
         self.assertEqual(web_version(), web_version())
         self.assertRegex(web_version(), r"^[0-9a-f]{12}$")
+
+    def test_state_tells_the_app_which_rooms_have_something_new(self):
+        state = json.loads(self.call("GET", "/api/state")[1])
+        room = next(r for r in state["rooms"] if r["name"] == "general")
+        self.assertEqual((room["last_id"], room["last_other"]), (0, 0))
+        mine = self.ws.post("general", "you", "just me talking")
+        room = next(r for r in json.loads(self.call("GET", "/api/state")[1])["rooms"] if r["name"] == "general")
+        self.assertEqual((room["last_id"], room["last_other"]), (mine, 0))  # your own words are never "unread"
+        self.ws.post_system("general", "a notice")
+        room = next(r for r in json.loads(self.call("GET", "/api/state")[1])["rooms"] if r["name"] == "general")
+        self.assertEqual(room["last_other"], room["last_id"])
+        self.assertGreater(room["last_other"], mine)
 
     def test_token_can_come_from_the_environment(self):
         from unittest import mock
