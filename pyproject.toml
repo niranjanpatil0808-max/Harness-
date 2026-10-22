@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kintsugi"
 version = "0.1.0"
-description = "A small harness that helps weak open models fix bugs by learning from their mistakes."
+description = "A phone-first workspace of safe AI agents that remember, work on a schedule, and improve only when measured."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"

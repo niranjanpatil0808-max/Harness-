@@ -1,4 +1,4 @@
-"""Command line entry point.
+"""Command line entry point. `workspace` is the product; `fix`, `graph` and `lessons` are the original research tools.
 
   kintsugi fix <task_dir> [--no-memory] [--no-graph] [--retries N] [--mock]
   kintsugi graph <task_dir>
@@ -70,7 +70,7 @@ def cmd_models(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="kintsugi", description="Fix bugs with a small model that learns from its mistakes.")
+    parser = argparse.ArgumentParser(prog="kintsugi", description="Kintsugi: a workspace of safe AI agents (workspace ...) and the original bug-fix research tools (fix, graph, lessons).")
     sub = parser.add_subparsers(dest="command", required=True)
 
     fix = sub.add_parser("fix", help="fix one task folder (source files + test_*.py + task.json)")
