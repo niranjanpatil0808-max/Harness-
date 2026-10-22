@@ -366,3 +366,91 @@ SETTINGS_PANELS.models = async () => {
     h("span", {}, h("strong", {}, "Show answers as they are written"), h("br"), h("span", {class: "muted", style: "font-size:13px"}, "You see the words appear while the AI is still answering. If your provider does not support it, the app quietly asks the normal way.")));
   return h("div", {}, base, box);
 };
+
+/* ---------- room brief: a pinned note every agent in the room reads ---------- */
+function renderBrief() {
+  const r = curRoom(); let strip = $("#brief-strip");
+  if (!strip) { strip = h("div", {id: "brief-strip"}); $("#topbar").after(strip); }
+  const brief = r && r.kind === "room" ? (r.brief || "") : "";
+  const sig = (r ? r.name : "") + "|" + brief + "|" + isAdmin();
+  if (strip.dataset.sig === sig) return;
+  strip.dataset.sig = sig;
+  if (!r || r.kind !== "room" || (!brief && !isAdmin())) { strip.hidden = true; fill(strip); return; }
+  strip.hidden = false;
+  const edit = isAdmin() ? h("button", {class: "mini", onclick: () => briefDialog(r)}, brief ? "Edit" : "Add a room brief") : null;
+  fill(strip, brief ? [h("span", {class: "brief-text", title: brief}, "📌 " + brief.replace(/\s+/g, " ")), edit] : [h("span", {class: "muted"}, "📌 Tell the agents what this room is for."), edit]);
+}
+function briefDialog(r) {
+  const box = h("textarea", {rows: 5, maxlength: 1500, "aria-label": "Room brief", placeholder: "e.g. This room plans the Friday launch. Keep answers short and list the next step at the end."}, r.brief || "");
+  const close = dialog("Room brief for #" + r.name, "Everyone in the room sees it, and every agent here reads it before answering. It cannot change what agents are allowed to do.", box,
+    (c) => [h("button", {class: "btn", onclick: c}, "Cancel"), h("button", {class: "btn primary", onclick: async () => {
+      try { const out = await api("/api/room/brief", {room: r.name, text: box.value}); toast(out.brief ? "Room brief saved" : "Room brief removed"); c(); await poll(true); } catch (e) { toast(e.message, true); } }}, "Save")]);
+}
+const _renderTopbar = renderTopbar;
+renderTopbar = function (force) { _renderTopbar(force); try { renderBrief(); } catch (e) { /* cosmetic */ } };
+
+/* ---------- outbox: a message typed with no signal waits and goes out when the connection is back ---------- */
+const OUTBOX_KEY = "kt-outbox";
+function outbox() { try { const v = JSON.parse(localStorage.getItem(OUTBOX_KEY) || "[]"); return Array.isArray(v) ? v.slice(0, 20) : []; } catch (e) { return []; } }
+function saveOutbox(list) { try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) { /* no storage: the message stays in memory only */ S.memOutbox = list; } renderOutbox(); }
+function queueOutbox(room, text) {
+  saveOutbox(outbox().concat([{id: Date.now() + Math.random(), room, text: text.slice(0, 8000)}]));
+  toast("No connection. Your message will be sent when you are back online.");
+}
+let flushing = false;
+async function flushOutbox() {
+  if (flushing || !navigator.onLine) return;
+  let list = outbox(); if (!list.length) return;
+  flushing = true;
+  try {
+    for (const item of list) {
+      try { await api("/api/say", {room: item.room, text: item.text}); }
+      catch (e) {
+        if (isNetworkError(e)) break;                     // still offline: keep the rest, try again later
+        toast("A waiting message could not be sent: " + e.message, true);  // refused for a real reason: do not retry it forever
+      }
+      list = outbox().filter((x) => x.id !== item.id); saveOutbox(list);
+    }
+  } finally { flushing = false; }
+  if (!outbox().length) { S.fast = 12; poll(true); }
+}
+function renderOutbox() {
+  let box = $("#outbox"); if (!box) { const inline = $("#inline"); if (!inline) return; box = h("div", {id: "outbox"}); inline.after(box); }
+  const here = outbox().filter((x) => x.room === S.room);
+  fill(box, here.map((x) => h("div", {class: "queued", role: "status"}, h("span", {}, "⏳ Waiting to send: " + x.text.slice(0, 120)),
+    h("button", {class: "mini", onclick: () => saveOutbox(outbox().filter((y) => y.id !== x.id))}, "Cancel"))));
+}
+window.addEventListener("online", () => { flushOutbox(); });
+const _renderInline = renderInline;
+renderInline = function () { _renderInline(); try { renderOutbox(); } catch (e) { /* cosmetic */ } };
+
+/* ---------- quick commands: type / in the message box ---------- */
+const SLASH = [["/task", "Give the team a task", "/task draft the launch email"], ["/search", "Search chats and messages", "/search pricing"], ["/help", "How to use Kintsugi", "/help"], ["/brief", "Edit this room's brief (admins)", "/brief"]];
+function runSlash(text) {
+  const m = text.match(/^\/(\w+)\s*([\s\S]*)$/); if (!m) return false;
+  const cmd = m[1].toLowerCase(), rest = m[2].trim(), r = curRoom();
+  if (cmd === "help") { helpDialog(); return true; }
+  if (cmd === "search") { openSwitcher(); const i = $("#dialog-root .sw-input"); if (i && rest) { i.value = rest; i.dispatchEvent(new Event("input")); } return true; }
+  if (cmd === "brief") { if (r && r.kind === "room" && isAdmin()) briefDialog(r); else toast("Only admins can edit a room brief, in shared rooms", true); return true; }
+  if (cmd === "task") {
+    if (!rest) { tasksDialog(); return true; }
+    const agent = r && (r.kind === "dm" ? roomAgents(r)[0] : recipient());
+    if (!agent) { toast("Open a chat with an agent first", true); return true; }
+    api("/api/tasks/create", {room: S.room, agent, title: rest}).then(() => { toast("Task given to " + agent); S.fast = 12; poll(true); }).catch((e) => toast(e.message, true));
+    return true;
+  }
+  return false;  // unknown: sent as an ordinary message
+}
+(function slashHints() {
+  const ta = $("#msg"); if (!ta) return;
+  const pop = h("div", {class: "mentions", id: "slash", role: "listbox", hidden: true}); ta.closest(".composer").prepend(pop);
+  ta.addEventListener("input", () => {
+    const v = ta.value, m = v.match(/^\/(\w*)$/);
+    if (!m) { pop.hidden = true; return; }
+    const list = SLASH.filter(([c]) => c.slice(1).startsWith(m[1].toLowerCase()));
+    if (!list.length) { pop.hidden = true; return; }
+    fill(pop, list.map(([c, label, ex]) => h("button", {class: "item", role: "option", onmousedown: (e) => e.preventDefault(), onclick: () => { ta.value = c + (c === "/task" || c === "/search" ? " " : ""); ta.dispatchEvent(new Event("input")); ta.focus(); }},
+      h("span", {class: "t"}, c), h("small", {class: "muted"}, label))));
+    pop.hidden = false;
+  });
+})();

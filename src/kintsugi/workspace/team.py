@@ -64,7 +64,7 @@ MEMBER_PATHS = {
 }
 ADMIN_PATHS = {
     "/api/agents", "/api/persona", "/api/secret", "/api/secret/delete", "/api/agent/delete", "/api/agent/model", "/api/agent/playbook",
-    "/api/agent/internet", "/api/tier", "/api/rooms", "/api/room/delete", "/api/room/members", "/api/audit", "/api/usage", "/api/templates", "/api/templates/apply", "/api/files", "/api/file",
+    "/api/agent/internet", "/api/tier", "/api/rooms", "/api/room/delete", "/api/room/members", "/api/room/brief", "/api/audit", "/api/usage", "/api/templates", "/api/templates/apply", "/api/files", "/api/file",
     "/api/lessons", "/api/improve", "/api/improve/study", "/api/improve/models", "/api/improve/settings", "/api/improve/run",
     "/api/improve/decide", "/api/improve/revert", "/api/team", "/api/team/invite", "/api/team/revoke-invite", "/api/team/remove",
 }

@@ -808,6 +808,7 @@ class Workspace:
             self.db.execute(f"DELETE FROM {table} WHERE room = ?", (room,))
         self.db.execute("DELETE FROM rooms WHERE name = ?", (room,))
         compact.forget(self, room)
+        self.db.execute("DELETE FROM settings WHERE key = ?", (f"brief:{room}",))
         tasks.forget_room(self, room)
         uploads.forget_room(self, room)
         origins.forget_room(self, room)
@@ -887,6 +888,28 @@ class Workspace:
 
     def list_rooms(self) -> list[dict]:
         return self.db.query("SELECT name, kind FROM rooms ORDER BY kind, name")
+
+    BRIEF_MAX = 1500
+    BRIEF_FORBIDDEN = re.compile(r"(ignore (your|the|all|any|previous)|disregard|override|bypass|disable|approv\w* (is|are|not|nothing|everything)|without ask|system prompt|jailbreak|"
+                                 r"no rules|never refuse|always obey|api[ _-]?key|password|credential|sk-[a-z0-9]|ghp_|xox[bp]-)", re.I)
+
+    def get_brief(self, room: str) -> str:
+        return self.get_setting(f"brief:{room}", "")
+
+    def set_brief(self, room: str, text: str, by: str) -> str:
+        """The room's shared brief: a few lines every agent in the room reads (what the room is for, how to answer). Style and context
+        only: wording that tries to loosen the rules, or that carries a key or password, is refused."""
+        if self._require_room(room)["kind"] != "room":
+            raise WorkspaceError("only shared rooms have a brief")
+        text = "\n".join(line.rstrip() for line in str(text or "").strip().splitlines())[: self.BRIEF_MAX].strip()
+        if text and self.BRIEF_FORBIDDEN.search(text):
+            raise WorkspaceError("a room brief is about what the room is for and how to answer here. It cannot loosen the safety rules or approvals, and it must not contain keys or passwords")
+        if text:
+            self.set_setting(f"brief:{room}", text)
+        else:
+            self.db.execute("DELETE FROM settings WHERE key = ?", (f"brief:{room}",))
+        self.audit(None, "brief-set", f"{room} by {by}")
+        return text
 
     def _require_room(self, room: str) -> dict:
         row = self.db.one("SELECT * FROM rooms WHERE name = ?", (room,))

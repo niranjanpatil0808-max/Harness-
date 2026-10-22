@@ -356,15 +356,20 @@ function pickMention(name) {
   const ta = $("#msg"), pos = ta.selectionStart, before = ta.value.slice(0, pos).replace(/@[a-z0-9_-]*$/, "@" + name + " ");
   ta.value = before + ta.value.slice(pos); ta.selectionStart = ta.selectionEnd = before.length; $("#mentions").hidden = true; ta.dispatchEvent(new Event("input")); ta.focus();
 }
+const isNetworkError = (e) => e instanceof TypeError || !navigator.onLine || /Failed to fetch|Load failed|NetworkError/i.test(String(e && e.message));
 async function sendMsg() {
   const ta = $("#msg"); let text = ta.value.trim();
   if (!text || !S.room || S.sending) return;
+  if (text.startsWith("/") && typeof runSlash === "function" && runSlash(text)) { ta.value = ""; ta.dispatchEvent(new Event("input")); return; }  // a quick command, not a message
   const target = recipient(); if (target && !/(^|\s)@[a-z]/.test(text)) text = "@" + target + " " + text;  // no need to type @ in a room
   stopSpeaking(); S.sending = true; S.stick = true; ta.value = ""; ta.dispatchEvent(new Event("input"));
   (S.talked = S.talked || {})[S.room] = true; updateComposer();
   (S.lastSent = S.lastSent || {})[S.room] = text;
   try { await api("/api/say", {room: S.room, text}); S.fast = 12; await poll(true); }
-  catch (e) { toast(e.message, true); ta.value = text; ta.dispatchEvent(new Event("input")); }
+  catch (e) {
+    if (typeof queueOutbox === "function" && isNetworkError(e)) queueOutbox(S.room, text);  // no signal: keep it and send when the connection is back
+    else { toast(e.message, true); ta.value = text; ta.dispatchEvent(new Event("input")); }
+  }
   finally { S.sending = false; ta.focus(); }
 }
 /* who a plain message in a room goes to: the agent you picked, else the one you last spoke to, else the first */
@@ -1043,6 +1048,7 @@ async function poll(now) {
   polling = true; clearTimeout(timer);
   try {
     S.state = await api("/api/state");
+    if (typeof flushOutbox === "function") flushOutbox();
     if (!S.room || !curRoom()) { const first = rooms().find((r) => r.kind !== "dm") || rooms()[0]; if (first) { S.room = first.name; S.last[S.room] = 0; S.stick = true; const ta = $("#msg"); if (ta) ta.value = store.get("kt-draft-" + S.room) || ""; } }
     focusAgent(); syncUnread(); renderSidebar(); renderTopbar(); updateComposer();
     if (!S.awayChecked && typeof awayDigest === "function") { S.awayChecked = true; setTimeout(awayDigest, 1200); }

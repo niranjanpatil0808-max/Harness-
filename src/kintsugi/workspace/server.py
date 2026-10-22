@@ -339,7 +339,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                                     "secrets": ws.keychain.names(a["name"]) if who.at_least("admin") else [], "apps": _apps(ws, a["name"]), "plugins": ws.plugins.enabled_for(a["name"]),
                                     "integrations": ws.integrations.enabled_for(a["name"])}
                                    for a in ws.list_agents()],
-                        "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in rooms],
+                        "rooms": [{**r, "members": ws.members(r["name"]), "brief": ws.get_brief(r["name"]) if r["kind"] == "room" else "", **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in rooms],
                         "approvals": approvals, "jobs": jobs, "onboarding": self._onboarding(), "busy": [a for a in ws.busy() if self._sees_run(a)], "activity": {a: t for a, t in ws.agent_activity().items() if self._sees_run(a)}, "drafts": {a: t for a, t in ws.agent_drafts().items() if self._sees_run(a)}, "open_tasks": tasks.open_counts(ws, self.who),
                         "sandbox": sandbox.status(), "provider": ws.provider(), "search_configured": ws.search_settings()["configured"], "internet_enabled": ws.internet_settings()["enabled"],
                         "providers": [{"id": p["id"], "label": p["label"], "model": p["model"], "default": p["default"]} for p in ws.providers()["profiles"]] if who.at_least("admin") else [],
@@ -544,6 +544,11 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     raise WorkspaceError("no such message")
                 ws.delete_message(int(body["id"]), "you" if self.who.role == "owner" else self.who.name, self.who.at_least("admin"))
                 return {"ok": True}
+            if path == "/api/room/brief":  # admins and the owner, in rooms they can see
+                room = str(body["room"])
+                if not ws.team.can_see_room(self.who, room):
+                    raise Forbidden("you are not in that room")
+                return {"brief": ws.set_brief(room, str(body.get("text") or ""), "you" if self.who.role == "owner" else self.who.name)}
             if path == "/api/share":
                 self._rate_limit(self.who.name)
                 src = ws.db.one("SELECT room FROM messages WHERE id = ?", (int(body["id"]),))
