@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kintsugi"
 version = "0.1.0"
-description = "A phone-first workspace of safe AI agents that remember, work on a schedule, and improve only when measured."
+description = "Work with your team and AI agents together: a self-hosted, phone-first shared workspace with task board, rooms, approvals and sandboxed code, on your own API key."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"

@@ -1,5 +1,5 @@
 <h1 align="center">Kintsugi</h1>
-<p align="center"><b>A team of safe AI agents you run yourself, from your phone, on your own API key.</b></p>
+<p align="center"><b>Work with your team and AI agents, together, in one shared space.</b><br>Self-hosted, phone-first, on your own API key.</p>
 
 <p align="center">
   <a href="https://github.com/niranjanpatil0808-max/KINTSUGI/actions/workflows/ci.yml"><img alt="tests" src="https://github.com/niranjanpatil0808-max/KINTSUGI/actions/workflows/ci.yml/badge.svg"></a>
@@ -15,7 +15,9 @@
 </p>
 <p align="center"><sub>Screenshots use the built-in scripted demo model, so they show the app, not a real model's answers.</sub></p>
 
-Founders and small teams get a shared room full of AI agents that **remember, work in parallel, work on a schedule, take tasks from anyone on the team, and learn how each person likes to work**. They ask before anything risky, run code in a locked box, go online only if you allow it, and show you what they cost. You paste your own key (OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Ollama or any OpenAI-style address). Nothing is hosted or sold for you, and your data stays on your server.
+Kintsugi is a shared workspace where **you, your teammates and AI agents work side by side**. Invite your team with a link, and everyone gets their own login, private chats and shared rooms. Hand an agent a task and the whole room follows it to done. Share a good answer with the team in one tap. Agents remember, work in parallel and on a schedule, and **learn how each person likes to work**.
+
+You stay in control: agents ask before anything risky, run code in a locked box, go online only if you allow it, and show what they cost. You paste your own key (OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Ollama or any OpenAI-style address). Nothing is hosted or sold for you, and your data stays on your server.
 
 > Built for the Meta Global AI Developer Hackathon (Indie developer track). Python standard library only; two small web libraries are bundled for the interface. "Kintsugi" is a working name.
 
@@ -23,7 +25,8 @@ Founders and small teams get a shared room full of AI agents that **remember, wo
 
 | | |
 |---|---|
-| **Team first** | Invite teammates with single-use links. Shared rooms, private chats, a **task board** (give an agent a job, everyone follows it to done), **Share** an answer into a room, @mentions. |
+| **Built for teams** | Invite teammates with single-use links and roles (owner, admin, member). Shared rooms, private chats, a **task board** (give an agent a job, everyone follows it to done), **Share** an answer into a room, @mentions, and approvals decided by the people you choose. |
+| **Agents as teammates** | Several agents work at once, `@all` gives everyone the same task, and each agent keeps its own files, memory and schedule. |
 | **Gets to know you** | Each agent learns every person's reply style and work context over time (👍/👎 and their own messages). You can see, edit, clear or switch it off. Work context stays in private chats. |
 | **Safe by default** | Risky actions wait for approval and show the full code. Approved code runs with no network and sees only its own folder. A daily call limit protects your quota. |
 | **Your key, your cost** | Any provider, one place to switch. A usage page shows calls, tokens and an estimated cost from prices you enter. |
