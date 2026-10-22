@@ -60,11 +60,11 @@ class Identity:
 MEMBER_PATHS = {
     "/api/state", "/api/messages", "/api/say", "/api/dm", "/api/me", "/api/me/token", "/api/tone", "/api/push", "/api/push/subscribe",
     "/api/push/unsubscribe", "/api/push/test", "/api/approve", "/api/timezone", "/api/applink", "/api/automations",
-    "/api/automations/toggle", "/api/automations/run", "/api/jobs", "/api/jobs/delete",
+    "/api/automations/toggle", "/api/automations/run", "/api/jobs", "/api/jobs/delete", "/api/stop",
 }
 ADMIN_PATHS = {
     "/api/agents", "/api/persona", "/api/secret", "/api/secret/delete", "/api/agent/delete", "/api/agent/model", "/api/agent/playbook",
-    "/api/agent/internet", "/api/tier", "/api/rooms", "/api/room/delete", "/api/room/members", "/api/audit", "/api/files", "/api/file",
+    "/api/agent/internet", "/api/tier", "/api/rooms", "/api/room/delete", "/api/room/members", "/api/audit", "/api/usage", "/api/files", "/api/file",
     "/api/lessons", "/api/improve", "/api/improve/study", "/api/improve/models", "/api/improve/settings", "/api/improve/run",
     "/api/improve/decide", "/api/improve/revert", "/api/team", "/api/team/invite", "/api/team/revoke-invite", "/api/team/remove",
 }

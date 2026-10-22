@@ -70,12 +70,19 @@ class BudgetExceeded(RuntimeError):
 class _Budgeted:
     """Wraps a model so every call is counted against the daily limit. Everything else passes straight through."""
 
-    def __init__(self, model: Model, ws: "Workspace") -> None:
-        self._model, self._ws = model, ws
+    def __init__(self, model: Model, ws: "Workspace", agent: str = "") -> None:
+        self._model, self._ws, self._agent = model, ws, agent
 
     def complete(self, messages: list[dict]) -> str:
         self._ws.spend_call()
-        return self._model.complete(messages)
+        usage = getattr(self._model, "usage", None)
+        before = (getattr(usage, "prompt_tokens", 0), getattr(usage, "completion_tokens", 0))
+        try:
+            return self._model.complete(messages)
+        finally:  # count what the call cost even when it failed after using tokens
+            usage = getattr(self._model, "usage", None)
+            self._ws.record_usage(self._agent, str(getattr(self._model, "name", "model")), getattr(usage, "prompt_tokens", 0) - before[0],
+                                  getattr(usage, "completion_tokens", 0) - before[1])
 
     def __getattr__(self, name: str):
         return getattr(self._model, name)
@@ -113,6 +120,9 @@ class Workspace:
         self._recent_runs: dict[str, deque] = defaultdict(deque)
         self._lock = threading.Lock()  # guards the rate limiter and the busy set
         self._busy: set[str] = set()
+        self._stop: set[str] = set()  # agents asked to stop
+        self._activity: dict[str, str] = {}  # what each working agent is doing right now
+        self._busy_room: dict[str, str] = {}
         self._inflight = 0  # runs submitted to the pool and not finished yet
         self._closing = False
         self._pending: deque = deque()  # sync mode: wake-ups queued so that runs never nest
@@ -464,7 +474,7 @@ class Workspace:
                 base = self.build_model(row["provider"], row["model"])
             else:
                 base = self.model_factory(agent)
-            self._models[agent] = _Budgeted(base, self)
+            self._models[agent] = _Budgeted(base, self, agent)
         return self._models[agent]
 
     def provider(self) -> str:
@@ -537,6 +547,91 @@ class Workspace:
                 raise WorkspaceError(f"today's limit of {cap} web searches is used up (the owner can raise it in Settings > Search)")
             self.db.execute("INSERT INTO usage (day, calls) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET calls = calls + 1",
                             (f"search-{self._day()}",))
+
+    # --- stopping an agent, and what it is doing right now ---
+
+    def request_stop(self, agent: str) -> bool:
+        """Ask a working agent to stop after its current step (a model call already in flight cannot be recalled)."""
+        with self._lock:
+            if agent not in self._busy:
+                return False
+            self._stop.add(agent)
+        self.audit(agent, "stop-requested")
+        return True
+
+    def stop_requested(self, agent: str) -> bool:
+        with self._lock:
+            return agent in self._stop
+
+    def set_activity(self, agent: str, text: str) -> None:
+        with self._lock:
+            self._activity[agent] = text[:60]
+
+    def agent_activity(self) -> dict[str, str]:
+        with self._lock:
+            return {a: t for a, t in self._activity.items() if a in self._busy}
+
+    def busy_room(self, agent: str) -> str | None:
+        with self._lock:
+            return self._busy_room.get(agent)
+
+    # --- usage: how many model calls and tokens each agent and model used ---
+
+    def record_usage(self, agent: str, model: str, prompt: int, completion: int) -> None:
+        provider = ""
+        try:
+            row = self.get_agent(agent, missing_ok=True) if agent else None
+            state = self._provider_state()
+            provider = (row or {}).get("provider") or state["default"] or ("env" if os.environ.get("KINTSUGI_API_KEY") or os.environ.get("GROQ_API_KEY") else "")
+        except Exception:
+            pass
+        self.db.execute("INSERT INTO usage_log (day, agent, provider, model, calls, prompt_tokens, completion_tokens) VALUES (?, ?, ?, ?, 1, ?, ?) "
+                        "ON CONFLICT(day, agent, provider, model) DO UPDATE SET calls = calls + 1, prompt_tokens = prompt_tokens + excluded.prompt_tokens, "
+                        "completion_tokens = completion_tokens + excluded.completion_tokens",
+                        (self._day(), agent or "-", provider, model[:100], max(0, int(prompt)), max(0, int(completion))))
+
+    def prices(self) -> dict:
+        try:
+            data = json.loads(self.get_setting("prices", "") or "{}")
+        except json.JSONDecodeError:
+            data = {}
+        return {m: [float(v[0]), float(v[1])] for m, v in data.items() if isinstance(v, list) and len(v) == 2} if isinstance(data, dict) else {}
+
+    def set_price(self, model: str, per_million_in: float, per_million_out: float) -> dict:
+        model = self._clean_model(model) or ""
+        if not model or not (0 <= per_million_in <= 100000 and 0 <= per_million_out <= 100000):
+            raise WorkspaceError("give a model name and prices per million tokens (0 or more)")
+        prices = self.prices()
+        prices[model] = [per_million_in, per_million_out]
+        self.set_setting("prices", json.dumps(prices))
+        return prices
+
+    def usage_report(self, days: int = 14) -> dict:
+        days = max(1, min(int(days), 90))
+        cutoff = time.strftime("%Y-%m-%d", time.gmtime(self.clock() - days * 86400))
+        rows = self.db.query("SELECT * FROM usage_log WHERE day >= ? ORDER BY day", (cutoff,))
+        prices = self.prices()
+
+        def cost(model: str, p: int, c: int) -> float | None:
+            price = prices.get(model)
+            return round((p * price[0] + c * price[1]) / 1_000_000, 4) if price else None
+
+        def fold(key):
+            out: dict = {}
+            for r in rows:
+                e = out.setdefault(r[key], {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cost": 0.0, "priced": True})
+                e["calls"] += r["calls"]
+                e["prompt_tokens"] += r["prompt_tokens"]
+                e["completion_tokens"] += r["completion_tokens"]
+                est = cost(r["model"], r["prompt_tokens"], r["completion_tokens"])
+                if est is None:
+                    e["priced"] = False
+                else:
+                    e["cost"] += est
+            return [{"name": k, **v, "cost": round(v["cost"], 4)} for k, v in sorted(out.items(), key=lambda kv: -kv[1]["calls"])]
+
+        return {"days": fold("day"), "by_agent": fold("agent"), "by_model": fold("model"), "prices": prices, "today_calls": self.calls_today(),
+                "daily_limit": self.daily_calls, "tokens_known": any(r["prompt_tokens"] or r["completion_tokens"] for r in rows)}
 
     # --- agents working at the same time ---
 
@@ -801,6 +896,9 @@ class Workspace:
 
         with self._lock:
             self._busy.add(agent)
+            self._busy_room[agent] = room
+            self._stop.discard(agent)
+            self._activity[agent] = "thinking"
         try:
             with self._agent_locks[agent]:
                 try:
@@ -812,6 +910,9 @@ class Workspace:
         finally:
             with self._lock:
                 self._busy.discard(agent)
+                self._stop.discard(agent)
+                self._activity.pop(agent, None)
+                self._busy_room.pop(agent, None)
 
     def _run_async(self, agent: str, room: str, message_id: int, hops: int) -> None:
         try:

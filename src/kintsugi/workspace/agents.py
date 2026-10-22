@@ -249,8 +249,18 @@ def _loop(ws, name, room, hops, model, ctx, memory, situation, messages, shown) 
     empty_retries = 0
     promise_nudges = 0
     did_tools = False
+    stopped = False
     for _ in range(MAX_STEPS):
+        if ws.stop_requested(name):
+            stopped = True
+            ws.post_system(room, f"{name} was stopped.")
+            break
+        ws.set_activity(name, "thinking")
         reply = model.complete(messages)
+        if ws.stop_requested(name):  # the person pressed Stop while the model was answering: drop the answer
+            stopped = True
+            ws.post_system(room, f"{name} was stopped.")
+            break
         calls, plain = parse_reply(reply)
         if not calls and not plain.strip() and empty_retries < 1:
             empty_retries += 1  # an empty answer is a slip, not an answer: ask once more
@@ -281,6 +291,7 @@ def _loop(ws, name, room, hops, model, ctx, memory, situation, messages, shown) 
                 results.append(f"[tool block] error: {call['_error']}")
                 failures.append(("format", None))
                 continue
+            ws.set_activity(name, f"using {call['tool']}")
             outcome = execute(ctx, call["tool"], call["args"])
             results.append(f"[{call['tool']}] {outcome.status}: {outcome.output}")
             if outcome.status == "pending":
@@ -303,5 +314,5 @@ def _loop(ws, name, room, hops, model, ctx, memory, situation, messages, shown) 
     else:
         ws.post(room, name, f"(I stopped after {MAX_STEPS} steps without finishing.)", hops=hops)
 
-    if not waiting:  # a run that is waiting for a human has no outcome yet
+    if not waiting and not stopped:  # a run that is waiting for a human, or that a person stopped, has no outcome to learn from
         memory.record_outcome(shown, finished and not last_step_failed, situation.id)

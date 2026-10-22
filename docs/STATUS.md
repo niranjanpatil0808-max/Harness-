@@ -102,3 +102,25 @@ DONE and tested (unit ~500 tests, 16 browser suites all green):
   Minor not done: improve/decide records by="web" instead of the person.
 STILL PENDING: browser QA reviewer (agent abfbc2c4f3fa9f541) had not reported yet; when it does, fix confirmed UX/layout bugs and add tests.
 Test hygiene note: stale `serve_mock.py` servers on port 8804 cause false browser-test failures; stop them by pid file, never with `pkill -f` or a /proc scan whose own command line contains the name.
+
+## Browser QA review (reviewer 4) findings: UI FIX CHECKLIST (received after review round 1; folded into the UI overhaul)
+
+1. HIGH  Admins get an empty Details drawer: loadTab() calls owner-only /api/plugins for the agent tab -> 403 every poll, drawer never renders. Fix: only owners fetch it / try-catch.
+2. HIGH  Member sign-out is a dead end: tokens never shown; same name cannot rejoin. Fix: show token/link once after join and after rotating; add owner/admin "reset sign-in" for a person (new link).
+3. MED-HIGH  New approval card can land below the fold on phone (`#scroll{scroll-behavior:smooth}` races card growth) -> instant scroll / scrollIntoView on new approval.
+4. MED-HIGH  Provider test with a wrong address freezes ~2 min (retries/back-off apply to connection refused) and shows raw JSON error -> test with max_retries=0, ~12 s timeout, friendly "did not answer like an OpenAI-style API (does it end in /v1?)", scroll result into view.
+5. MED  Wrong/expired/revoked token is silent (Connect dialog reopens without message; open dialogs block it; wording meant for the owner) -> message in dialog, replace open dialogs on 401, member wording.
+6. MED  aria-pressed/aria-selected rendered as ""/missing (h() helper) -> String(v) for aria-* attributes.
+7. MED  Dialogs not modal (no focus trap/restore); closed off-canvas sidebar stays in tab order -> trap + restore + inert/visibility hidden.
+8. MED  Admin Team panel labels the owner row "you" (wrong for admins) -> show owner's real label, mark current user "(you)".
+9. MED  No agents / room with no agents: composer enabled, messages vanish silently -> disable/banner with "New agent".
+10. LOW-MED  Invite dialog dismissable -> blank app; joining in a browser holding the owner's token silently overwrites it; name rules inconsistent (Sam accepted+lowercased, "Sam Smith" rejected, New agent rejects "Carol") -> non-dismissable join with "sign in instead", warn before replacing, normalise names everywhere.
+11. LOW-MED  Contrast: white on accent ~3.1:1 (dark), 4.2:1 (light), dark placeholder 2.87:1, accent text 3.36:1, 12px headings 4.15:1 -> adjust palette.
+12. LOW  Tap targets <40px (chips 38, textarea 36, Copy 47x25), top-bar sidebar button squeezed to 18px by approval pill, Settings/drawer tabs clipped without scroll hint -> flex-shrink:0, scrollIntoView active tab, min-height 40.
+13. LOW  Sidebar stays open after Settings on phone; toast covers fields; numeric settings clamp silently but say "Saved"; missing period after "Get a key at ..."; drawer says "server's clock" even after time zone set;
+    Safety tab shows owner-only buttons to admins; provider address https://169.254.169.254/v1 accepted (block link-local/private IP literals unless localhost).
+(QA verified working: first-run Models prompt + clear no-key error, validation messages, chat basics, automations, settings persistence, plugins/integrations/team flows, PWA offline shell, focus rings, no console errors.)
+
+## Current plan (after limits reset; user asked: 1) friendlier UI, 2) major upgrades, 3) then security)
+Backend done so far (uncommitted until tests): stop-an-agent (/api/stop + live activity in /api/state), usage tracking (usage_log, /api/usage, prices), name clash fixed (agent_activity).
+Next: message search (/api/find), starter templates (/api/templates), file upload/download, then UI overhaul (settings page with sections, first-run wizard, quick switcher, message actions, Stop button, usage tab, QA fixes), tests, then security round 2.

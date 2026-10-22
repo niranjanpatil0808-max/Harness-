@@ -280,7 +280,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                                     "integrations": ws.integrations.enabled_for(a["name"])}
                                    for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in rooms],
-                        "approvals": approvals, "jobs": jobs, "busy": ws.busy(),
+                        "approvals": approvals, "jobs": jobs, "busy": ws.busy(), "activity": ws.agent_activity(),
                         "sandbox": sandbox.status(), "provider": ws.provider(), "search_configured": ws.search_settings()["configured"], "internet_enabled": ws.internet_settings()["enabled"],
                         "providers": [{"id": p["id"], "label": p["label"], "model": p["model"], "default": p["default"]} for p in ws.providers()["profiles"]] if who.at_least("admin") else [],
                         "model_ready": bool(ws.providers()["profiles"]) or ws.providers()["env_fallback"] or ws.model_factory is not core_mod.default_model_factory,
@@ -296,6 +296,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 if self.who.role != "owner":  # tool arguments can hold private chat content: admins see what happened, not the content
                     rows = [{**r, "detail": (r["detail"] or "").split(" ", 1)[0] if r["event"] in ("tool-ok", "tool-error", "approval-granted", "approval-requested", "approval-denied") else r["detail"]} for r in rows]
                 return rows
+            if path == "/api/usage":
+                return ws.usage_report(int((query.get("days") or ["14"])[0]))
             if path == "/api/me":
                 return {"name": self.who.name, "role": self.who.role}
             if path == "/api/team":
@@ -422,6 +424,14 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return {"ok": True}
             if path == "/api/team/policy":
                 return {"policy": ws.team.set_policy(str(body["policy"]))}
+            if path == "/api/stop":
+                agent = str(body["agent"])
+                room = ws.busy_room(agent)
+                if room is not None and not ws.team.can_see_room(self.who, room):
+                    raise Forbidden("that agent is working in a chat you are not part of")
+                return {"stopping": ws.request_stop(agent)}
+            if path == "/api/usage/price":
+                return {"prices": ws.set_price(str(body["model"]), float(body["in"]), float(body["out"]))}
             if path == "/api/me/token":
                 if self.who.role == "owner":
                     raise WorkspaceError("the owner's token is changed by setting KINTSUGI_TOKEN, not here")
