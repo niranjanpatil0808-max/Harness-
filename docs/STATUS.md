@@ -172,3 +172,17 @@ APP_CSP lacks frame-ancestors 'none'.
 6. MED run_python cap bypass via back-dated mtime. Fix: snapshot pre-run file set; remove new/changed files regardless of mtime.
 Notes: published apps sound; DST skipped-hour miss (low); backup rollback needs passphrase (low).
 Progress on A/B/C fixes: A1 A2 A3 A5 A6 A7 done (uploads now outside agent folder, per chat) + summary tags; remaining below.
+
+
+## Update: team focus + security round 2 fixes (user: "Focus on team sharing and using agents like the main concept")
+Done and pushed:
+- tasks.py + /api/tasks, /api/tasks/create, /api/tasks/update (member paths, checks inside); task rows linked to message ids; core._run
+  calls tasks.started/finish (status from approvals pending / stop / errors / agent reply); resumed-after-approval runs map back via
+  "(approval #N)". UI: sidebar Tasks (badge = open_tasks in /api/state), tasksDialog in extras.js, switcher action, tests/ui/tasks.js.
+- ws.share + /api/share (no wake, credited, renders as sanitised markdown); post(..., wake=False); @person mention -> notify_if_away("mention").
+- ALL confirmed findings of reviewers A, B, C fixed with regression tests (tests/test_workspace_review3.py, tasks, upgrades updates).
+  Uploads now at <ws>/uploads/<agent>/<room-key>/ (outside agent folder), read via read_file "uploads/x" only in that chat.
+  Reset sign-in is owner-only. #token links confirm the account unless it is the owner's link on a fresh browser.
+Last full run before the task-board UI: 542 unit OK, 17 browser suites OK. (Re-run after UI: see git log.)
+Remaining known: per-person agent memory (agents still share one memory/folder across chats — documented); DST skipped hour; backup
+rollback (needs passphrase); look-alike markdown links; tokens in sign-in links are long-lived (one-time codes would be better).

@@ -35,6 +35,26 @@ Remove a person (Settings > Team) and their token stops working at once. Anyone 
 - An agent will not post into a room the person who asked is not part of, so a private chat is not carried into other rooms by an agent.
 - `@all` wakes every agent in the room at once.
 
+## Working with agents as a team
+
+- **Team tasks** (sidebar > Tasks, or Ctrl/Cmd+K "tasks"): pick a room, an agent and what it should do. The task is posted in the room
+  ("@alice Task #7: ...") and the board shows everyone in that room how it is going: *Waiting to start*, *Working*, *Needs approval*,
+  *Done*, *Stopped* or *Failed*, with a link to the result. The person who gave a task, or an admin, can ask again, mark it done or remove it.
+  You only see tasks from rooms you are in (the owner sees all). A task gives the agent no extra powers: approvals apply as usual.
+- **Share**: every message has a *Share* button. It copies the message into another room you are in, with your name and where it came
+  from ("Shared by sam from a private chat with alice"). It wakes no agent. Use it to bring a good answer from a private chat to the team.
+- **@mentions**: writing `@sam` in a room nudges Sam's phone (if notifications are on and Sam is not in the app right now). `@agent`
+  wakes that agent; `@all` wakes every agent in the room.
+- **Files**: a file you attach is given to the agent *in that chat only*. The agent reads it as `uploads/<name>` while working in that
+  chat; in other rooms it cannot see it, and only people in that chat can download it. (Agent code run with run_python cannot see uploads.)
+- **Long chats**: agents see the last 12 messages and a short summary of older ones, so a team can come back to a room days later.
+
+## Signing in again
+
+If someone loses their sign-in, the **owner** opens Settings > Team > *Reset sign-in* for that person and sends them the new link
+privately (shown once). Admins cannot do this, because a new sign-in would let them read that person's private chats. A sign-in link
+opened in a browser names the account and asks before signing in (except the owner's own link on a new device).
+
 ## Who can approve a risky action
 
 Settings > Team > *Who can approve risky actions* (owner only):
@@ -52,7 +72,7 @@ recorded with the name of whoever decided.
   private chat can come up later when a teammate talks to that agent. Use separate agents for things that must stay separate.
 - The owner can read everything, including other people's private chats.
 - Tokens and invite links travel through the browser: use HTTPS (hosting platforms provide it). There is no email check, password
-  reset or single sign-on; losing a token means asking for a new invite.
+  reset or single sign-on; losing a sign-in means asking the owner for a new link.
 - **Integration and plugin tools run for anyone who can talk to an agent they are switched on for.** If you switch GitHub, Slack, Gmail or
   Calendar on for an agent, any member of a room that agent is in can ask it to read from them. Switch integrations on only for agents
   (and rooms) whose members you are comfortable sharing that data with.

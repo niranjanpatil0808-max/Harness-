@@ -134,6 +134,7 @@ function openSwitcher() {
     for (const a of agents()) if (!low || a.name.includes(low)) out.push({kind: "Agent", title: a.name, sub: a.persona.slice(0, 60), run: () => dmWith(a.name)});
     for (const [k, label] of settingsTabs()) if (!low || label.toLowerCase().includes(low) || k.includes(low)) out.push({kind: "Settings", title: label, sub: SETTINGS_BLURB[k], run: () => settingsDialog(k)});
     if (S.room && (!low || "save export download chat markdown".includes(low) || low.split(" ").some((w) => w.length > 2 && "save export download markdown".includes(w)))) out.push({kind: "Action", title: "Save this chat as a file", run: () => exportChat(S.room)});
+    if (!low || "tasks team board assign".includes(low) || low.split(" ").some((w) => w.length > 2 && "tasks board assign".includes(w))) out.push({kind: "Action", title: "Team tasks", sub: "Give an agent a task, follow progress", run: () => tasksDialog()});
     if (isAdmin() && (!low || "starter team template".includes(low))) out.push({kind: "Action", title: "Start from a team", run: startersDialog});
     return out.slice(0, 14);
   };
@@ -185,4 +186,62 @@ async function exportChat(room) {
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     toast("Saved " + all.length + " messages");
   } catch (e) { toast(e.message, true); }
+}
+
+/* ---------- team task board: give an agent a task in a shared room, and everyone in that room can follow it ---------- */
+const TASK_LABEL = {queued: "Waiting to start", working: "Working", waiting: "Needs approval", done: "Done", stopped: "Stopped", failed: "Failed"};
+async function tasksDialog(room) {
+  let list = [], timer = 0, closed = false;
+  const mine = () => rooms().filter((r) => r.members.includes(me().name) && roomAgents(r).length);
+  const roomSel = h("select", {"aria-label": "Room"}, mine().map((r) => h("option", {value: r.name, selected: r.name === (room || S.room)}, r.kind === "dm" ? "Private: " + roomLabel(r) : "#" + r.name)));
+  const agentSel = h("select", {"aria-label": "Agent"});
+  const fillAgents = () => { const r = rooms().find((x) => x.name === roomSel.value); fill(agentSel, (r ? roomAgents(r) : []).map((a) => h("option", {value: a}, a))); };
+  roomSel.onchange = fillAgents; fillAgents();
+  const what = h("textarea", {rows: 2, placeholder: "What should the agent do? e.g. Draft the launch email for Friday", "aria-label": "Task", maxlength: 600});
+  const give = h("button", {class: "btn primary"}, "Give task");
+  give.onclick = async () => {
+    if (!what.value.trim()) { what.focus(); return; }
+    give.disabled = true;
+    try { await api("/api/tasks/create", {room: roomSel.value, agent: agentSel.value, title: what.value}); what.value = ""; toast("Task given. Everyone in the room can follow it here."); S.fast = 12; await refresh(); }
+    catch (e) { toast(e.message, true); }
+    give.disabled = false;
+  };
+  const board = h("div", {class: "task-board", "aria-live": "polite"});
+  const card = (t) => {
+    const r = rooms().find((x) => x.name === t.room), where = r ? (r.kind === "dm" ? "private chat" : "#" + t.room) : t.room;
+    const canChange = t.created_by === me().name || isAdmin(), open = ["queued", "working", "waiting"].includes(t.status);
+    return h("div", {class: "task-card st-" + t.status},
+      h("div", {class: "task-top"}, h("span", {class: "task-chip st-" + t.status}, TASK_LABEL[t.status] || t.status), h("span", {class: "muted", style: "font-size:12px"}, "#" + t.id + " · " + clock(t.updated))),
+      h("div", {class: "task-title"}, t.title),
+      h("div", {class: "muted", style: "font-size:13px"}, avatar(t.agent), " " + t.agent + " · " + where + " · given by " + t.created_by),
+      h("div", {class: "task-actions"},
+        r ? h("button", {class: "btn", onclick: () => { close(); openRoom(t.room); if (t.result_id || t.message_id) setTimeout(() => jumpTo(t.result_id || t.message_id), 400); }}, t.result_id ? "See the result" : "Open the chat") : null,
+        canChange && !open ? h("button", {class: "btn", onclick: () => change(t, "retry", "Asked again")}, "Ask again") : null,
+        canChange && open ? h("button", {class: "btn", onclick: () => change(t, "done", "Marked done")}, "Mark done") : null,
+        canChange ? h("button", {class: "btn danger", "aria-label": "Remove task " + t.id, onclick: () => change(t, "delete", "Removed")}, "Remove") : null));
+  };
+  const change = async (t, action, ok) => { try { await api("/api/tasks/update", {id: t.id, action}); toast(ok); await refresh(); } catch (e) { toast(e.message, true); } };
+  const draw = () => {
+    const active = list.filter((t) => ["queued", "working", "waiting"].includes(t.status)), past = list.filter((t) => !active.includes(t));
+    fill(board, list.length ? [active.length ? [h("h4", {}, "In progress (" + active.length + ")"), active.map(card)] : null, past.length ? [h("h4", {}, "Finished"), past.slice(0, 60).map(card)] : null]
+      : h("div", {class: "hello", style: "padding:20px 0"}, h("p", {}, "No tasks yet. Give an agent a task above: it works on it in the room, and everyone there sees how it is going.")));
+  };
+  const refresh = async () => { try { list = await api("/api/tasks"); draw(); } catch (e) { /* the poll reports connection problems */ } };
+  const tick = async () => { if (closed) return; await refresh(); timer = setTimeout(tick, 3000); };
+  const form = mine().length ? h("div", {class: "task-form"}, h("div", {class: "task-row"}, roomSel, agentSel), what, give)
+    : h("p", {class: "muted"}, isAdmin() ? "Add an agent to a room first (New agent, or Start from a team)." : "You are not in a room with an agent yet. Ask an admin to add you.");
+  what.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); give.click(); } });
+  const close = dialog("Team tasks", "Hand work to an agent in a shared room. Everyone in that room can follow it.", h("div", {}, form, board), (c) => [h("button", {class: "btn primary", onclick: c}, "Done")], () => { closed = true; clearTimeout(timer); });
+  close.dialog.classList.add("tasks-dialog");
+  draw(); tick();
+}
+function jumpTo(id) { const el = document.querySelector('[data-mid="' + id + '"]'); if (el) { el.scrollIntoView({block: "center"}); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); } }
+
+/* ---------- share an answer into a room ---------- */
+function shareDialog(m) {
+  const targets = rooms().filter((r) => r.kind !== "dm" && r.name !== m.room && r.members.includes(me().name));
+  if (!targets.length) { toast("You are not in any other room to share into", true); return; }
+  const sel = h("select", {"aria-label": "Share to room"}, targets.map((r) => h("option", {value: r.name}, "#" + r.name)));
+  const close = dialog("Share this message", "It is copied into the room with your name and where it came from. Nobody is woken up by it.", h("div", {}, h("blockquote", {class: "share-preview"}, m.text.slice(0, 400) + (m.text.length > 400 ? "…" : "")), sel),
+    (c) => [h("button", {class: "btn", onclick: c}, "Cancel"), h("button", {class: "btn primary", onclick: async () => { try { await api("/api/share", {id: m.id, room: sel.value}); c(); toast("Shared to #" + sel.value); } catch (e) { toast(e.message, true); } }}, "Share")]);
 }

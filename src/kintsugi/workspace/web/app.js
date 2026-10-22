@@ -108,7 +108,7 @@ function sigChanged(key, data) { const s = JSON.stringify(data); if (S.sig[key] 
 function renderSidebar() {
   const st = S.state; if (!st) return;
   const pend = {}; st.approvals.forEach((a) => (pend[a.room] = (pend[a.room] || 0) + 1));
-  if (!sigChanged("side", [st.rooms, st.agents.map((a) => a.name), st.busy, pend, S.room, st.improve, !!S.installEvent, IS_STANDALONE(), st.jobs.map((j) => [j.id, j.enabled]), seen(), st.rooms.map((r) => r.last_other)])) return;
+  if (!sigChanged("side", [st.rooms, st.agents.map((a) => a.name), st.busy, pend, S.room, st.improve, !!S.installEvent, IS_STANDALONE(), st.jobs.map((j) => [j.id, j.enabled]), st.open_tasks, seen(), st.rooms.map((r) => r.last_other)])) return;
   const roomItem = (r) => h("button", {class: "item" + (r.name === S.room ? " on" : ""), onclick: () => openRoom(r.name)},
     r.kind === "dm" ? avatar(roomLabel(r)) : h("span", {class: "muted", style: "width:24px;text-align:center"}, "#"),
     h("span", {class: "t", style: isUnread(r) && r.name !== S.room ? "font-weight:700" : ""}, roomLabel(r)), busyIn(r).length ? h("span", {class: "dot", title: "working"}) : (isUnread(r) && r.name !== S.room ? h("span", {class: "dot", title: "new", style: "animation:none"}) : null),
@@ -126,6 +126,7 @@ function renderSidebar() {
       st.agents.map((a) => h("button", {class: "item", title: a.persona || a.name, onclick: () => dmWith(a.name)},
         avatar(a.name), h("span", {class: "t"}, a.name), st.busy.includes(a.name) ? h("span", {class: "dot"}) : h("span", {class: "muted", style: "font-size:12px"}, a.tier))),
       isAdmin() ? h("button", {class: "item muted", onclick: newAgentDialog}, h("span", {style: "width:24px;text-align:center"}, "+"), "New agent") : null,
+      h("button", {class: "item muted", onclick: () => tasksDialog()}, h("span", {style: "width:24px;text-align:center"}, "✓"), "Tasks", st.open_tasks ? h("span", {class: "badge", "aria-label": st.open_tasks + " open"}, st.open_tasks) : null),
       h("button", {class: "item muted", onclick: () => automationsDialog()}, h("span", {style: "width:24px;text-align:center"}, "⏰"), "Automations", jobBadge()),
       canInstall() ? h("button", {class: "item muted", onclick: installApp}, h("span", {style: "width:24px;text-align:center"}, "⤓"), "Install the app") : null),
     h("div", {class: "side-foot"}, avatar(me().name), h("span", {class: "who"}, me().name, me().role !== "owner" ? h("small", {class: "muted", style: "margin-left:6px"}, me().role) : null),
@@ -205,14 +206,16 @@ function bodyOf(m) {
     const job = S.state && S.state.jobs.find((j) => "cron-" + j.id === m.sender), body = m.text.replace(/^@\S+\s*/, "");
     return h("div", {class: "sys cron"}, "⏰ " + (job && job.title ? job.title : "Scheduled: " + body.slice(0, 90)));
   }
-  if (m.sender === me().name) return h("div", {class: "row me", title: clock(m.ts)}, h("div", {class: "bubble"}, m.text));
+  const shared = /^Shared by \S+ from .{1,80} \(\S+ wrote\):\n/.test(m.text);  // a shared answer keeps its formatting (sanitised like any agent reply)
+  if (m.sender === me().name) return h("div", {class: "row me", title: clock(m.ts), "data-mid": m.id}, h("div", {class: "bubble" + (shared ? " shared" : "")}, shared ? md(m.text) : m.text));
   const agent = isAgent(m.sender);
-  return h("div", {class: "row"}, avatar(m.sender, true),
+  return h("div", {class: "row", "data-mid": m.id}, avatar(m.sender, true),
     h("div", {class: "body-wrap", style: "flex:1;min-width:0"},
       h("div", {class: "who-line"}, m.sender, h("time", {}, clock(m.ts))),
-      agent ? md(m.text) : h("div", {class: "body", style: "white-space:pre-wrap"}, m.text),
+      agent || shared ? md(m.text) : h("div", {class: "body", style: "white-space:pre-wrap"}, m.text),
       h("div", {class: "msg-actions"}, h("button", {class: "mini", "aria-label": "Copy this message", onclick: (e) => copyText(m.text, e.currentTarget)}, "Copy"),
-        agent ? h("button", {class: "mini", "aria-label": "Ask again", title: "Send your last message to " + m.sender + " again", onclick: () => askAgain(m.sender)}, "Ask again") : null)));
+        agent ? h("button", {class: "mini", "aria-label": "Ask again", title: "Send your last message to " + m.sender + " again", onclick: () => askAgain(m.sender)}, "Ask again") : null,
+        h("button", {class: "mini", "aria-label": "Share this message to a room", onclick: () => shareDialog(m)}, "Share"))));
 }
 function emptyState() {
   const r = curRoom(), ra = roomAgents(r), first = ra[0] || (agents()[0] || {}).name;
