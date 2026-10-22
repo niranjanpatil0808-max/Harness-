@@ -1,6 +1,9 @@
 # Kintsugi
 
-**A small, from-scratch harness that helps a small open model fix more Python bugs: it retries against real tests, writes lessons from its own mistakes, and sees only the code that matters.**
+**A local workspace of AI agents that learn from their mistakes. Each agent has its own files, secrets, permissions, schedule and web apps; they talk in rooms; and every failed tool call becomes a lesson the agent remembers.** Under it sits the Kintsugi harness: a small, from-scratch harness that helps a small open model fix more Python bugs by retrying against real tests, writing lessons from its own mistakes, and seeing only the code that matters.
+
+- **Workspace** (new): see [docs/WORKSPACE.md](docs/WORKSPACE.md) and `python examples/workspace_demo.py`. Tested, runs offline; whether its lessons improve agents is **not yet measured**.
+- **Harness + benchmark**: the measured part, below. The evidence in this README is about the bug-fix harness only.
 
 *Kintsugi* is the Japanese art of repairing broken pottery with gold: the cracks become the strongest part. Here, the model's failures become lessons that guide its next fix.
 
@@ -13,6 +16,7 @@
 - **Makes lessons for itself.** When a fix fails, the model writes its own short lesson about what went wrong. No human labels, no fine-tuning: lessons are saved, deduplicated, tested against later tasks, kept when they help and dropped when they don't.
 - **Has its context graphified.** The codebase is turned into a graph of what calls, uses and imports what. For each task the harness walks that graph and hands the model only the connected code, not the whole repo.
 - **Retries against real tests.** Every fix is checked by unit tests in a separate process, and the error goes back to the model for another try.
+- **A workspace for agents** (QM-style). Rooms and DMs, per-agent files, notes, keychain, tiered permissions with approvals, cron jobs, published web apps, a loop guard. Local, stdlib only. [Details](docs/WORKSPACE.md).
 - **Honest numbers only.** Every table in this repo is generated from the benchmark's own result files, including runs that failed, were invalid or stopped early ([RESULTS.md](RESULTS.md)).
 
 ---
@@ -85,6 +89,15 @@ export KINTSUGI_API_KEY=anything
 export KINTSUGI_MAX_TOKENS=4096                      # keep prompt + max_tokens under your per-minute limit
 ```
 
+**The workspace.**
+
+```bash
+python examples/workspace_demo.py            # offline tour
+kintsugi workspace init && kintsugi workspace agent alice && kintsugi workspace room team alice you
+kintsugi workspace say team "@alice hello"   # needs a model key, or add --mock before the subcommand
+kintsugi workspace serve                     # web UI on http://127.0.0.1:8765
+```
+
 **Running the benchmark without a computer.** `.github/workflows/benchmark.yml` runs it on GitHub's servers. Add your key as the repository secret `KINTSUGI_API_KEY`, edit `benchmark/run.config` (base URL, then one `model|max_tokens|repeats|modes` entry per model) and push: the run starts and commits its results to `results/`. Rebuild the all-runs page with `python benchmark/build_results_md.py`.
 
 ## Benchmark
@@ -141,6 +154,7 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 | [SWE-agent/mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) | MIT | A tiny agent loop that skips the tool-calling API, so any model works | Plain-text prompt in, fenced code blocks out; one short loop |
 | [Aider-AI/aider](https://github.com/Aider-AI/aider) (repo map) | Apache-2.0 | A map of definitions and references ranked with PageRank, personalized to the current task, within a size budget | `graph.py`: stdlib PageRank over the `ast` graph, seeded by test names |
 | [ReflexioAI/reflexio](https://github.com/ReflexioAI/reflexio) | Apache-2.0 | Turn repeated corrections into lasting, deduplicated behavior changes | Near-duplicate lessons merge and count how often they recur |
+| [yc-software/qm](https://github.com/yc-software/qm) | MIT | A workspace where agents have durable memory, files and a sandbox, talk in channels, and run under tiered permissions with a keychain and scheduled jobs | `src/kintsugi/workspace/`: a small local reimplementation (no Slack, Postgres or cloud); the mistake-memory is the addition |
 | [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) | MIT | Harness state (prompts, memories) kept as durable files, updated in small evidence-backed steps | `lessons.json` is plain data; every change records the task and outcome that caused it |
 
 ## Limitations
@@ -155,6 +169,8 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 - **Name-based resolution.** The graph links calls by name, not by type, so two unrelated functions with the same name can be linked.
 - **Memory retrieval is keyword overlap**, not embeddings.
 - **The model sees the tests.** That measures "fix to pass given tests", not "find an unknown bug".
+- **The workspace's learning is unmeasured.** Tests show the lesson mechanism works (a failed tool call produces a stored, retrieved, scored lesson); there is no experiment showing it makes agents better.
+- **The workspace sandbox is not a security sandbox.** Approved `run_python` code runs with your permissions (rlimits and a scrubbed environment, but it can still read files and use the network). The keychain is not encrypted unless the optional `cryptography` package is installed. One shared access token, no user accounts. See [docs/WORKSPACE.md](docs/WORKSPACE.md).
 - **Model code runs with your permissions.** The verifier uses a separate process, a temp directory and a timeout, but it is not a security sandbox.
 
 ## What's next
@@ -167,6 +183,9 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 
 ```
 src/kintsugi/   model.py  verifier.py  loop.py  memory.py  graph.py  cli.py
+src/kintsugi/workspace/   core.py  agents.py  tools.py  perms.py  sandbox.py  keychain.py
+                scheduler.py  server.py  db.py  cli.py  web/index.html
+docs/WORKSPACE.md   examples/workspace_demo.py
 benchmark/      tasks/  solutions/  split.json  check_tasks.py  run_benchmark.py
                 run.config  build_results_md.py  run_notes.json
 results/        every measured run (JSON + table + lessons learned)

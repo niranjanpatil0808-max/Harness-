@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kintsugi workspace</title>
+<style>
+:root{--bg:#faf7f2;--fg:#2a2622;--mut:#7a7066;--card:#fff;--line:#e4dccf;--gold:#b8893b}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1a17;--fg:#ece6dc;--mut:#9c9286;--card:#26231f;--line:#3a352e;--gold:#d4a24f}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:17px;margin:0;color:var(--gold)}main{display:grid;grid-template-columns:200px 1fr 260px;min-height:calc(100vh - 50px)}
+@media(max-width:800px){main{grid-template-columns:1fr}}
+aside,section{padding:12px 16px}aside{border-right:1px solid var(--line)}aside.r{border-left:1px solid var(--line);border-right:0}
+.room{display:block;padding:6px 8px;border-radius:6px;cursor:pointer}.room.on{background:var(--card);border:1px solid var(--line)}
+.msg{margin:6px 0;padding:8px 10px;background:var(--card);border:1px solid var(--line);border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg b{color:var(--gold)}.msg.system{color:var(--mut);font-style:italic}
+form{display:flex;gap:8px;margin-top:10px}input,select,button{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg)}
+input[type=text]{flex:1}button{cursor:pointer}button.go{background:var(--gold);color:#fff;border-color:var(--gold)}
+h3{margin:14px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
+small,.mut{color:var(--mut)}.ap{border:1px solid var(--gold);border-radius:8px;padding:8px;margin:6px 0}
+</style></head><body>
+<header><h1>Kintsugi workspace</h1><span class="mut">agents that learn from their mistakes</span>
+<input id="token" type="password" placeholder="access token" size="22"><button id="connect">Connect</button><span id="status" class="mut"></span></header>
+<main>
+<aside><h3>Rooms</h3><div id="rooms"></div><h3>Agents</h3><div id="agents"></div></aside>
+<section><div id="log"></div>
+<form id="say"><input type="text" id="text" placeholder="Message, e.g. @alice write a todo list" autocomplete="off"><button class="go">Send</button></form></section>
+<aside class="r"><h3>Waiting for approval</h3><div id="approvals" class="mut">nothing</div>
+<h3>Lessons <select id="lagent"></select></h3><div id="lessons" class="mut"></div>
+<h3>Scheduled jobs</h3><div id="jobs" class="mut">none</div></aside>
+</main>
+<script>
+let token=sessionStorage.getItem("kt")||"",room=null,state=null,last={};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+async function api(path,body){
+  const r=await fetch(path,{method:body?"POST":"GET",headers:{"X-Token":token,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
+  const d=await r.json();if(!r.ok)throw new Error(d.error||r.status);return d}
+$("token").value=token;
+$("connect").onclick=()=>{token=$("token").value.trim();sessionStorage.setItem("kt",token);refresh()};
+$("say").onsubmit=async e=>{e.preventDefault();const t=$("text").value.trim();if(!t||!room)return;
+  $("text").value="";try{await api("/api/say",{room,text:t});}catch(x){$("status").textContent=x.message}refresh()};
+async function decide(id,approve){await api("/api/approve",{id,approve});refresh()}
+async function refresh(){
+  if(!token)return;
+  try{state=await api("/api/state");$("status").textContent="connected"}catch(x){$("status").textContent=x.message;return}
+  $("rooms").innerHTML=state.rooms.map(r=>`<a class="room ${r.name===room?"on":""}" data-r="${esc(r.name)}">${r.kind==="dm"?"✉":"#"} ${esc(r.name)}</a>`).join("")||"<small>none yet</small>";
+  document.querySelectorAll(".room").forEach(a=>a.onclick=()=>{room=a.dataset.r;$("log").innerHTML="";last={};refresh()});
+  $("agents").innerHTML=state.agents.map(a=>`<div>${esc(a.name)} <small>${esc(a.tier)}</small></div>`).join("")||"<small>none yet</small>";
+  if(!room&&state.rooms.length)room=state.rooms[0].name;
+  $("approvals").innerHTML=state.approvals.length?state.approvals.map(a=>`<div class="ap"><b>#${a.id}</b> ${esc(a.agent)} wants <b>${esc(a.tool)}</b><br><small>${esc(a.args.slice(0,200))}</small><br><button onclick="decide(${a.id},true)">Approve</button> <button onclick="decide(${a.id},false)">Deny</button></div>`).join(""):"nothing";
+  $("jobs").innerHTML=state.jobs.length?state.jobs.map(j=>`<div><code>${esc(j.cron)}</code> ${esc(j.agent)}: ${esc(j.prompt)}</div>`).join(""):"none";
+  const sel=$("lagent"),cur=sel.value;sel.innerHTML=state.agents.map(a=>`<option>${esc(a.name)}</option>`).join("");if(cur)sel.value=cur;
+  if(sel.value){const ls=await api("/api/lessons?agent="+encodeURIComponent(sel.value));
+    $("lessons").innerHTML=ls.length?ls.map(l=>`<div>• ${esc(l.text)} <small>(${l.wins}/${l.uses} ${esc(l.status)})</small></div>`).join(""):"none yet"}
+  if(room){const after=last[room]||0;const ms=await api(`/api/messages?room=${encodeURIComponent(room)}&after=${after}`);
+    for(const m of ms){last[room]=m.id;$("log").insertAdjacentHTML("beforeend",`<div class="msg ${m.sender==="system"?"system":""}"><b>${esc(m.sender)}</b> ${esc(m.text)}</div>`)}
+    if(ms.length)window.scrollTo(0,document.body.scrollHeight)}
+}
+setInterval(refresh,2000);refresh();
+</script></body></html>

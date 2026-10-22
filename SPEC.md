@@ -40,3 +40,16 @@ work and are measured.
 Model output is only ever executed by the verifier's child process, in a temp directory, with a
 timeout. Writes outside the task folder are refused. This is not a full sandbox: the child process
 runs with the user's permissions. Do not point the harness at code or models you don't trust.
+
+## Workspace (added 2026-10-22)
+
+| Decision | Default | Reason |
+|---|---|---|
+| Location | `src/kintsugi/workspace/`; core harness modules unchanged | Benchmark runs and results stay valid |
+| Stack | Python stdlib: SQLite, `http.server`, a scheduler thread | Same "nothing to install" promise |
+| Tool protocol | Fenced ```tool JSON blocks in plain text | Works with any chat model, no tool-calling API |
+| Permissions | strict / auto (default) / dangerous; risky tools queue an approval | Humans decide what code runs |
+| Memory | Reuses `MemoryStore` (lessons from failed tool calls) plus keyword-searched notes | One memory design across benchmark and workspace |
+| Loop guard | 4 agent-to-agent hops per thread, 20 runs/min/agent | Agents cannot chat or spend forever |
+| Sandbox | Subprocess, scrubbed env, wall timeout, CPU/memory rlimits | NOT a security boundary; documented |
+| Evidence | None yet for the workspace; the benchmark covers the memory idea only | Do not claim what is not measured |

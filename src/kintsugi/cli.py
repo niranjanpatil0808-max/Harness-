@@ -4,6 +4,7 @@
   kintsugi graph <task_dir>
   kintsugi lessons [--memory PATH]
   kintsugi models
+  kintsugi workspace init|serve|agent|room|say|log|approvals|approve|deny|tier|job|secret|audit
 """
 
 from __future__ import annotations
@@ -92,6 +93,10 @@ def main(argv: list[str] | None = None) -> int:
 
     models = sub.add_parser("models", help="list the model names your API key can use")
     models.set_defaults(func=cmd_models)
+
+    from .workspace.cli import add_parser as add_workspace
+
+    add_workspace(sub)
 
     args = parser.parse_args(argv)
     return args.func(args)
