@@ -89,3 +89,16 @@ Minor: to_text double html.unescape; web_search result URL control chars; Retry-
 
 ## Progress on the internet-facing checklist (reviewer 2)
 Done in code (tests being finished): items 1-4, 6-11, 13 and minor ones, plus ICS parser rewrite (item 5). Item 12 partially (download cap + restore never crashes; rollback protection NOT done).
+
+## Update (end of review round 1)
+
+DONE and tested (unit ~500 tests, 16 browser suites all green):
+- Reviewer 3 (core): all 12 fixed. Reviewer 2 (internet): items 1-11 and 13 fixed (redirects never forward keys, IMAP TLS verified, push validation, fetch deadline incl. headers
+  via watchdog, IPv6-embedded IPv4, idna Host, redirect text not echoed, plugin `..`/header/prefix/fingerprint, ICS parser rewritten, keychain atomic+locked); item 12 partial
+  (download cap + restore never crashes; **rollback protection NOT done**).
+- Reviewer 1 (access/UI): items 1-7, 9, 10 fixed (message markup sanitized hard, admins cannot read private DM content/args/approvals or approve code given secrets, cross-room hand-off
+  fails closed, invites/schedules die with their owner, right token never throttled, no default TRUST_PROXY except render.yaml, DM name collisions, caps, reserved names,
+  sign-in confirmation, clean sign-out, approval card shows secrets). Item 8 (published apps on the workspace origin) only DOCUMENTED + warning on the approval card; separate origin NOT built.
+  Minor not done: improve/decide records by="web" instead of the person.
+STILL PENDING: browser QA reviewer (agent abfbc2c4f3fa9f541) had not reported yet; when it does, fix confirmed UX/layout bugs and add tests.
+Test hygiene note: stale `serve_mock.py` servers on port 8804 cause false browser-test failures; stop them by pid file, never with `pkill -f` or a /proc scan whose own command line contains the name.
