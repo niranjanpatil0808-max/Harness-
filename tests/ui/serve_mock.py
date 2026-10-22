@@ -30,6 +30,27 @@ def reply(messages):
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dojo_models import factory, make_model  # noqa: E402
 
+import json as _json, os, threading  # noqa: E402
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer  # noqa: E402
+
+
+class _FakeSearch(BaseHTTPRequestHandler):  # a stand-in search provider so the Search settings can be tried without a real key
+    def log_message(self, *a):
+        pass
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        body = _json.dumps({"results": [{"title": "Example result", "url": "https://example.org/a", "content": "A short snippet."}]}).encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+_fake = ThreadingHTTPServer(("127.0.0.1", 0), _FakeSearch)
+threading.Thread(target=_fake.serve_forever, daemon=True).start()
+os.environ["KINTSUGI_SEARCH_BASE_URL"] = f"http://127.0.0.1:{_fake.server_port}"
+
 ws = Workspace(sys.argv[1], model_factory=lambda n: MockModel(reply), sync=False, encrypt_keychain=False)
 seed(ws)
 # studies find a real improvement: the default model is weak, the candidate 'strong' is good

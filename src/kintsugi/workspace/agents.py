@@ -216,7 +216,7 @@ def run_agent(ws: "Workspace", name: str, room: str, message_id: int, hops: int)
     asker = trigger["sender"] if trigger["sender"] not in ("system",) and not trigger["sender"].startswith("cron-") else "you"
     system = SYSTEM.format(name=name, persona=agent["persona"], max_tools=MAX_TOOLS_PER_STEP, playbook=playbook_text,
                            tone=ws.tone_text(asker),
-                           tools=describe_tools(agent["tools"]))
+                           tools=describe_tools(agent["tools"], ws))
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": build_context(ws, room, message_id, memory.format(lessons),

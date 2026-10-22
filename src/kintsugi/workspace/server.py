@@ -214,6 +214,11 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 ws.get_agent(agent)
                 base = ws.files_dir(agent)
                 return sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file())[:200]
+            if path == "/api/search":
+                from .websearch import PROVIDERS
+
+                return {**ws.search_settings(), "used_today": ws.searches_today(),
+                        "providers": {k: {kk: v[kk] for kk in ("label", "signup", "note")} for k, v in PROVIDERS.items()}}
             if path == "/api/tone":
                 from .core import TONE_LABELS, TONES
 
@@ -296,6 +301,19 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return {"ok": True}
             if path == "/api/purge":
                 return {"deleted": ws.purge_messages(float(body["days"]))}
+            if path == "/api/search/settings":  # the key is write-only: it is never returned by any endpoint
+                return ws.set_search(str(body["provider"]), str(body.get("key") or "") or None, body.get("daily_cap"))
+            if path == "/api/search/test":
+                from .websearch import SearchError
+
+                try:
+                    results = ws.web_search(str(body.get("query") or "open source software"), 3)
+                except SearchError as err:
+                    raise WorkspaceError(str(err))
+                return {"results": results}
+            if path == "/api/search/remove":
+                ws.remove_search_key()
+                return {"ok": True}
             if path == "/api/tone":
                 return ws.set_tone("you", str(body["style"]), str(body.get("custom", "")))
             if path == "/api/improve/settings":

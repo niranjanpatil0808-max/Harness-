@@ -293,6 +293,61 @@ class Workspace:
             self.db.execute("INSERT INTO usage (day, calls) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET calls = calls + 1",
                             (self._day(),))
 
+    # --- web search (the owner's own key; counted per day) --------------------------
+
+    SEARCH_AGENT = "_workspace"  # the keychain slot for workspace-wide keys (agents cannot have this name)
+
+    def search_settings(self) -> dict:
+        raw = self.get_setting("search", "")
+        try:
+            saved = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            saved = {}
+        return {"provider": saved.get("provider") if saved.get("provider") in ("tavily", "brave") else "tavily",
+                "daily_cap": min(max(int(saved.get("daily_cap", 50)), 1), 1000),
+                "configured": "SEARCH_API_KEY" in self.keychain.names(self.SEARCH_AGENT)}
+
+    def set_search(self, provider: str, key: str | None = None, daily_cap: int | None = None) -> dict:
+        from .websearch import PROVIDERS
+
+        if provider not in PROVIDERS:
+            raise WorkspaceError("provider must be one of: " + ", ".join(PROVIDERS))
+        current = self.search_settings()
+        cap = current["daily_cap"] if daily_cap is None else min(max(int(daily_cap), 1), 1000)
+        if key:
+            self.keychain.set(self.SEARCH_AGENT, "SEARCH_API_KEY", key.strip())
+        self.set_setting("search", json.dumps({"provider": provider, "daily_cap": cap}))
+        self.audit(None, "search-settings", f"{provider} cap={cap}" + (" key-updated" if key else ""))
+        return self.search_settings()
+
+    def remove_search_key(self) -> None:
+        self.keychain.delete(self.SEARCH_AGENT, "SEARCH_API_KEY")
+        self.audit(None, "search-key-removed")
+
+    def searches_today(self) -> int:
+        row = self.db.one("SELECT calls FROM usage WHERE day = ?", (f"search-{self._day()}",))
+        return row["calls"] if row else 0
+
+    def spend_search(self) -> None:
+        """Count one web search; refuse when today's allowance (set by the owner) is used up."""
+        with self._lock:
+            cap = self.search_settings()["daily_cap"]
+            if self.searches_today() >= cap:
+                raise WorkspaceError(f"today's limit of {cap} web searches is used up (the owner can raise it in Settings > Search)")
+            self.db.execute("INSERT INTO usage (day, calls) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET calls = calls + 1",
+                            (f"search-{self._day()}",))
+
+    def web_search(self, query: str, count: int = 5) -> list[dict]:
+        """Run one search with the owner's key. Raises SearchError/WorkspaceError with messages fit to show."""
+        from .websearch import SearchError, search
+
+        settings = self.search_settings()
+        if not settings["configured"]:
+            raise SearchError("web search is not set up (the owner adds a search key in Settings > Search)")
+        self.spend_search()
+        key = self.keychain.env_for(self.SEARCH_AGENT, ["SEARCH_API_KEY"])["SEARCH_API_KEY"]
+        return search(settings["provider"], key, query, count)
+
     # --- deleting data (privacy) ---------------------------------------------
 
     def delete_agent(self, name: str) -> None:

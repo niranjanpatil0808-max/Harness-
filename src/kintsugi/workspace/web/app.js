@@ -361,6 +361,26 @@ async function generalPanel() {
     h("div", {style: "margin-top:12px"}, h("button", {class: "btn", onclick: () => { speak("Hello! This is how I sound."); }}, "Test voice")));
 }
 
+/* ---------- settings: web search ---------- */
+async function searchPanel() {
+  const d = await api("/api/search");
+  const provider = h("select", {"aria-label": "Search provider"}, Object.entries(d.providers).map(([k, p]) => h("option", {value: k, selected: d.provider === k}, p.label)));
+  const key = h("input", {type: "password", placeholder: d.configured ? "A key is saved. Paste a new one to replace it." : "Paste your search key", autocomplete: "off", "aria-label": "Search key"});
+  const cap = h("input", {type: "number", min: 1, max: 1000, value: d.daily_cap, "aria-label": "Searches per day"});
+  const note = h("small", {class: "muted", style: "display:block;margin-top:2px"}), out = h("div", {id: "search-test"});
+  const showNote = () => { const p = d.providers[provider.value]; note.replaceChildren(p.note + " Get a key at ", h("a", {href: p.signup, target: "_blank", rel: "noopener"}, p.signup.replace("https://", ""))); };
+  provider.onchange = showNote; showNote();
+  const row = (label, el, n) => h("div", {style: "margin:12px 0"}, h("label", {style: "margin:0 0 4px"}, label), el, n || null);
+  return h("div", {}, h("p", {style: "margin-top:0"}, "Agents can look things up on the web with your own search key. They get a few short snippets with their sources. They cannot open pages or download anything, and web text is treated as untrusted data, never as instructions."),
+    h("div", {class: "card"}, d.configured ? "Search is on (" + d.providers[d.provider].label + "). Used today: " + d.used_today + " of " + d.daily_cap + "." : "Search is off. Add a key to turn it on."),
+    row("Provider", provider, note), row("Key", key, h("small", {class: "muted", style: "display:block;margin-top:2px"}, "Stored in your keychain. It is never shown again, never sent to the model, and never included in exports.")),
+    row("Searches per day", cap, h("small", {class: "muted", style: "display:block;margin-top:2px"}, "Stops runaway loops from using up your allowance.")),
+    h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, h("button", {class: "btn primary", onclick: async () => { const ok = await act(() => api("/api/search/settings", {provider: provider.value, key: key.value, daily_cap: +cap.value}), "Search settings saved"); if (ok) { key.value = ""; fill($("#settings-body"), await searchPanel()); } }}, "Save"),
+      d.configured ? h("button", {class: "btn", onclick: async () => { try { const r = await api("/api/search/test", {query: "open source software"}); fill(out, r.results.length ? r.results.map((x) => h("div", {class: "card"}, h("strong", {}, x.title), h("div", {class: "muted", style: "font-size:13px"}, x.snippet), h("small", {}, x.url))) : h("p", {class: "muted"}, "The key works but the test found nothing.")); } catch (e) { toast(e.message, true); } }}, "Test search") : null,
+      d.configured ? h("button", {class: "btn danger", onclick: () => confirmDialog("Remove the search key?", "Agents will no longer be able to search the web.", "Remove", async () => { await act(() => api("/api/search/remove", {}), "Key removed"); fill($("#settings-body"), await searchPanel()); })}, "Remove key") : null),
+    out, h("p", {class: "muted", style: "font-size:13px;margin-top:14px"}, "Privacy: each search sends the words the agent chose to " + d.providers[d.provider].label + ". Secrets are never included, but think about what you ask. Search is counted and capped, and every search appears in the Log."));
+}
+
 /* ---------- navigation ---------- */
 function openRoom(name) {
   S.room = name; S.last[name] = 0; S.loadedRooms[name] = false; S.stick = true; S.sig = {}; closeSidebarMobile(); focusAgent();
@@ -526,8 +546,8 @@ async function improvePanel() {
   content.append(h("div", {style: "display:flex;justify-content:flex-end;margin-top:8px"}, h("button", {class: "btn primary", onclick: save}, "Save settings")));
   return content;
 }
-const SETTINGS_TABS = [["general", "General"], ["improve", "Improve"]];
-const SETTINGS_PANELS = {general: () => generalPanel(), improve: () => improvePanel()};
+const SETTINGS_TABS = [["general", "General"], ["search", "Search"], ["improve", "Improve"]];
+const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel()};
 async function settingsDialog(tab) {
   if (typeof tab !== "string") tab = S.settingsTab || "general";
   S.settingsOpen = true;
