@@ -54,6 +54,15 @@ TONE_FORBIDDEN = re.compile(r"(ignore|disregard|override|bypass|disable|forget|a
                             r"password|credential|api[ _-]?key|sandbox|unfiltered|uncensored|no rules|jailbreak|https?:|never refuse|always obey)", re.I)
 
 
+def plain(text: str) -> str:
+    """Text as a person would read it: compatibility forms folded (fullwidth letters), and invisible or control characters removed, so
+    a safety filter cannot be slipped past with zero-width characters. Newlines and tabs are kept."""
+    import unicodedata
+
+    folded = unicodedata.normalize("NFKC", str(text))
+    return "".join(ch for ch in folded if ch in "\n\t" or unicodedata.category(ch) not in ("Cf", "Cc", "Co", "Cn"))
+
+
 class BudgetExceeded(RuntimeError):
     """The workspace's daily model-call limit is used up (protects your API quota from runaway loops)."""
 
@@ -146,6 +155,7 @@ class Workspace:
             unknown = [t for t in tools if t not in TOOLS]
             if unknown:
                 raise WorkspaceError(f"unknown tools: {', '.join(unknown)}")
+        self._clear_agent_grants(name)
         self.db.execute("INSERT INTO agents (name, persona, tier, tools, created, model) VALUES (?, ?, ?, ?, ?, ?)",
                         (name, persona[:1000], tier, None if tools is None else json.dumps(tools), self.clock(),
                          self._clean_model(model)))
@@ -195,13 +205,17 @@ class Workspace:
             raise WorkspaceError("model names use letters, digits and . _ : / @ + -")
         return model or None
 
-    def set_model(self, name: str, model: str | None, provider: str | None = None) -> None:
-        """Choose which model (and which saved provider) an agent uses. None = the workspace default."""
+    def set_model(self, name: str, model: str | None, provider: str | None = None, keep_provider: bool = False) -> None:
+        """Choose which model (and which saved provider) an agent uses. None = the workspace default.
+        keep_provider=True changes only the model (self-improvement uses this: it may never move an agent to another provider)."""
         self.get_agent(name)
         provider = (provider or "").strip() or None
         if provider and provider not in self._provider_state()["profiles"]:
             raise WorkspaceError(f"there is no saved provider named '{provider}' (add it in Settings > Models)")
-        self.db.execute("UPDATE agents SET model = ?, provider = ? WHERE name = ?", (self._clean_model(model), provider, name))
+        if keep_provider:
+            self.db.execute("UPDATE agents SET model = ? WHERE name = ?", (self._clean_model(model), name))
+        else:
+            self.db.execute("UPDATE agents SET model = ?, provider = ? WHERE name = ?", (self._clean_model(model), provider, name))
         self._models.pop(name, None)
         self.audit(name, "model-changed", f"{provider or 'default provider'} / {model or 'default model'}")
 
@@ -341,7 +355,7 @@ class Workspace:
     def set_tone(self, user: str, style: str, custom: str = "") -> dict:
         if style not in TONE_LABELS:
             raise WorkspaceError("style must be one of: " + ", ".join(TONE_LABELS))
-        custom = " ".join(str(custom).split())[:300]
+        custom = " ".join(plain(custom).split())[:300]
         if style == "custom":
             if len(custom) < 5:
                 raise WorkspaceError("describe the style you want in a few words")
@@ -608,8 +622,9 @@ class Workspace:
                if r["room"].startswith("dm-")]
         for room in dms:
             self.delete_room(room)
-        for table in ("notes", "jobs", "approvals"):
+        for table in ("notes", "jobs", "approvals", "proposals"):
             self.db.execute(f"DELETE FROM {table} WHERE agent = ?", (name,))
+        self._clear_agent_grants(name)
         self.db.execute("DELETE FROM messages WHERE sender = ?", (name,))
         self.db.execute("DELETE FROM members WHERE member = ?", (name,))
         self.db.execute("DELETE FROM audit WHERE agent = ?", (name,))
@@ -618,6 +633,17 @@ class Workspace:
         (self.keychain.folder / f"{name}.json").unlink(missing_ok=True)
         self._models.pop(name, None)
         self.audit(None, "agent-deleted", name)
+
+    def _clear_agent_grants(self, name: str) -> None:
+        """Forget which plugins and integrations were switched on for this name, so a new agent with the same name inherits nothing."""
+        for key in ("plugin_enabled", "integration_enabled"):
+            try:
+                data = json.loads(self.get_setting(key, "") or "{}")
+            except json.JSONDecodeError:
+                data = {}
+            if isinstance(data, dict) and name in data:
+                data.pop(name)
+                self.set_setting(key, json.dumps(data))
 
     def delete_room(self, room: str) -> None:
         self._require_room(room)
@@ -700,6 +726,8 @@ class Workspace:
         is_agent = self.get_agent(sender, missing_ok=True) is not None
         if is_agent:
             text = self.keychain.redact(sender, text)  # an agent can never post a secret it has been given
+        if not is_agent and not human and sender != "system" and not sender.startswith("cron-") and not self.team.is_person(sender):
+            raise WorkspaceError(f"'{sender}' is not an agent or a person here")
         if human and (is_agent or not HUMAN_RE.match(sender) or sender == "system" or sender.startswith("cron-")):
             raise WorkspaceError("that sender name is not available to people")
         if is_agent and sender not in self.members(room):
@@ -741,8 +769,10 @@ class Workspace:
                 if self._closing:
                     return
                 self._inflight += 1
-                pool = self._pool
-            pool.submit(self._run_async, agent, room, message_id, hops)
+                try:
+                    self._pool.submit(self._run_async, agent, room, message_id, hops)
+                except RuntimeError:  # the pool was just replaced or is shutting down: do not leave the count stuck
+                    self._inflight -= 1
             return
         # Single-threaded mode: an agent's reply may wake another agent (or the same one again). Queue
         # the wake-up and let the outermost call work through the queue, so runs never nest.
@@ -791,9 +821,9 @@ class Workspace:
         return False
 
     def _run_failed(self, agent: str, room: str, hops: int, notice: str, err: Exception) -> None:
-        self.audit(agent, "run-error", f"{type(err).__name__}: {err}"[:300])
+        self.audit(agent, "run-error", self._scrub(agent, f"{type(err).__name__}: {err}")[:300])
         self.db.execute("INSERT INTO messages (room, sender, text, ts, hops) VALUES (?, 'system', ?, ?, ?)",
-                        (room, notice[:400], self.clock(), hops))
+                        (room, self._scrub(agent, notice)[:400], self.clock(), hops))
 
     def busy(self) -> list[str]:
         """Agents that are working on a message right now."""
@@ -834,20 +864,37 @@ class Workspace:
             raise WorkspaceError(f"no such approval: {approval_id}")
         if row["status"] != "pending":
             raise WorkspaceError(f"approval {approval_id} was already {row['status']}")
+        if not self._claim_approval(approval_id, "denied" if not approve else "approved", by):
+            raise WorkspaceError(f"approval {approval_id} was already decided")
         if not approve:
-            self.db.execute("UPDATE approvals SET status = 'denied', decided_by = ?, result = 'denied' WHERE id = ?",
-                            (by, approval_id))
+            self.db.execute("UPDATE approvals SET result = 'denied' WHERE id = ?", (approval_id,))
             self.audit(row["agent"], "approval-denied", f"#{approval_id} {row['tool']}")
             self.post_system(row["room"], f"#{approval_id}: {row['agent']} was not allowed to run {row['tool']}.")
             self._resume(row, "A person denied it. Carry on without it, or ask what else would help.")
             return "denied"
-        self.db.execute("UPDATE approvals SET status = 'approved', decided_by = ? WHERE id = ?", (by, approval_id))
         ctx = Ctx(self, row["agent"], row["room"], hops=0, situation=f"approval#{approval_id}")
-        outcome = execute(ctx, row["tool"], json.loads(row["args"]), approved=True)
+        try:
+            outcome = execute(ctx, row["tool"], json.loads(row["args"]), approved=True)
+        except Exception as err:  # never leave an approval stuck half-done: record the failure and let the agent carry on
+            from .tools import Outcome
+
+            outcome = Outcome("error", self._scrub(row["agent"], f"it could not run: {type(err).__name__}: {err}"))
+            self.db.execute("UPDATE approvals SET status = 'error' WHERE id = ?", (approval_id,))
         self.db.execute("UPDATE approvals SET result = ? WHERE id = ?", (outcome.output[:2000], approval_id))
         self.audit(row["agent"], "approval-granted", f"#{approval_id} {row['tool']} -> {outcome.status}")
         self._resume(row, f"A person approved it and it finished ({outcome.status}). Output:\n{outcome.output[:1500]}")
         return outcome.output
+
+    def _claim_approval(self, approval_id: int, status: str, by: str) -> bool:
+        """Decide an approval exactly once: of two simultaneous decisions only one wins."""
+        with self.db.lock:
+            cur = self.db.conn.execute("UPDATE approvals SET status = ?, decided_by = ? WHERE id = ? AND status = 'pending'", (status, by, approval_id))
+            self.db.conn.commit()
+            return cur.rowcount == 1
+
+    def _scrub(self, agent: str, text: str) -> str:
+        """Remove this agent's secrets and the workspace's keys (provider, search, integrations) from text that will be shown."""
+        return self.keychain.redact(self.SEARCH_AGENT, self.keychain.redact(agent, text))
 
     def _resume(self, approval: dict, news: str) -> None:
         """Wake the agent that asked, so it can use the result instead of leaving the task half done."""

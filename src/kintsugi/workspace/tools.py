@@ -8,6 +8,7 @@ output and writes the audit trail.
 from __future__ import annotations
 
 import difflib
+import sqlite3
 import json
 import os
 import re
@@ -82,7 +83,7 @@ def _path(ctx: Ctx, value: str) -> Path:
 # --- safe tools -------------------------------------------------------------
 
 def send_message(ctx: Ctx, args: dict) -> str:
-    room = args.get("room") or ctx.room
+    room = _text(args, "room", 60, required=False) or ctx.room
     text = _text(args, "text", 2000)
     if ctx.agent not in ctx.ws.members(room):
         raise ToolError(f"you are not a member of room '{room}'")
@@ -264,7 +265,7 @@ def fix_code(ctx: Ctx, args: dict) -> str:
     except (KeyError, json.JSONDecodeError) as err:
         raise ToolError(f"bad task.json: {err}") from None
     recorder = _RecordingModel(ctx.ws.model_for(ctx.agent))
-    result = solve(task, recorder, max_retries=min(int(args.get("retries", 2)), 3))
+    result = solve(task, recorder, max_retries=max(0, min(int(args.get("retries", 2)), 3)))
     if not result.passed:
         last = result.attempts[-1]
         raise ToolError(f"not fixed after {result.num_attempts} attempt(s): {last.error_type}: {last.output[-500:]}")
@@ -284,7 +285,7 @@ def schedule(ctx: Ctx, args: dict) -> str:
         raise ToolError(f"bad cron expression: {err}") from None
     if len(ctx.ws.list_jobs(ctx.agent)) >= MAX_JOBS_PER_AGENT:
         raise ToolError(f"at most {MAX_JOBS_PER_AGENT} scheduled jobs per agent")
-    room = args.get("room") or ctx.room
+    room = _text(args, "room", 60, required=False) or ctx.room
     if ctx.agent not in ctx.ws.members(room):
         raise ToolError(f"you are not a member of room '{room}'")
     job_id = ctx.ws.add_job(ctx.agent, room, cron, prompt)
@@ -414,7 +415,7 @@ def execute(ctx: Ctx, name: str, args: object, approved: bool = False) -> Outcom
         status = "ok"
     except ToolError as err:
         output, status = str(err), "error"
-    except (OSError, ValueError, TypeError, KeyError) as err:
+    except (OSError, ValueError, TypeError, KeyError, sqlite3.Error, IndexError) as err:
         output, status = f"{type(err).__name__}: {err}", "error"
     output = ctx.ws.keychain.redact(ctx.agent, output)
     if status == "error":

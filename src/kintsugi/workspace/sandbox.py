@@ -7,12 +7,14 @@ accidents and runaway loops, not a determined attacker. Use a container or VM fo
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
 from kintsugi.verifier import trim
@@ -118,11 +120,28 @@ def _namespace_command(folder: Path, script_dir: Path, cpu: int, mem: int, fsize
 
 
 
-def agent_uid(name: str) -> int:
-    """A stable user id per agent for the drop-privileges backend (range 40000-59999)."""
-    import zlib
+_uid_lock = threading.Lock()
 
-    return 40000 + zlib.crc32(name.encode()) % 20000
+
+def agent_uid(name: str, registry: Path) -> int:
+    """A stable, UNIQUE user id per agent for the drop-privileges backend (range 40000-59999), remembered in `registry`.
+    (Hashing the name collided: two agents could share a uid and so read each other's files.)"""
+    with _uid_lock:
+        try:
+            table = json.loads(registry.read_text())
+        except (OSError, json.JSONDecodeError):
+            table = {}
+        if name not in table:
+            used = set(table.values())
+            free = next((u for u in range(40000, 60000) if u not in used), None)
+            if free is None:
+                raise OSError("no free user ids for agents")
+            table[name] = free
+            registry.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(registry, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as handle:
+                json.dump(table, handle)
+        return table[name]
 
 
 def _run(command: list[str], cwd, env: dict, timeout: float, **kwargs) -> tuple[int | None, str]:
@@ -217,7 +236,7 @@ def run_python(folder: Path, source: str, timeout: float = 10.0, extra_env: dict
         os.chmod(script, 0o644)
         kwargs: dict = {}
         if mode == "drop-user" and os.geteuid() == 0:
-            uid = agent_uid(agent or "anonymous")
+            uid = agent_uid(agent or "anonymous", folder.parent.parent / ".uids.json")
             _chown_tree(folder, uid)
             kwargs = {"user": uid, "group": uid, "extra_groups": []}
         command = [sys.executable, "-B", "-c", LAUNCHER, str(int(timeout) + 2), str(memory_mb * 1024 * 1024),

@@ -187,6 +187,14 @@ def clean_reply(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+MESSAGE_TAG = re.compile(r"<(/?)\s*message\b", re.I)
+
+
+def _defang(text: str) -> str:
+    """Stop message text from closing its own <message> block and pretending to be someone else in the next one."""
+    return MESSAGE_TAG.sub(lambda m: "<\u200b" + m.group(1) + "message", text)
+
+
 def build_context(ws: "Workspace", room: str, message_id: int, lessons_text: str, notes: list[dict]) -> str:
     history = ws.history(room, limit=HISTORY_MESSAGES)
     parts = [f"Room: {room} (members: {', '.join(ws.members(room))})"]
@@ -195,7 +203,7 @@ def build_context(ws: "Workspace", room: str, message_id: int, lessons_text: str
     if notes:
         parts.append("Your notes:\n" + "\n".join(f"- {n['text']}" for n in notes))
     parts.append("Recent messages (oldest first):\n" + "\n".join(
-        f'<message id="{m["id"]}" from="{m["sender"]}">\n{m["text"]}\n</message>' for m in history))
+        f'<message id="{m["id"]}" from="{m["sender"]}">\n{_defang(m["text"])}\n</message>' for m in history))
     parts.append(f"Respond to message {message_id}. Write only your own reply.")
     return "\n\n".join(parts)
 
@@ -229,7 +237,8 @@ def run_agent(ws: "Workspace", name: str, room: str, message_id: int, hops: int)
     try:
         _loop(ws, name, room, hops, model, ctx, memory, situation, messages, shown)
     finally:
-        memory.save()  # a lesson learned just before a model outage is still kept
+        if ws.get_agent(name, missing_ok=True):  # not if the agent was deleted while it was thinking
+            memory.save()  # a lesson learned just before a model outage is still kept
 
 
 def _loop(ws, name, room, hops, model, ctx, memory, situation, messages, shown) -> None:

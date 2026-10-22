@@ -64,7 +64,7 @@ class TestTone(unittest.TestCase):
     def test_everyone_gets_the_style_they_chose_and_new_people_get_the_owners_default(self):
         self.ws.set_tone("you", "concise")
         self.ws.set_tone("sam", "regular")
-        self.ws.post("r", "sam", "@alice hi")
+        self.ws.post("r", "sam", "@alice hi", human=True)
         self.assertIn(TONES["regular"], self.system())
         self.ws.post("r", "you", "@alice hi again")
         self.assertIn(TONES["concise"], self.system())

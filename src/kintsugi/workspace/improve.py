@@ -66,7 +66,9 @@ What went wrong when it was tested:
 def clean_playbook(text: str) -> str:
     """Keep only short, general, '- ' rules that do not touch safety, secrets or permissions. Max 8 rules."""
     rules = []
-    for line in str(text).splitlines():
+    from .core import plain
+
+    for line in plain(text).splitlines():
         line = line.strip()
         if not line.startswith("- "):
             continue
@@ -342,7 +344,7 @@ class Improver:
         agent = self.ws.get_agent(row["agent"])
         if row["kind"] == "model":
             self.ws.db.execute("UPDATE proposals SET previous = ? WHERE id = ?", (agent["model"] or "", proposal_id))
-            self.ws.set_model(row["agent"], row["detail"])
+            self.ws.set_model(row["agent"], row["detail"], keep_provider=True)
         elif row["kind"] == "playbook":
             playbook = clean_playbook(row["detail"])  # checked again at the moment of applying
             if not playbook:
@@ -362,7 +364,7 @@ class Improver:
         if row is None:
             return False
         if kind == "model":
-            self.ws.set_model(agent, row["previous"] or None)
+            self.ws.set_model(agent, row["previous"] or None, keep_provider=True)
         else:
             self.ws.set_playbook(agent, row["previous"] or "")
         self.ws.db.execute("UPDATE proposals SET status = 'reverted' WHERE id = ?", (row["id"],))
