@@ -21,7 +21,7 @@ from typing import Callable
 from kintsugi.memory import tokens
 from kintsugi.model import Model, ModelInfraError, ModelRequestError, OpenAIAdapter, QuotaExhausted
 
-from . import compact, perms, personal, providers, tasks, uploads
+from . import compact, origins, perms, personal, providers, tasks, uploads
 from .db import Database
 from .keychain import Keychain
 
@@ -769,6 +769,7 @@ class Workspace:
         compact.forget(self, room)
         tasks.forget_room(self, room)
         uploads.forget_room(self, room)
+        origins.forget_room(self, room)
         self.audit(None, "room-deleted", room)
 
     def purge_messages(self, older_than_days: float) -> int:

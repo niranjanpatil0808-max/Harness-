@@ -214,3 +214,43 @@ class TestNotesPerChat(Base):
         self.assertNotIn("friday", execute(Ctx(self.ws, "alice", dm, 0, dm + "#1"), "search_memory", {"query": "launch friday"}).output)
         self.ws.delete_room(dm)
         self.assertIsNone(self.ws.db.one("SELECT 1 FROM notes WHERE text LIKE '%123k%'"))
+
+
+class TestFilesFromPrivateChats(Base):
+    def run_tool(self, room, tool, args, approved=False):
+        from kintsugi.workspace.tools import Ctx, execute
+
+        return execute(Ctx(self.ws, "alice", room, 0, room + "#1"), tool, args, approved=approved)
+
+    def test_a_file_written_in_a_private_chat_is_not_readable_or_listed_from_a_team_room(self):
+        dm = self.ws.open_dm("you", "alice")
+        self.assertEqual(self.run_tool(dm, "write_file", {"path": "salary.txt", "content": "123k"}).status, "ok")
+        self.assertEqual(self.run_tool("team", "write_file", {"path": "plan.txt", "content": "launch friday"}).status, "ok")
+        team_read = self.run_tool("team", "read_file", {"path": "salary.txt"})
+        self.assertNotEqual(team_read.status, "ok")
+        self.assertNotIn("123k", team_read.output)
+        listing = self.run_tool("team", "list_files", {}).output
+        self.assertIn("plan.txt", listing)
+        self.assertNotIn("salary.txt", listing)
+        self.assertIn("123k", self.run_tool(dm, "read_file", {"path": "salary.txt"}).output)  # still there in its own chat
+        self.assertIn("plan.txt", self.run_tool(dm, "list_files", {}).output)  # shared files are visible everywhere
+        # the team room cannot overwrite it to read around the rule, and writing to it from the team room is refused
+        self.assertNotEqual(self.run_tool("team", "write_file", {"path": "salary.txt", "content": "x"}).status, "ok")
+
+    def test_files_made_by_code_in_a_private_chat_get_the_same_label(self):
+        dm = self.ws.open_dm("you", "alice")
+        out = self.run_tool(dm, "run_python", {"code": "open('secret.csv','w').write('a,b')"}, approved=True)
+        self.assertEqual(out.status, "ok", out.output)
+        self.assertNotEqual(self.run_tool("team", "read_file", {"path": "secret.csv"}).status, "ok")
+        # rewritten in a shared room it becomes a shared file
+        self.run_tool("team", "run_python", {"code": "open('secret.csv','w').write('public now')"}, approved=True)
+        self.assertEqual(self.run_tool("team", "read_file", {"path": "secret.csv"}).status, "ok")
+
+    def test_download_follows_the_same_rule_and_deleting_the_chat_frees_the_file(self):
+        self.invite_and_join("ann", role="admin", rooms=["team"])
+        dm = self.ws.open_dm("you", "alice")
+        self.run_tool(dm, "write_file", {"path": "private.txt", "content": "hello"})
+        self.assertEqual(self.call("ann", "GET", "/api/download?agent=alice&path=private.txt")[0], 403)
+        self.assertEqual(self.call("owner", "GET", "/api/download?agent=alice&path=private.txt")[0], 200)
+        self.ws.delete_room(dm)
+        self.assertEqual(self.run_tool("team", "read_file", {"path": "private.txt"}).status, "ok")

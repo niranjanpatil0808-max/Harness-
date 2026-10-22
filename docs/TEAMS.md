@@ -87,9 +87,11 @@ recorded with the name of whoever decided.
 
 - **What stays in its chat:** files you attach, notes an agent saves with `remember`, and the long-chat summary. These are only
   available to the agent while it works in that chat, and are deleted with it.
-- **What an agent shares across chats:** its own folder of files it wrote, its published apps and its lessons from mistakes. If an agent
-  writes something into its folder during a private chat, a teammate in another room could ask it to read that file. Use separate agents
-  for work that must stay separate.
+- **Files an agent writes in a private chat** are labelled with that chat: the agent will not read, list or overwrite them from another room,
+  and admins outside that chat cannot download them. A file written or rewritten in a shared room is shared. **Limit:** code an agent runs
+  (`run_python`, which you approve after reading it) can open any file in its folder, so approved code in a team room could still read such a
+  file. Use separate agents for work that must stay separate.
+- **What an agent still shares across chats:** its published apps and its lessons from mistakes (general rules it learned from failed tool calls).
 - The owner can read everything, including other people's private chats.
 - Tokens and invite links travel through the browser: use HTTPS (hosting platforms provide it). There is no email check, password
   reset or single sign-on; losing a sign-in means asking the owner for a new link.

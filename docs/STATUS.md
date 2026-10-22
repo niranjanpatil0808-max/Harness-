@@ -202,3 +202,14 @@ loop+memory,full) hit Groq's 500k tokens/day for that model mid-loop+memory. ARC
 waiting for the user's yes (it reshuffles the repo right before the merge to main).
 Batch 2 plan (not started, needs the user's go): benchmark/run.config RUNS=('openai/gpt-oss-20b|4096|3|loop+memory|0.6|{"reasoning_effort":"low"}|split.json')
 so loop+memory (3 repeats) can be compared with batch 1's loop mode (same split, settings), then allam-2-7b loop+memory,full again once its daily quota resets.
+
+## Update: remaining-items sweep (2026-10-22, evening)
+Done and pushed: DST (skipped hour runs once after the jump; repeated hour runs once; tests/test_workspace_dst.py; note: the earlier reviewer claim that
+the double run was already suppressed was wrong, reproduced and fixed), backup rollback/clobber checks (backup.meta.json counter+time inside the encrypted
+file; refuse to overwrite newer/unreadable remote; refuse restore when commit date >6h after inside time; KINTSUGI_BACKUP_OVERWRITE / _ACCEPT_OLD),
+one-time sign-in codes (signin_codes table, POST /api/signin public+throttled, Reset sign-in returns {"code"}; link is #signin=...; owner link still #token),
+look-alike links show host / tel:,javascript: inert, improve/decide attributed, origins.py (files written in a private chat only readable/listable/downloadable
+there; run_python code can still read them: documented). Full run before origins: 570 unit OK + 19 browser suites OK.
+Research: batch 2 (run 39845091741) started 20:00 UTC, check scheduled. Archive move still waiting for the user's yes.
+Still open: published apps share the workspace origin only via a sandboxed CSP (sound per review); sessionStorage copy of the token unused; token-in-owner-link;
+agents' lessons shared across chats; nothing tried against real services/phones/teams.

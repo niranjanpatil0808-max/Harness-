@@ -228,6 +228,12 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                         raise Forbidden("that file belongs to a chat you are not part of")
                 elif not self.who.at_least("admin"):
                     raise Forbidden("only admins can download agents' files")
+                else:  # a file an agent made in someone's private chat is only for people in that chat
+                    from . import origins as _origins
+
+                    owner_room = _origins.owner_room(ws, query["agent"][0], query["path"][0])
+                    if owner_room is not None and not ws.team.can_see_room(self.who, owner_room):
+                        raise Forbidden("that file was made in a private chat you are not part of")
                 name, data = uploads.read_for_download(ws, query["agent"][0], query["path"][0], room if uploads.is_upload_path(query["path"][0]) else None)
             except uploads.UploadError as err:
                 raise WorkspaceError(str(err)) from None

@@ -23,6 +23,7 @@ from kintsugi.loop import load_task, parse_files, solve
 from kintsugi.memory import tokens
 
 from . import perms
+from . import origins
 from .sandbox import (MAX_FILE_BYTES, MAX_FOLDER_BYTES, PathError, folder_size, run_python, safe_path)
 from .scheduler import parse_cron
 
@@ -115,10 +116,21 @@ def send_message(ctx: Ctx, args: dict) -> str:
     return f"sent to {room}"
 
 
+def _private_elsewhere(ctx: Ctx, path: Path) -> bool:
+    """Was this file made in someone's private chat that is not the one this run is in?"""
+    try:
+        rel = path.relative_to(ctx.ws.files_dir(ctx.agent).resolve()).as_posix()
+    except ValueError:
+        return False  # an upload: kept per chat already
+    return not origins.allowed(ctx.ws, ctx.agent, ctx.room, rel)
+
+
 def read_file(ctx: Ctx, args: dict) -> str:
     path = _path(ctx, _text(args, "path", 300), uploads_ok=True)
     if path.is_symlink() or not path.is_file():
         raise ToolError("no such file")
+    if _private_elsewhere(ctx, path):
+        raise ToolError("that file was made in a private chat, so it is only available there")
     content = path.read_text(errors="replace")
     return content[:MAX_READ_CHARS] + ("\n...(truncated)" if len(content) > MAX_READ_CHARS else "")
 
@@ -127,7 +139,7 @@ def list_files(ctx: Ctx, args: dict) -> str:
     path = _path(ctx, _text(args, "path", 300, required=False) or ".", uploads_ok=True)
     if not path.is_dir():
         raise ToolError("not a folder")
-    entries = sorted(path.iterdir(), key=lambda p: p.name)
+    entries = sorted((p for p in path.iterdir() if not (p.is_file() and _private_elsewhere(ctx, p))), key=lambda p: p.name)
     lines = [f"{p.name}{'/' if p.is_dir() else ''}  {p.stat().st_size if p.is_file() else ''}".rstrip() for p in entries[:200]]
     return "\n".join(lines) or "(empty)"
 
@@ -141,8 +153,11 @@ def write_file(ctx: Ctx, args: dict) -> str:
     existing = path.stat().st_size if path.exists() else 0
     if folder_size(base) - existing + len(content.encode()) > MAX_FOLDER_BYTES:
         raise ToolError("your folder is full (5 MB limit)")
+    if _private_elsewhere(ctx, path):
+        raise ToolError("that file was made in a private chat; use another name here")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
+    origins.mark(ctx.ws, ctx.agent, ctx.room, [path.relative_to(base.resolve()).as_posix()])
     return f"wrote {path.relative_to(base.resolve()).as_posix()} ({len(content)} characters)"
 
 
@@ -244,6 +259,9 @@ def run_python_tool(ctx: Ctx, args: dict) -> str:
     before = files()
     ok, output = run_python(base, code, timeout=timeout, extra_env=env, agent=ctx.agent)
     after = files()
+    base_resolved = base.resolve()
+    origins.mark(ctx.ws, ctx.agent, ctx.room, [p.relative_to(base_resolved).as_posix() for p, sig in after.items()
+                                                if sig[2] == stat.S_IFREG and before.get(p) != sig])
     for path, (_, _, kind) in after.items():  # pipes, sockets and devices have no place in a folder of files (and break backups)
         if kind not in (stat.S_IFREG, stat.S_IFDIR, stat.S_IFLNK):
             path.unlink(missing_ok=True)
