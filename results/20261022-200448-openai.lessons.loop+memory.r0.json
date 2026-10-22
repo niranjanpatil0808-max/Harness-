@@ -1,0 +1,491 @@
+{
+  "version": 1,
+  "lessons": [
+    {
+      "id": "L001",
+      "text": "When implementing a dependency resolver, always treat nodes that appear only in dependency lists as part of the graph and process ready nodes in a deterministic order (e.g., alphabetically) to ensure consistent, expected results.",
+      "error_type": "AssertionError",
+      "keywords": [
+        "add",
+        "alphabetically",
+        "always",
+        "appear",
+        "append",
+        "come",
+        "consistent",
+        "contains",
+        "cycle",
+        "dep",
+        "dependency",
+        "depends",
+        "deterministic",
+        "dict",
+        "empty",
+        "ensure",
+        "entries",
+        "error",
+        "expected",
+        "first",
+        "get",
+        "gives",
+        "graph",
+        "harmless",
+        "implementing",
+        "including",
+        "inside",
+        "itself",
+        "list",
+        "lists",
+        "mapping",
+        "node",
+        "nodes",
+        "order",
+        "part",
+        "pick",
+        "process",
+        "raise",
+        "ready",
+        "repeated",
+        "resolver",
+        "results",
+        "same",
+        "seen",
+        "set",
+        "several",
+        "smallest",
+        "takes",
+        "time",
+        "too",
+        "topo",
+        "treat",
+        "valid",
+        "visit"
+      ],
+      "status": "promoted",
+      "seen": 1,
+      "uses": 21,
+      "wins": 21,
+      "evidence": [
+        {
+          "task": "h05_topo_order",
+          "event": "created",
+          "error": "AssertionError"
+        },
+        {
+          "task": "h05_topo_order",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s02_palindrome",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s03_binary_search",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s05_word_count",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s06_chunk",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s08_merge_intervals",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s09_rotate",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s11_duration",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s12_moving_average",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s15_brackets",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s16_top_k",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m02_display_name",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m03_config_defaults",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m05_bank_errors",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m06_coupon",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m08_scheduler",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h02_wrap_text",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h04_csv_line",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h06_split_amount",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h07_business_days",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h08_nested_decode",
+          "event": "used",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "id": "L002",
+      "text": "When handling graph dependencies, deduplicate edges before cycle detection to avoid misclassifying repeated entries as cycles. Treat each dependency as a set rather than a list to ensure accurate topological ordering.",
+      "error_type": "ValueError",
+      "keywords": [
+        "accurate",
+        "add",
+        "alphabetically",
+        "always",
+        "appear",
+        "append",
+        "avoid",
+        "before",
+        "come",
+        "contains",
+        "cycle",
+        "cycles",
+        "deduplicate",
+        "dep",
+        "dependencies",
+        "dependency",
+        "depends",
+        "detection",
+        "dict",
+        "edges",
+        "empty",
+        "ensure",
+        "entries",
+        "error",
+        "first",
+        "get",
+        "gives",
+        "graph",
+        "handling",
+        "harmless",
+        "including",
+        "inside",
+        "itself",
+        "list",
+        "lists",
+        "mapping",
+        "misclassifying",
+        "node",
+        "nodes",
+        "order",
+        "ordering",
+        "part",
+        "pick",
+        "raise",
+        "rather",
+        "ready",
+        "repeated",
+        "same",
+        "seen",
+        "set",
+        "several",
+        "smallest",
+        "takes",
+        "time",
+        "too",
+        "topo",
+        "topological",
+        "treat",
+        "valid",
+        "visit"
+      ],
+      "status": "promoted",
+      "seen": 1,
+      "uses": 21,
+      "wins": 21,
+      "evidence": [
+        {
+          "task": "h05_topo_order",
+          "event": "created",
+          "error": "ValueError"
+        },
+        {
+          "task": "h05_topo_order",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s02_palindrome",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s03_binary_search",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s05_word_count",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s06_chunk",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s08_merge_intervals",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s09_rotate",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s11_duration",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s12_moving_average",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s15_brackets",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s16_top_k",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m02_display_name",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m03_config_defaults",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m05_bank_errors",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m06_coupon",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m08_scheduler",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h02_wrap_text",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h04_csv_line",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h06_split_amount",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h07_business_days",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h08_nested_decode",
+          "event": "used",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "id": "L003",
+      "text": "When rotating a grid, double\u2011check the direction and order of rows versus columns; a common error is reversing the row order instead of transposing and then reversing columns. Always test with a minimal example to confirm the orientation matches the specification.",
+      "error_type": "AssertionError",
+      "keywords": [
+        "always",
+        "check",
+        "clockwise",
+        "cols",
+        "columns",
+        "common",
+        "confirm",
+        "degrees",
+        "direction",
+        "double",
+        "equal",
+        "error",
+        "example",
+        "grid",
+        "input",
+        "instead",
+        "len",
+        "length",
+        "list",
+        "matches",
+        "matrix",
+        "may",
+        "minimal",
+        "new",
+        "order",
+        "orientation",
+        "range",
+        "rectangular",
+        "reversing",
+        "rotate",
+        "rotated",
+        "rotating",
+        "row",
+        "rows",
+        "specification",
+        "test",
+        "transposing",
+        "versus"
+      ],
+      "status": "promoted",
+      "seen": 1,
+      "uses": 14,
+      "wins": 14,
+      "evidence": [
+        {
+          "task": "s09_rotate",
+          "event": "created",
+          "error": "AssertionError"
+        },
+        {
+          "task": "s09_rotate",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s11_duration",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s12_moving_average",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s14_fibonacci",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s15_brackets",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m02_display_name",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m03_config_defaults",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m05_bank_errors",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m06_coupon",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "m08_scheduler",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h02_wrap_text",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h04_csv_line",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h06_split_amount",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h08_nested_decode",
+          "event": "used",
+          "passed": true
+        }
+      ]
+    }
+  ]
+}
