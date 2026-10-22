@@ -26,13 +26,13 @@
 | **Plugins:** skills and web-API tools from a folder or GitHub repo, previewed in full before install ([docs/PLUGINS.md](docs/PLUGINS.md)) | **Works** against fake servers; no plugin code runs; Python-code plugins are **not built** |
 | **Encrypted backup** to your private GitHub repo, restored automatically on an empty free host | **Works** against a fake GitHub in tests; **not yet tried against the real GitHub** ([docs/HOSTING.md](docs/HOSTING.md)) |
 | **Teams:** separate logins through single-use invite links, owner/admin/member roles, who may approve, shared rooms plus private chats ([docs/TEAMS.md](docs/TEAMS.md)) | **Works** (permission matrix tests and a two-browser test); not yet used by a real group over a real deployment |
-| Integrations: GitHub, then Slack, then Gmail and Calendar | **Planned, after teams** |
+| **Integrations:** GitHub (read-only, repo allow-list), Slack (read; posting is off by default and always asks), Calendar (read-only secret iCal address), Gmail (read-only IMAP) — no app registration ([docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)) | **Works** against local fakes; **not yet tried against the real GitHub, Slack, Google Calendar or Gmail** |
 
 Rows marked planned do not exist yet. This table is updated as each one lands, and it says what has and has not been verified.
 
 ## What it is for
 
-It works for **one person** (a founder, a builder) who wants a few agents they can actually trust, and for a **small team**: the owner invites teammates with single-use links, gives them a role, and they get their own logins, private chats and shared rooms. Agents cannot run harmful code without approval, cannot see your other files or the network when they run code, cannot overspend your model quota, and everything they know and do can be seen and deleted. What a team still lacks: integrations (GitHub, Slack, email, calendar), and per-person agent memory (agents share one memory among everyone who talks to them).
+It works for **one person** (a founder, a builder) who wants a few agents they can actually trust, and for a **small team**: the owner invites teammates with single-use links, gives them a role, and they get their own logins, private chats and shared rooms. Agents cannot run harmful code without approval, cannot see your other files or the network when they run code, cannot overspend your model quota, and everything they know and do can be seen and deleted. What a team still lacks: per-person agent memory (agents share one memory among everyone who talks to them), single sign-on, and integrations beyond GitHub, Slack, Calendar and Gmail.
 
 ## Quick start
 

@@ -515,6 +515,40 @@ async function generalPanel() {
       h("button", {class: "btn", onclick: () => confirmDialog("Sign out on this device?", isOwner() ? "You will need the access token to come back." : "You will need a new invite (or your token) to come back.", "Sign out", () => { store.set("kt-token", ""); try { sessionStorage.removeItem("kt"); } catch (e) { /* ok */ } location.reload(); })}, "Sign out on this device")));
 }
 
+/* ---------- settings: integrations (GitHub, Slack, Calendar, Gmail) ---------- */
+const INTEGRATION_HELP = {
+  github: ["Create a fine-grained token at github.com/settings/personal-access-tokens: choose only the repositories you want shared, with read-only access to Contents, Issues, Pull requests and Metadata. Then list those repositories here (owner/name, or owner/* for all of one owner's).", "Repositories the agents may read (one per line)"],
+  slack: ["Create a Slack app (api.slack.com/apps), add the bot scopes channels:read, channels:history (and groups:read, groups:history for private channels; chat:write only if you allow posting), install it to your workspace, copy the Bot User OAuth Token (xoxb-…), and invite the bot to each channel with /invite.", "Channels the agents may read (one per line)"],
+  calendar: ["In Google Calendar: Settings > your calendar > Integrate calendar > Secret address in iCal format. Paste it here. It is read-only and anyone who has the address can read the calendar, so it is kept in your keychain and never shown again.", ""],
+  gmail: ["Turn on 2-step verification for your Google account, create an App password (myaccount.google.com/apppasswords), turn IMAP on in Gmail settings, then paste your address and the 16-letter app password. This app only reads the inbox: it cannot send, delete or mark mail as read.", ""],
+};
+async function integrationsPanel() {
+  const d = await api("/api/integrations"), refresh = async () => fill($("#settings-body"), await integrationsPanel());
+  const card = (kind, it) => {
+    const token = kind === "github" || kind === "slack" ? h("input", {type: "password", autocomplete: "off", "aria-label": it.label + " token", placeholder: it.configured ? "A token is saved. Paste a new one to replace it." : (kind === "github" ? "github_pat_…" : "xoxb-…")}) : null;
+    const url = kind === "calendar" ? h("input", {type: "password", autocomplete: "off", "aria-label": "Calendar address", placeholder: it.configured ? "An address is saved. Paste a new one to replace it." : "https://calendar.google.com/calendar/ical/…/basic.ics"}) : null;
+    const user = kind === "gmail" ? h("input", {type: "text", autocapitalize: "none", "aria-label": "Gmail address", value: it.user || "", placeholder: "you@gmail.com"}) : null;
+    const pass = kind === "gmail" ? h("input", {type: "password", autocomplete: "off", "aria-label": "Gmail app password", placeholder: it.configured ? "A password is saved. Paste a new one to replace it." : "16-letter app password"}) : null;
+    const list = INTEGRATION_HELP[kind][1] ? h("textarea", {rows: 3, "aria-label": it.label + " allow-list"}, (kind === "github" ? it.repos : it.channels).join("\n")) : null;
+    const post = kind === "slack" ? h("input", {type: "checkbox", checked: it.post, style: "width:auto", "aria-label": "Allow posting"}) : null;
+    const lines = (el) => el.value.split(/\n+/).map((x) => x.trim()).filter(Boolean);
+    const save = async () => { const body = {kind}; if (token) body.token = token.value; if (url) body.url = url.value; if (user) { body.user = user.value; body.password = pass.value; } if (list) body[kind === "github" ? "repos" : "channels"] = lines(list); if (post) body.post = post.checked;
+      if (await act(() => api("/api/integrations/save", body), it.label + " saved")) await refresh(); };
+    const out = h("div", {});
+    return h("div", {class: "card"}, h("div", {style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"}, h("strong", {style: "flex:1"}, it.label), h("span", {class: "muted"}, it.configured ? "Connected" : "Not set up")),
+      h("details", {open: !it.configured}, h("summary", {style: "cursor:pointer;margin:6px 0"}, it.configured ? "Change settings" : "Set up"), h("p", {class: "muted", style: "font-size:13px"}, INTEGRATION_HELP[kind][0]),
+        token, url, user, pass, list ? [h("label", {style: "margin:8px 0 2px"}, INTEGRATION_HELP[kind][1]), list] : null,
+        post ? h("label", {style: "display:flex;gap:8px;align-items:center;font-weight:400;margin:8px 0"}, post, "Allow posting (every post still waits for your approval)") : null,
+        h("button", {class: "btn primary", style: "margin-top:6px", onclick: save}, "Save")),
+      it.configured ? h("div", {style: "margin-top:8px"}, h("div", {class: "muted", style: "font-size:13px;margin-bottom:4px"}, "Switch on for:"), h("div", {style: "display:flex;gap:6px;flex-wrap:wrap"}, d.agents.map((n) => h("button", {class: "chip" + (it.enabled_for.includes(n) ? " on" : ""), "aria-pressed": it.enabled_for.includes(n),
+          onclick: async () => { await act(() => api("/api/integrations/enable", {kind, agent: n, on: !it.enabled_for.includes(n)}), n + (it.enabled_for.includes(n) ? ": off" : ": on")); await refresh(); }}, n))),
+        h("div", {style: "display:flex;gap:8px;margin-top:8px"}, h("button", {class: "btn", onclick: async () => { try { const r = await api("/api/integrations/test", {kind}); fill(out, h("div", {class: "card"}, r.ok ? r.message : "Problem: " + r.error)); } catch (e) { toast(e.message, true); } }}, "Test connection"),
+          h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + it.label + "?", "The saved credential is deleted and agents lose access.", "Remove", async () => { await act(() => api("/api/integrations/remove", {kind}), it.label + " removed"); await refresh(); })}, "Remove")), out) : null);
+  };
+  return h("div", {}, h("p", {style: "margin-top:0"}, "Let agents read from your tools. Everything is read-only unless stated (Slack posting is off by default and always asks). Credentials are stored in your keychain and never shown again. Whatever comes back is treated as untrusted information, never as instructions, and each agent's Internet setting (Off / Ask / Allow) still applies."),
+    Object.entries(d.items).map(([kind, it]) => card(kind, it)));
+}
+
 /* ---------- team: people, invites, roles ---------- */
 const POLICY_LABELS = {admins: "Only admins can approve risky actions", requester: "The person who asked can also approve their own", everyone: "Anyone in the room can approve"};
 function inviteLinkDialog(made) {
@@ -830,10 +864,10 @@ async function improvePanel() {
   content.append(h("div", {style: "display:flex;justify-content:flex-end;margin-top:8px"}, h("button", {class: "btn primary", onclick: save}, "Save settings")));
   return content;
 }
-const SETTINGS_TAB_LIST = [["general", "General", "member"], ["team", "Team", "admin"], ["models", "Models", "owner"], ["internet", "Internet", "owner"], ["plugins", "Plugins", "owner"], ["search", "Search", "owner"], ["improve", "Improve", "admin"], ["backup", "Backup", "owner"]];
+const SETTINGS_TAB_LIST = [["general", "General", "member"], ["team", "Team", "admin"], ["models", "Models", "owner"], ["internet", "Internet", "owner"], ["integrations", "Integrations", "owner"], ["plugins", "Plugins", "owner"], ["search", "Search", "owner"], ["improve", "Improve", "admin"], ["backup", "Backup", "owner"]];
 const RANKS = {member: 0, admin: 1, owner: 2};
 const settingsTabs = () => SETTINGS_TAB_LIST.filter((t) => RANKS[me().role] >= RANKS[t[2]]).map((t) => [t[0], t[1]]);
-const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel(), team: () => teamPanel(), models: () => modelsPanel(), internet: () => internetPanel(), plugins: () => pluginsPanel()};
+const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel(), team: () => teamPanel(), integrations: () => integrationsPanel(), models: () => modelsPanel(), internet: () => internetPanel(), plugins: () => pluginsPanel()};
 async function settingsDialog(tab) {
   if (typeof tab !== "string") tab = S.settingsTab || "general";
   S.settingsOpen = true;

@@ -349,8 +349,22 @@ def describe_tools(allowed: list[str] | None, ws: "Workspace | None" = None, age
     lines = [f"- {t.doc}" for t in TOOLS.values()
              if (allowed is None or t.name in allowed) and (not t.net or online) and (t.name != "web_search" or searching) and (t.name != "skill" or has_skills)]
     if ws is not None and agent is not None and online:
-        lines += [line for line in ws.plugins.describe(agent) if allowed is None or line.split()[1] in allowed]
+        lines += [line for line in ws.plugins.describe(agent) + ws.integrations.describe(agent) if allowed is None or line.split()[1] in allowed]
     return "\n".join(lines)
+
+
+def _integration_runner(fn):
+    from .integrations import IntegrationError
+
+    def run(ctx: Ctx, args: dict) -> str:
+        from .core import WorkspaceError
+
+        try:
+            ctx.ws.spend_fetch()  # integration calls count against the daily online-request cap
+            return fn(ctx, args)
+        except (IntegrationError, WorkspaceError) as err:
+            raise ToolError(str(err)) from None
+    return run
 
 
 def execute(ctx: Ctx, name: str, args: object, approved: bool = False) -> Outcome:
@@ -366,6 +380,11 @@ def execute(ctx: Ctx, name: str, args: object, approved: bool = False) -> Outcom
             spec = Tool(name, "safe" if tool["method"] == "GET" else "risky", f"{name} {{{args_doc}}} - {tool['description']}",
                         lambda c, a, m=manifest, tl=tool: plugin_mod.run_http_tool(c, m, tl, a), net=True)
     if spec is None:
+        found_integration = ctx.ws.integrations.tool_specs(ctx.agent).get(name)  # GitHub, Slack, Calendar, Gmail: only if the owner switched them on for this agent
+        if found_integration:
+            risk, doc, fn = found_integration
+            spec = Tool(name, risk, doc, _integration_runner(fn), net=True)
+    if spec is None:
         near = difflib.get_close_matches(str(name), list(TOOLS), n=2, cutoff=0.5)
         hint = f" Did you mean: {', '.join(near)}?" if near else ""
         return Outcome("error", f"unknown tool '{name}'.{hint} Available tools: {', '.join(TOOLS)}.")
@@ -379,6 +398,8 @@ def execute(ctx: Ctx, name: str, args: object, approved: bool = False) -> Outcom
     decision = perms.ALLOW if approved else perms.decide(agent["tier"], spec.risk, name, agent["tools"])
     if spec.net and not approved and decision == perms.ALLOW and ctx.ws.internet_mode(ctx.agent) == "ask":
         decision = perms.ASK  # every online action waits for a yes that shows the exact search or address
+    if spec.net and spec.risk == "risky" and not approved and decision == perms.ALLOW:
+        decision = perms.ASK  # anything that sends data out always waits for a person, even in the "never ask" tier
     if approved and agent["tools"] is not None and name not in agent["tools"]:
         decision = perms.DENY
     if decision == perms.DENY:

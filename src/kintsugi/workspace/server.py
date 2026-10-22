@@ -257,7 +257,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return {"me": {"name": who.name, "role": who.role}, "approval_policy": ws.team.policy(),
                         "people": [u["name"] for u in ws.team.users()] if who.at_least("admin") else [],
                         "agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools", "model", "provider", "internet", "playbook")},
-                                    "secrets": ws.keychain.names(a["name"]) if who.at_least("admin") else [], "apps": _apps(ws, a["name"]), "plugins": ws.plugins.enabled_for(a["name"])}
+                                    "secrets": ws.keychain.names(a["name"]) if who.at_least("admin") else [], "apps": _apps(ws, a["name"]), "plugins": ws.plugins.enabled_for(a["name"]),
+                                    "integrations": ws.integrations.enabled_for(a["name"])}
                                    for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in rooms],
                         "approvals": approvals, "jobs": jobs, "busy": ws.busy(),
@@ -307,6 +308,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return ws.providers()
             if path == "/api/internet":
                 return ws.internet_settings()
+            if path == "/api/integrations":
+                return {"items": ws.integrations.status(), "agents": [a["name"] for a in ws.list_agents()]}
             if path == "/api/plugins":
                 from .plugin_examples import EXAMPLES
 
@@ -474,6 +477,27 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/search/remove":
                 ws.remove_search_key()
                 return {"ok": True}
+            if path.startswith("/api/integrations/"):
+                from .integrations import IntegrationError
+
+                try:
+                    action, kind = path.rsplit("/", 1)[1], str(body.get("kind", ""))
+                    if action == "save":  # credentials are write-only: nothing here or anywhere returns them
+                        return ws.integrations.save(kind, {k: v for k, v in body.items() if k != "kind"})
+                    if action == "remove":
+                        ws.integrations.remove(kind)
+                        return {"ok": True}
+                    if action == "enable":
+                        ws.integrations.set_enabled(str(body["agent"]), kind, bool(body.get("on")))
+                        return {"ok": True}
+                    if action == "test":
+                        try:
+                            ws.spend_fetch()
+                            return {"ok": True, "message": ws.integrations.test(kind)}
+                        except IntegrationError as err:
+                            return {"ok": False, "error": ws.keychain.redact("_workspace", str(err))}
+                except IntegrationError as err:
+                    raise WorkspaceError(str(err)) from None
             if path.startswith("/api/plugins/"):
                 from .plugins import PluginError
 

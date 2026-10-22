@@ -402,6 +402,14 @@ class Workspace:
             self.audit(None, "push-error", f"{type(err).__name__}: {str(err)[:150]}")
 
     @property
+    def integrations(self):
+        from .integrations import Integrations
+
+        if getattr(self, "_integrations", None) is None:
+            self._integrations = Integrations(self)
+        return self._integrations
+
+    @property
     def team(self):
         from .team import Team
 
