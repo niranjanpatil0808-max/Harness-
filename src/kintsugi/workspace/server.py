@@ -360,6 +360,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                                    for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"]), "brief": ws.get_brief(r["name"]) if r["kind"] == "room" else "", **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in rooms],
                         "approvals": approvals, "jobs": jobs, "onboarding": self._onboarding(), "busy": [a for a in ws.busy() if self._sees_run(a)], "activity": {a: t for a, t in ws.agent_activity().items() if self._sees_run(a)}, "drafts": {a: t for a, t in ws.agent_drafts().items() if self._sees_run(a)}, "open_tasks": tasks.open_counts(ws, self.who),
+                        "deleted": [{"room": d["room"], "id": d["message_id"]} for d in ws.db.query("SELECT room, message_id FROM deleted_messages ORDER BY id DESC LIMIT 200") if d["room"] in seen],
                         "sandbox": sandbox.status(), "provider": ws.provider(), "search_configured": ws.search_settings()["configured"], "internet_enabled": ws.internet_settings()["enabled"],
                         "providers": [{"id": p["id"], "label": p["label"], "model": p["model"], "default": p["default"]} for p in ws.providers()["profiles"]] if who.at_least("admin") else [],
                         "model_ready": bool(ws.providers()["profiles"]) or ws.providers()["env_fallback"] or ws.model_factory is not core_mod.default_model_factory,
@@ -498,7 +499,26 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     if not ws.team.can_see_room(self.who, room):
                         raise Forbidden("you are not in that room")
                     sender = self.who.name
-                return {"id": ws.post(room, sender, str(body["text"]), human=True)}
+                cid = str(body.get("cid") or "")[:64]
+                if cid:  # a client id makes a retry safe: the same message is never posted twice (lost reply, two tabs)
+                    with ws._lock:
+                        seen_ids = ws.__dict__.setdefault("_say_ids", {})
+                        if (self.who.name, cid) in seen_ids:
+                            return {"id": seen_ids[(self.who.name, cid)], "duplicate": True}
+                        seen_ids[(self.who.name, cid)] = 0  # claimed before posting, so a parallel retry sees it
+                        while len(seen_ids) > 2000:
+                            seen_ids.pop(next(iter(seen_ids)))
+                try:
+                    mid = ws.post(room, sender, str(body["text"]), human=True)
+                except Exception:
+                    if cid:
+                        with ws._lock:
+                            ws.__dict__.get("_say_ids", {}).pop((self.who.name, cid), None)  # it failed: a retry may try again
+                    raise
+                if cid:
+                    with ws._lock:
+                        ws.__dict__.setdefault("_say_ids", {})[(self.who.name, cid)] = mid
+                return {"id": mid}
             if path == "/api/agents":
                 if str(body.get("tier", "auto")) == "dangerous" and self.who.role != "owner":
                     raise Forbidden("only the owner can create an agent that never asks")
@@ -803,8 +823,9 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     read_only = _read_only_plugin_tool(ws, row["agent"], row["tool"])
                     if not _standing.rememberable(ws, row["tool"], args, read_only):
                         raise WorkspaceError("this kind of action always asks: it could send data out, use secrets, or run without isolation")
+                    _standing.ensure_room_for_one_more(ws, row["agent"])  # refuse before running anything, never after
                     out = ws.decide(int(body["id"]), True, by=self.who.name)
-                    _standing.remember(ws, row["agent"], row["tool"], args, self.who.name, read_only)
+                    _standing.remember(ws, row["agent"], row["tool"], args, self.who.name, row["room"], read_only)
                     return {"output": out, "remembered": True}
                 return {"output": ws.decide(int(body["id"]), bool(body["approve"]), by=self.who.name)}
             if path == "/api/jobs":

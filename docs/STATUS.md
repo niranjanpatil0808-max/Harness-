@@ -221,3 +221,20 @@ and not a risky net tool; audited "auto-allowed". /api/approve {remember:true} o
 /api/state approvals carry can_remember (owner only). delete_agent clears. UI: "Always allow this exact one" on approval cards; Settings >
 Remembered approvals (extras.js approvalsPanel). Tests: tests/test_workspace_standing.py (6), tests/ui/standing.js (stubs api; the mock server has no
 isolated sandbox so the real button path is covered by unit tests). Known: web_search/web_fetch queries are remembered by exact args only.
+
+## Update: user-journey test on PC + phone, review round 4 fixes (2026-10-22, night)
+tests/ui/journey.js (suite "journey"): full flow on a 1280px desktop and a 390px touch phone (+ a teammate joining on a phone): chat, approval,
+reply buttons, DM, task board, room brief, search, /, attachment, offline outbox, every Settings tab, help, new chat, theme, invite. Audits each stage
+(sideways scroll, clipped text, off-screen controls, <30px touch targets, console/server errors). Found + fixed: small Edit/Cancel/.mini buttons on touch
+(pointer:coarse rule), 👍👎 orphan line (.rate-group), settings nav too tall on desktop. Mock-server note: serve_mock also binds port 8806; do not run
+two mock servers at once.
+Review round 4 (two independent reviewers) fixed: standing approvals now room-scoped, pause when .py files in the agent folder change, never offered for
+run_python unless the network is blocked, capacity checked BEFORE running; outbox is per-user, wiped on account change/sign-out, refused messages go back to
+the composer, 5xx/429/401 keep waiting (8 tries), /api/say takes a cid so a retry never posts twice; poll room-switch race; failed approval click re-enables;
+deleted messages disappear from other open screens (state.deleted, table deleted_messages); task title scrubbed on delete; names with old messages cannot be
+re-registered; draft preview hides TOOL-case fences, unfenced calls, <thinking>/<|channel|> and no longer backtracks; link label check is exact host;
+refused /task keeps its text. Tests: tests/test_workspace_review4.py, extended test_workspace_standing.py, tests/ui/review4.js.
+Not fixed (documented): sign-in code redemption is refused while an address is throttled (shared-address lockout); #signin= link signs in without a confirm
+dialog when the browser has no token (a person with their own reset code could sign a victim browser into their account: consider a confirm dialog);
+history LIMIT 50 skips older messages after a very long offline; repeating-task label uses the server clock unless the time zone is set; any website can
+prefill the composer via /?share_text= (never auto-sent).

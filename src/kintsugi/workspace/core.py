@@ -596,7 +596,10 @@ class Workspace:
         with self._lock:
             return agent in self._stop
 
-    _TOOL_FENCE = re.compile(r"```(?:tool|json)?\s*\n?\s*\{.*?(?:```|\Z)", re.S)
+    # no ambiguous whitespace runs: a hostile "```" + thousands of spaces must not make this slow
+    _TOOL_FENCE = re.compile(r"```(?:tool|json)?(?:[ \t]*\n)?[ \t]*\{.*?(?:```|\Z)", re.S | re.I)
+    _HIDDEN_THOUGHT = re.compile(r"<(think|thinking|thought|reasoning)>.*?(?:</\1>|\Z)|<\|channel\|>analysis.*?(?:<\|channel\|>final<\|message\|>|\Z)", re.S | re.I)
+    _UNFENCED_CALL = re.compile(r"^[ \t]*(?:tool[ \t]*:[ \t]*)?[a-z_]*[ \t]*[(:]?[ \t]*\{[ \t]*\"?tool|^[ \t]*[a-z_]+[ \t]*\{[ \t]*\"", re.M | re.I)
 
     def set_draft(self, agent: str, text: str | None) -> None:
         """What an agent has written so far in the answer it is still writing (for the live preview). Tool-call blocks, hidden reasoning
@@ -606,9 +609,10 @@ class Workspace:
                 self._drafts.pop(agent, None)
             return
         shown = self._TOOL_FENCE.sub("", text)
-        shown = re.sub(r"<think>.*?(?:</think>|\Z)", "", shown, flags=re.S)
-        if shown.lstrip().startswith('{"tool"') or shown.lstrip().startswith("{ \"tool\""):
-            shown = ""
+        shown = self._HIDDEN_THOUGHT.sub("", shown)
+        bare = self._UNFENCED_CALL.search(shown)  # a call written without a fence: hide it and whatever follows until it is parsed
+        if bare:
+            shown = shown[:bare.start()]
         shown = self._scrub(agent, shown).strip()[-600:]
         with self._lock:
             if shown:
@@ -827,7 +831,10 @@ class Workspace:
             raise WorkspaceError("you can only delete your own messages")
         self.db.execute("DELETE FROM messages WHERE id = ?", (row["id"],))
         self.db.execute("UPDATE tasks SET result_id = NULL WHERE result_id = ?", (row["id"],))
+        self.db.execute("UPDATE tasks SET title = '(message deleted)', message_id = NULL WHERE message_id = ?", (row["id"],))  # the title is the deleted text
         self.db.execute("DELETE FROM feedback WHERE message_id = ?", (row["id"],))
+        self.db.execute("INSERT INTO deleted_messages (room, message_id, ts) VALUES (?, ?, ?)", (row["room"], row["id"], self.clock()))
+        self.db.execute("DELETE FROM deleted_messages WHERE id NOT IN (SELECT id FROM deleted_messages ORDER BY id DESC LIMIT 500)")  # other open screens only need the recent ones
         compact.forget(self, row["room"])
         self.audit(None, "message-deleted", f"#{row['id']} in {row['room']} by {who}")
 

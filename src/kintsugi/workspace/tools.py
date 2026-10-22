@@ -467,7 +467,7 @@ def execute(ctx: Ctx, name: str, args: object, approved: bool = False) -> Outcom
         ctx.ws.audit(ctx.agent, "denied", name)
         return Outcome("denied", f"tool '{name}' is not allowed for this agent")
     read_only = spec.risk == "safe"
-    if decision == perms.ASK and not (spec.net and spec.risk == "risky") and standing.matches(ctx.ws, ctx.agent, name, args) \
+    if decision == perms.ASK and not (spec.net and spec.risk == "risky") and standing.matches(ctx.ws, ctx.agent, name, args, ctx.room) \
             and standing.rememberable(ctx.ws, name, args, read_only):
         ctx.ws.audit(ctx.agent, "auto-allowed", f"{name} (the owner chose to always allow this exact call)")
         decision = perms.ALLOW

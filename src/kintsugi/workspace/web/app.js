@@ -46,7 +46,13 @@ function color(name) { let n = 0; for (const c of name) n = (n * 31 + c.charCode
 function avatar(name, big) { return h("span", {class: "avatar" + (big ? " lg" : ""), style: "background:" + color(name), "aria-hidden": "true"}, name[0] || "?"); }
 const clock = (ts) => new Date(ts * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
 const store = {get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
-               set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } }};
+               set: (k, v) => {
+                 try {
+                   // a different account (or a sign-out) on this browser must not inherit drafts, waiting messages or unread marks
+                   if (k === "kt-token" && localStorage.getItem(k) && localStorage.getItem(k) !== v) Object.keys(localStorage).filter((x) => /^kt-(draft-|outbox$|lastseen$|seen$)/.test(x)).forEach((x) => localStorage.removeItem(x));
+                   localStorage.setItem(k, v);
+                 } catch (e) { /* private mode */ }
+               }};
 
 let toastTimer;
 function toast(msg, bad) {
@@ -58,8 +64,8 @@ async function api(path, body) {
   const r = await fetch(path, {method: body ? "POST" : "GET", headers: {"X-Token": S.token, "Content-Type": "application/json", "X-Visible": document.visibilityState === "visible" ? "1" : "0"},
                                body: body ? JSON.stringify(body) : undefined});
   let d = {}; try { d = await r.json(); } catch (e) { /* empty */ }
-  if (r.status === 401) { connectDialog(!!S.token); throw new Error("Enter your access token"); }
-  if (!r.ok) throw new Error(d.error || "Request failed (" + r.status + ")");
+  if (r.status === 401) { connectDialog(!!S.token); throw Object.assign(new Error("Enter your access token"), {status: 401}); }
+  if (!r.ok) throw Object.assign(new Error(d.error || "Request failed (" + r.status + ")"), {status: r.status});
   return d;
 }
 function clamped(el) {  // the number an input will really be saved as, and the words for it
@@ -83,7 +89,7 @@ function md(text) {
     // a link whose words differ from where it goes (the way a phishing link hides) shows its real host
     const said = (a.textContent || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "");
     const host = url.hostname.replace(/^www\./, "");
-    if (url.origin !== location.origin && !said.startsWith(host)) a.after(h("span", {class: "linkhost", title: url.href}, " (" + host + ")"));
+    if (url.origin !== location.origin && said.split(/[\/\s?#:]/)[0] !== host) a.after(h("span", {class: "linkhost", title: url.href}, " (" + host + ")"));
   });
   box.querySelectorAll("pre").forEach((pre) => {
     const code = pre.textContent;
@@ -230,8 +236,8 @@ function bodyOf(m) {
         agent ? h("button", {class: "mini", "aria-label": "Ask again", title: "Send your last message to " + m.sender + " again", onclick: () => askAgain(m.sender)}, "Ask again") : null,
         h("button", {class: "mini", "aria-label": "Share this message to a room", onclick: () => shareDialog(m)}, "Share"),
         isAdmin() ? h("button", {class: "mini", "aria-label": "Delete this message", onclick: () => deleteMessage(m)}, "Delete") : null,
-        agent ? [h("button", {class: "mini rate" + ((S.rated || {})[m.id] === true ? " on" : ""), "data-good": "1", "aria-label": "Helpful", title: "Helpful: agents learn what works for you", onclick: (e) => rate(m, true, e.currentTarget)}, "👍"),
-          h("button", {class: "mini rate" + ((S.rated || {})[m.id] === false ? " on" : ""), "data-good": "0", "aria-label": "Not helpful", title: "Not helpful: agents adjust to you", onclick: (e) => rate(m, false, e.currentTarget)}, "👎")] : null)));
+        agent ? h("span", {class: "rate-group"}, h("button", {class: "mini rate" + ((S.rated || {})[m.id] === true ? " on" : ""), "data-good": "1", "aria-label": "Helpful", title: "Helpful: agents learn what works for you", onclick: (e) => rate(m, true, e.currentTarget)}, "👍"),
+          h("button", {class: "mini rate" + ((S.rated || {})[m.id] === false ? " on" : ""), "data-good": "0", "aria-label": "Not helpful", title: "Not helpful: agents adjust to you", onclick: (e) => rate(m, false, e.currentTarget)}, "👎")) : null)));
 }
 function emptyState() {
   const r = curRoom(), ra = roomAgents(r), first = ra[0] || (agents()[0] || {}).name;
@@ -287,9 +293,16 @@ function sandboxLine(tool) {
   return sb && sb.isolated ? "Read it before you allow it. It runs isolated: only this agent's folder, " + (sb.network_blocked ? "no network." : "network is not blocked.")
     : "Read it before you allow it. NOT isolated here: it runs with the server's permissions, files and network.";
 }
+const deciding = new Set();  // approvals whose answer is on its way: their buttons stay off, and come back if it fails
+async function decide(id, body, ok) {
+  deciding.add(id); sigChanged("inline", null); renderInline();
+  const r = await act(() => api("/api/approve", {id, ...body}), ok);
+  deciding.delete(id); sigChanged("inline", null);
+  if (r === undefined) renderInline();  // it failed: show the buttons again so it can be retried
+}
 function renderInline() {
   const r = curRoom(), pend = pendingFor(S.room), busy = busyIn(r);
-  if (!sigChanged("inline", [S.room, pend, busy, (S.state.activity || {}), (S.state.drafts || {})])) return;
+  if (!sigChanged("inline", [S.room, pend, busy, (S.state.activity || {}), (S.state.drafts || {}), [...deciding]])) return;
   const s = $("#scroll"), near = s.scrollHeight - s.scrollTop - s.clientHeight < 90;
   fill($("#inline"),
     pend.map((a) => {
@@ -306,9 +319,9 @@ function renderInline() {
         isCode && Object.keys(rest).length ? [h("div", {class: "meta"}, "Other details it sent:"), h("pre", {}, JSON.stringify(rest, null, 2))] : null,
         a.requested_by && a.requested_by !== me().name ? h("div", {class: "meta"}, "Asked by " + a.requested_by) : null,
         a.can_decide === false ? h("div", {class: "meta"}, "Waiting for " + (S.state.approval_policy === "admins" ? "an admin" : "someone allowed") + " to decide.")
-        : h("div", {class: "actions"}, h("button", {class: "btn primary", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: true})); }}, "Allow once"),
-          a.can_remember ? h("button", {class: "btn", title: "Next time " + a.agent + " makes exactly this call, it runs without asking. Revoke it any time in Settings.", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: true, remember: true}), "Remembered: this exact action will not ask again"); }}, "Always allow this exact one") : null,
-          h("button", {class: "btn danger", onclick: (e) => { e.target.disabled = true; act(() => api("/api/approve", {id: a.id, approve: false})); }}, "Deny")));
+        : h("div", {class: "actions"}, h("button", {class: "btn primary", disabled: deciding.has(a.id), onclick: () => decide(a.id, {approve: true})}, "Allow once"),
+          a.can_remember ? h("button", {class: "btn", disabled: deciding.has(a.id), title: "Next time " + a.agent + " makes exactly this call in this room, it runs without asking. Revoke it any time in Settings.", onclick: () => decide(a.id, {approve: true, remember: true}, "Remembered: this exact action will not ask again in this room")}, "Always allow this exact one") : null,
+          h("button", {class: "btn danger", disabled: deciding.has(a.id), onclick: () => decide(a.id, {approve: false})}, "Deny")));
     }),
     busy.length ? h("div", {class: "working", "aria-live": "polite"}, SPARK(), h("span", {class: "wk"}, busy.map((n) => n + " is " + ((S.state.activity || {})[n] || "working") + "…").join(" · ")),
       h("button", {class: "stop", "aria-label": "Stop " + busy.join(", "), onclick: () => stopAgents(busy)}, "Stop")) : null,
@@ -366,9 +379,10 @@ async function sendMsg() {
   stopSpeaking(); S.sending = true; S.stick = true; ta.value = ""; ta.dispatchEvent(new Event("input"));
   (S.talked = S.talked || {})[S.room] = true; updateComposer();
   (S.lastSent = S.lastSent || {})[S.room] = text;
-  try { await api("/api/say", {room: S.room, text}); S.fast = 12; await poll(true); }
+  const cid = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);  // lets the server ignore a repeat of this same message
+  try { await api("/api/say", {room: S.room, text, cid}); S.fast = 12; await poll(true); }
   catch (e) {
-    if (typeof queueOutbox === "function" && isNetworkError(e)) queueOutbox(S.room, text);  // no signal: keep it and send when the connection is back
+    if (typeof queueOutbox === "function" && isNetworkError(e) && queueOutbox(S.room, text, cid)) { /* no signal: kept, and sent when the connection is back */ }
     else { toast(e.message, true); ta.value = text; ta.dispatchEvent(new Event("input")); }
   }
   finally { S.sending = false; ta.focus(); }
@@ -1054,10 +1068,12 @@ async function poll(now) {
     focusAgent(); syncUnread(); renderSidebar(); renderTopbar(); updateComposer();
     if (!S.awayChecked && typeof awayDigest === "function") { S.awayChecked = true; setTimeout(awayDigest, 1200); }
     if (S.state.model_ready === false && !S.askedModel && !S.settingsOpen && !$("#dialog-root .dialog")) { S.askedModel = true; if (isOwner()) setupWizard(); else noModelNotice(); }
+    for (const d of S.state.deleted || []) if (d.room === S.room) document.querySelector('#thread .row[data-mid="' + d.id + '"]')?.remove();  // removed by someone else while this screen was open
     if (S.room) {
-      const after = S.last[S.room] || 0, fresh = await api("/api/messages?room=" + encodeURIComponent(S.room) + "&after=" + after);
+      const room = S.room, after = S.last[room] || 0, fresh = await api("/api/messages?room=" + encodeURIComponent(room) + "&after=" + after);
+      if (S.room !== room) { again = true; return; }  // the person switched rooms while this was loading: these messages belong to the other room
       const msgs = fresh.filter((m) => m.id > after);
-      if (msgs.length) S.last[S.room] = msgs[msgs.length - 1].id;
+      if (msgs.length) S.last[room] = msgs[msgs.length - 1].id;
       const wasLoaded = !!S.loadedRooms[S.room];
       renderThread(msgs);
       S.loadedRooms[S.room] = true;

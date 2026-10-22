@@ -86,10 +86,13 @@ Owners and admins can always decide. A scheduled run is attributed to the person
 recorded with the name of whoever decided.
 
 **Always allow this exact one (owner only).** On an approval card the owner also sees *Always allow this exact one*. From then on that
-agent's identical call (same tool, same arguments, character for character) runs without asking, which keeps a repeating task from
-stalling while nobody is around. It never widens anything: other code, other links or another agent still ask, and calls that are given
-secrets, could send data out, or would run without isolation never offer the button. Settings > Remembered approvals lists every one with a
-Revoke button; deleting the agent clears them; each automatic run is recorded in the audit log as *auto-allowed*. Agents cannot add one.
+agent's identical call (same tool, same arguments, character for character) runs without asking **in that same room**, which keeps a
+repeating task from stalling while nobody is around. It never widens anything: other code, other links, another agent or another room still
+ask. Calls that are given secrets, could send data out, or would run without isolation and a blocked network never offer the button. For
+code, the permission also pauses the moment any Python file in the agent's folder changes (so code an agent rewrites later is reviewed
+again; code that reads other kinds of files and runs them is not covered by that check). Settings > Remembered approvals lists every one
+with its room and a Revoke button; deleting the agent clears them; each automatic run is recorded in the audit log as *auto-allowed*.
+Agents cannot add one.
 
 ## Honest limits
 

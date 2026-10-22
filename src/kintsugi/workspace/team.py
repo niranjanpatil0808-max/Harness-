@@ -120,6 +120,8 @@ class Team:
             raise TeamError("a name is 2-24 characters: lowercase letters, digits, '-' and '_', starting with a letter")
         if name in RESERVED or name.startswith(("cron-", "dm-")) or self.ws.get_agent(name, missing_ok=True) or self.get(name):
             raise TeamError("that name is taken or reserved; choose another")
+        if self.ws.db.one("SELECT 1 FROM messages WHERE sender = ? LIMIT 1", (name,)):
+            raise TeamError("that name was used by someone before and their old messages still carry it; choose another")
         return name
 
     def _new_token(self) -> str:

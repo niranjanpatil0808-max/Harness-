@@ -235,7 +235,7 @@ async function tasksDialog(room) {
   const form = mine().length ? h("div", {class: "task-form"}, h("div", {class: "task-row"}, roomSel, agentSel), what, repeat, give)
     : h("p", {class: "muted"}, isAdmin() ? "Add an agent to a room first (New agent, or Start from a team)." : "You are not in a room with an agent yet. Ask an admin to add you.");
   what.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); give.click(); } });
-  const close = dialog("Team tasks", "Hand work to an agent in a shared room. Everyone in that room can follow it.", h("div", {}, form, board), (c) => [h("button", {class: "btn primary", onclick: c}, "Done")], () => { closed = true; clearTimeout(timer); });
+  const close = dialog("Team tasks", "Hand work to an agent in a room or private chat. Everyone in that room can follow it.", h("div", {}, form, board), (c) => [h("button", {class: "btn primary", onclick: c}, "Done")], () => { closed = true; clearTimeout(timer); });
   close.dialog.classList.add("tasks-dialog");
   draw(); tick();
 }
@@ -392,26 +392,49 @@ const _renderTopbar = renderTopbar;
 renderTopbar = function (force) { _renderTopbar(force); try { renderBrief(); } catch (e) { /* cosmetic */ } };
 
 /* ---------- outbox: a message typed with no signal waits and goes out when the connection is back ---------- */
-const OUTBOX_KEY = "kt-outbox";
-function outbox() { try { const v = JSON.parse(localStorage.getItem(OUTBOX_KEY) || "[]"); return Array.isArray(v) ? v.slice(0, 20) : []; } catch (e) { return []; } }
-function saveOutbox(list) { try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) { /* no storage: the message stays in memory only */ S.memOutbox = list; } renderOutbox(); }
-function queueOutbox(room, text) {
-  saveOutbox(outbox().concat([{id: Date.now() + Math.random(), room, text: text.slice(0, 8000)}]));
+const OUTBOX_KEY = "kt-outbox", OUTBOX_MAX = 20, OUTBOX_TRIES = 8;
+// Waiting messages belong to the person who wrote them: another account on this browser neither sees nor sends them.
+function outbox() {
+  let all = [];
+  try { const v = JSON.parse(localStorage.getItem(OUTBOX_KEY) || "[]"); all = Array.isArray(v) ? v : []; } catch (e) { all = S.memOutbox || []; }
+  return all.filter((x) => x && x.user === me().name).slice(0, OUTBOX_MAX);
+}
+function saveOutbox(mine) {
+  let others = [];
+  try { const v = JSON.parse(localStorage.getItem(OUTBOX_KEY) || "[]"); others = (Array.isArray(v) ? v : []).filter((x) => x && x.user !== me().name); } catch (e) { /* no storage */ }
+  const all = others.concat(mine.slice(0, OUTBOX_MAX));
+  try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(all)); } catch (e) { S.memOutbox = all; }  // no storage: kept while this page stays open
+  renderOutbox();
+}
+function queueOutbox(room, text, cid) {
+  const list = outbox();
+  if (list.length >= OUTBOX_MAX) { toast("Too many messages are waiting to be sent. Yours is back in the message box.", true); return false; }
+  saveOutbox(list.concat([{id: Date.now() + Math.random(), user: me().name, room, text: text.slice(0, 8000), cid: cid || String(Date.now()), tries: 0}]));
   toast("No connection. Your message will be sent when you are back online.");
+  return true;
+}
+function backToDraft(item, why) {  // never lose what someone wrote: a message that cannot be sent goes back into that chat's message box
+  const key = "kt-draft-" + item.room, have = store.get(key) || "";
+  store.set(key, have ? have + "\n" + item.text : item.text);
+  if (item.room === S.room) { const ta = $("#msg"); if (ta) { ta.value = store.get(key); ta.dispatchEvent(new Event("input")); } }
+  toast("A waiting message could not be sent (" + why + "). It is back in your message box.", true);
 }
 let flushing = false;
 async function flushOutbox() {
-  if (flushing || !navigator.onLine) return;
-  let list = outbox(); if (!list.length) return;
+  if (flushing || !navigator.onLine || !S.token) return;
+  if (!outbox().length) return;
   flushing = true;
   try {
-    for (const item of list) {
-      try { await api("/api/say", {room: item.room, text: item.text}); }
+    for (const first of outbox()) {
+      const item = outbox().find((x) => x.id === first.id);  // cancelled while this was running: skip it
+      if (!item) continue;
+      try { await api("/api/say", {room: item.room, text: item.text, cid: item.cid}); }
       catch (e) {
-        if (isNetworkError(e)) break;                     // still offline: keep the rest, try again later
-        toast("A waiting message could not be sent: " + e.message, true);  // refused for a real reason: do not retry it forever
+        const keep = isNetworkError(e) || e.status === 401 || e.status === 429 || e.status >= 500;  // not their fault: try again later
+        if (keep && (item.tries || 0) + 1 < OUTBOX_TRIES) { saveOutbox(outbox().map((x) => x.id === item.id ? {...x, tries: (x.tries || 0) + 1} : x)); break; }
+        saveOutbox(outbox().filter((x) => x.id !== item.id)); backToDraft(item, keep ? "the server kept refusing it" : e.message); continue;
       }
-      list = outbox().filter((x) => x.id !== item.id); saveOutbox(list);
+      saveOutbox(outbox().filter((x) => x.id !== item.id));
     }
   } finally { flushing = false; }
   if (!outbox().length) { S.fast = 12; poll(true); }
@@ -438,7 +461,7 @@ function runSlash(text) {
     if (!rest) { tasksDialog(); return true; }
     const agent = r && (r.kind === "dm" ? roomAgents(r)[0] : recipient());
     if (!agent) { toast("Open a chat with an agent first", true); return true; }
-    api("/api/tasks/create", {room: S.room, agent, title: rest}).then(() => { toast("Task given to " + agent); S.fast = 12; poll(true); }).catch((e) => toast(e.message, true));
+    api("/api/tasks/create", {room: S.room, agent, title: rest}).then(() => { toast("Task given to " + agent); S.fast = 12; poll(true); }).catch((e) => { toast(e.message, true); const ta = $("#msg"); if (ta && !ta.value) { ta.value = text; ta.dispatchEvent(new Event("input")); } });  // a refused command keeps its words
     return true;
   }
   return false;  // unknown: sent as an ordinary message
@@ -461,9 +484,11 @@ function runSlash(text) {
 async function approvalsPanel() {
   const list = await api("/api/standing");
   const refresh = async () => fill($("#set-panel"), await approvalsPanel());
-  return h("div", {}, h("p", {style: "margin-top:0"}, "When you tap \"Always allow this exact one\" on an approval, that one call runs without asking from then on, for example in a repeating task while nobody is around. It covers only that exact action by that agent. A different code, link or agent still asks, and anything that could use secrets, send data out or run without isolation always asks."),
+  return h("div", {}, h("p", {style: "margin-top:0"}, "When you tap \"Always allow this exact one\" on an approval, that one call runs without asking from then on, for example in a repeating task while nobody is around. It covers only that exact action, by that agent, in that room. Different code, a different link, another agent or another room still asks. Code stops being covered the moment a Python file in the agent's folder changes. Anything that could use secrets, send data out, or run without isolation and a blocked network always asks."),
     list.length ? h("div", {class: "stack"}, list.map((e) => h("div", {class: "perm"}, h("h5", {}, e.agent + " · " + e.tool),
-      h("pre", {}, e.summary || ""), h("div", {class: "meta"}, "Allowed by " + e.by + (e.ts ? " · " + whenText(e.ts) : "")),
+      h("pre", {}, e.summary || ""), e.size > (e.summary || "").length ? h("div", {class: "meta"}, "Shortened here: the full action is " + e.size + " characters long.") : null,
+      h("div", {class: "meta"}, "In " + (e.room ? "#" + e.room : "the room where it was approved") + " · allowed by " + e.by + (e.ts ? " · " + whenText(e.ts) : "")),
+      e.stale ? h("div", {class: "meta"}, "Paused: a Python file in this agent's folder changed, so it will ask again.") : null,
       h("div", {class: "actions"}, h("button", {class: "btn danger", "aria-label": "Revoke " + e.agent + " " + e.tool, onclick: async () => { await act(() => api("/api/standing/revoke", {agent: e.agent, h: e.h}), "Revoked"); await refresh(); }}, "Revoke")))))
       : h("p", {class: "muted"}, "Nothing is remembered. Approvals always ask."));
 }
