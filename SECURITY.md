@@ -29,6 +29,7 @@ is not, and what to do about it. Last reviewed 2026-10-22. It is a small project
   a chroot, built from standard tools. It stops accidents and ordinary snooping; a determined attacker with a
   kernel exploit could escape it. Do not run code you do not understand, and do not put secrets you cannot
   lose on the same machine.
+- **A fork bomb can briefly slow the machine** until the timeout kills it (there is no process-count limit).
 - **In the fallback modes the network is open.** Approved code could send a secret you gave it to the internet. In the
   plain-process mode it can also read anything the server's user can read.
 - **`fix_code` runs model-written code outside the sandbox** (through the benchmark verifier). It is therefore

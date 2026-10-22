@@ -170,6 +170,31 @@ class TestServer(unittest.TestCase):
         self.assertEqual(self.call("GET", "/apps/alice/todo/?token=secret-token", token=None)[0], 401)  # no token in URLs
         self.assertEqual(self.call("GET", "/api/applink?agent=alice&app=nope")[0], 400)
 
+    def test_a_signed_link_cannot_reach_a_sibling_app_through_dot_dot(self):
+        self.make_app()
+        other = self.ws.www_dir("alice") / "other"
+        other.mkdir()
+        (other / "index.html").write_text("SIBLING")
+        link = json.loads(self.call("GET", "/api/applink?agent=alice&app=todo")[1])["url"]
+        sneaky = link.replace("/todo/?", "/todo/../other/index.html?")
+        status, data, _ = self.call("GET", sneaky, token=None)
+        self.assertNotEqual(status, 200)
+        self.assertNotIn(b"SIBLING", data)
+
+    def test_a_negative_content_length_is_rejected_instead_of_hanging(self):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.putrequest("POST", "/api/say")
+        conn.putheader("X-Token", "secret-token")
+        conn.putheader("Content-Length", "-5")
+        conn.endheaders()
+        self.assertEqual(conn.getresponse().status, 400)
+
+    def test_idle_connections_are_dropped(self):
+        from kintsugi.workspace import server as server_module
+
+        handler = self.server.RequestHandlerClass
+        self.assertTrue(0 < handler.timeout <= 60, handler.timeout)
+
     def test_security_headers_and_health_check(self):
         status, data, resp = self.call("GET", "/", token=None)
         self.assertIn("script-src 'self'", resp.getheader("Content-Security-Policy"))

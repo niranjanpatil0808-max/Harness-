@@ -76,6 +76,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "Kintsugi"
+        timeout = 30  # seconds a connection may sit idle or send slowly before it is dropped
 
         def log_message(self, fmt, *args):  # keep the terminal quiet
             pass
@@ -133,7 +134,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
 
         def _body(self) -> dict:
             length = int(self.headers.get("Content-Length") or 0)
-            if length > MAX_BODY:
+            if length < 0 or length > MAX_BODY:
                 raise WorkspaceError("request too large")
             data = json.loads(self.rfile.read(length) or b"{}")
             if not isinstance(data, dict):
@@ -287,7 +288,10 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 relative += "index.html"
             try:
                 target = safe_path(ws.www_dir(parts[2]), relative)
+                app_root = safe_path(ws.www_dir(parts[2]), parts[3])
             except PathError:
+                return self._json(404, {"error": "no such app"})
+            if app_root not in target.parents and target != app_root:  # a link for one app never reaches another
                 return self._json(404, {"error": "no such app"})
             if target.is_dir():
                 target = target / "index.html"

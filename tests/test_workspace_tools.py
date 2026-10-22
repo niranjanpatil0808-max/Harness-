@@ -118,6 +118,14 @@ class TestSmallModelTolerance(unittest.TestCase):
         self.assertEqual(self.run_tool("run_python", script="print(6 * 7)").output, "42")
         self.assertEqual(self.run_tool("remember", content="likes tea").status, "ok")
 
+    def test_code_cannot_fill_the_folder_with_many_files(self):
+        code = "for i in range(40):\n    open(f'f{i}.bin', 'wb').write(b'x' * 190000)"
+        out = self.run_tool("run_python", code=code, timeout=30)
+        self.assertEqual(out.status, "error")
+        self.assertIn("filled your folder", out.output)
+        total = sum(p.stat().st_size for p in self.ws.files_dir("alice").rglob("*") if p.is_file())
+        self.assertLessEqual(total, 5_000_000)
+
     def test_real_names_win_over_aliases(self):
         self.assertEqual(self.run_tool("write_file", path="b.txt", content="real", text="alias").status, "ok")
         self.assertEqual((self.ws.files_dir("alice") / "b.txt").read_text(), "real")

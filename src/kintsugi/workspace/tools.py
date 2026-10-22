@@ -11,6 +11,7 @@ import difflib
 import json
 import os
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
@@ -158,7 +159,16 @@ def run_python_tool(ctx: Ctx, args: dict) -> str:
         raise ToolError(str(err.args[0])) from None
     timeout = float(args.get("timeout", 10))
     timeout = 10.0 if timeout != timeout else min(max(timeout, 1.0), 30.0)
-    ok, output = run_python(ctx.ws.files_dir(ctx.agent), code, timeout=timeout, extra_env=env, agent=ctx.agent)
+    base = ctx.ws.files_dir(ctx.agent)
+    started = time.time() - 1
+    ok, output = run_python(base, code, timeout=timeout, extra_env=env, agent=ctx.agent)
+    if folder_size(base) > MAX_FOLDER_BYTES:  # code can write many files; the cap must hold for it too
+        for path in sorted(base.rglob("*"), key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True):
+            if folder_size(base) <= MAX_FOLDER_BYTES:
+                break
+            if path.is_file() and not path.is_symlink() and path.stat().st_mtime >= started:
+                path.unlink()
+        raise ToolError("that code filled your folder (5 MB limit); the files it created were removed")
     if not ok:
         raise ToolError(output)
     return output
