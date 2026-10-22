@@ -19,7 +19,7 @@ Paired comparisons (same tasks; interval = bootstrap over tasks):
 
 - **Retries (loop mode):** first attempt passes 0%, after retries 0% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Of 16 task runs, 16 failed the first attempt and 0 of those were repaired by the retries. The first attempt of this mode is the same request as the no-retry baseline, so the comparison is within the same runs.
 - **Memory (loop+memory vs loop):** 0% vs 0% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
-- **Context graph (full vs loop+memory):** 0% vs 0% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
+- **Context graph with memory (full vs loop+memory):** 0% vs 0% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
 - **Memory and graph together (full vs loop):** 0% vs 0% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
 - **Loop vs the separate baseline mode:** 0% vs 0% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
 
@@ -42,7 +42,7 @@ Paired comparisons (same tasks; interval = bootstrap over tasks):
 
 - **Retries (loop mode):** first attempt passes 100%, after retries 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Of 16 task runs, 0 failed the first attempt and 0 of those were repaired by the retries. The first attempt of this mode is the same request as the no-retry baseline, so the comparison is within the same runs.
 - **Memory (loop+memory vs loop):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
-- **Context graph (full vs loop+memory):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
+- **Context graph with memory (full vs loop+memory):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
 - **Memory and graph together (full vs loop):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
 - **Loop vs the separate baseline mode:** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
 
@@ -90,7 +90,7 @@ Paired comparisons (same tasks; interval = bootstrap over tasks):
 
 - **Retries (loop mode):** first attempt passes 94%, after retries 100% (+6.2 pp, 95% interval +0.0 pp to +18.8 pp; the interval includes zero, so this is not distinguishable from no effect). Of 16 task runs, 1 failed the first attempt and 1 of those were repaired by the retries. The first attempt of this mode is the same request as the no-retry baseline, so the comparison is within the same runs.
 - **Memory (loop+memory vs loop):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
-- **Context graph (full vs loop+memory):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
+- **Context graph with memory (full vs loop+memory):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
 - **Memory and graph together (full vs loop):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
 - **Loop vs the separate baseline mode:** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
 
@@ -128,7 +128,7 @@ Paired comparisons (same tasks; interval = bootstrap over tasks):
 
 - **Retries (loop mode):** first attempt passes 95%, after retries 100% (+4.8 pp, 95% interval +0.0 pp to +14.3 pp; the interval includes zero, so this is not distinguishable from no effect). Of 21 task runs, 1 failed the first attempt and 1 of those were repaired by the retries. The first attempt of this mode is the same request as the no-retry baseline, so the comparison is within the same runs.
 - **Memory (loop+memory vs loop):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Tokens per task: 820 vs 911.
-- **Context graph (full vs loop+memory):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Tokens per task: 726 vs 820.
+- **Context graph with memory (full vs loop+memory):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Tokens per task: 726 vs 820.
 - **Memory and graph together (full vs loop):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Tokens per task: 726 vs 911.
 - **Loop vs the separate baseline mode:** 100% vs 90% (+9.5 pp, 95% interval +0.0 pp to +23.8 pp; the interval includes zero, so this is not distinguishable from no effect). Tokens per task: 911 vs 725.
 
@@ -167,3 +167,96 @@ Paired comparisons (same tasks; interval = bootstrap over tasks):
 - **Loop vs the separate baseline mode:** 100% vs 90% (+9.5 pp, 95% interval +0.0 pp to +23.8 pp; the interval includes zero, so this is not distinguishable from no effect). Tokens per task: 955 vs 725.
 
 Raw data: `results/20261021-170243-openai.json`
+
+## 2026-10-22 17:39 UTC · `openai/gpt-oss-20b` · code `7e3295e`
+
+_Batch 1(a). gpt-oss-20b with reasoning_effort=low (a DELIBERATELY WEAKENED configuration, chosen to create headroom), 32-task set, loop mode only, 3 repeats at temperature 0.6. Valid and complete (63 task runs, no API errors). There is no separate baseline mode in this run: the retry effect is read from the first attempt of loop mode, which is the same request._
+
+Model: `openai/gpt-oss-20b` · held-out tasks: 21 (5 hard) · repeats: 3 · max retries: 3 · temperature: 0.6 · extra request fields: {"reasoning_effort": "low"}
+
+| Mode | Pass rate (held-out) | On the first attempt | Hard tasks only | Avg attempts | Model calls (scored tasks) | Tokens (scored tasks) |
+|---|---|---|---|---|---|---|
+| loop | 100% (21/21) [100%–100%] | 90% | 100% (5/5) | 1.10 | 23 | 21,269 |
+
+Paired comparisons (same tasks; interval = bootstrap over tasks):
+
+- **Retries (loop mode):** first attempt passes 90%, after retries 100% (+9.5 pp, 95% interval +0.0 pp to +22.2 pp; the interval includes zero, so this is not distinguishable from no effect). Of 63 task runs, 6 failed the first attempt and 6 of those were repaired by the retries. The first attempt of this mode is the same request as the no-retry baseline, so the comparison is within the same runs.
+
+Raw data: `results/20261022-173912-openai.json`
+
+## 2026-10-22 17:46 UTC · `openai/gpt-oss-20b` · code `7e3295e`
+
+_Batch 1(b). gpt-oss-20b (reasoning_effort=low, deliberately weakened), the 8 large multi-file project tasks (split_scale.json, 7 held-out), 1 repeat, temperature 0.6. Valid and complete. Every mode passes every task, so accuracy cannot separate the modes; only the token count differs._
+
+Model: `openai/gpt-oss-20b` · held-out tasks: 7 (0 hard) · repeats: 1 · max retries: 3 · temperature: 0.6 · extra request fields: {"reasoning_effort": "low"}
+
+| Mode | Pass rate (held-out) | On the first attempt | Hard tasks only | Avg attempts | Model calls (scored tasks) | Tokens (scored tasks) |
+|---|---|---|---|---|---|---|
+| baseline | 100% (7/7) | 100% | – | 1.00 | 7 | 26,099 |
+| loop | 100% (7/7) | 100% | – | 1.00 | 7 | 25,849 |
+| loop+graph | 100% (7/7) | 100% | – | 1.00 | 7 | 14,309 |
+
+Paired comparisons (same tasks; interval = bootstrap over tasks):
+
+- **Retries (loop mode):** first attempt passes 100%, after retries 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Of 7 task runs, 0 failed the first attempt and 0 of those were repaired by the retries. The first attempt of this mode is the same request as the no-retry baseline, so the comparison is within the same runs.
+- **Context graph alone (loop+graph vs loop):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Tokens per task: 2,044 vs 3,693.
+- **Loop vs the separate baseline mode:** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Tokens per task: 3,693 vs 3,728.
+
+Raw data: `results/20261022-174610-openai.json`
+
+## 2026-10-22 17:54 UTC · `allam-2-7b` · code `7e3295e`
+
+_Batch 1(b). allam-2-7b on the large multi-file tasks (split_scale.json), 1 repeat. INCOMPLETE/INVALID as a pass rate: baseline and loop were rejected by the API on all 7 tasks (context too long), and loop+graph on 3 of 7. Those are missing answers, not failures; the 0% shown must not be read as a score. What it does show: with the context graph 4 of 7 prompts fit, and the model still failed all 4._
+
+Model: `allam-2-7b` · held-out tasks: 7 (0 hard) · repeats: 1 · max retries: 3 · temperature: 0.0
+
+| Mode | Pass rate (held-out) | On the first attempt | Hard tasks only | Avg attempts | Model calls (scored tasks) | Tokens (scored tasks) |
+|---|---|---|---|---|---|---|
+| baseline | 0% (0/7) (7 task run(s) rejected by the model, e.g. context too long) | 0% | – | 1.00 | 0 | 0 |
+| loop | 0% (0/7) (7 task run(s) rejected by the model, e.g. context too long) | 0% | – | 1.00 | 0 | 0 |
+| loop+graph | 0% (0/7) (3 task run(s) rejected by the model, e.g. context too long) | 0% | – | 3.14 | 19 | 67,680 |
+
+Paired comparisons (same tasks; interval = bootstrap over tasks):
+
+- **Retries (loop mode):** first attempt passes 0%, after retries 0% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Of 7 task runs, 7 failed the first attempt and 0 of those were repaired by the retries. The first attempt of this mode is the same request as the no-retry baseline, so the comparison is within the same runs.
+- **Context graph alone (loop+graph vs loop):** 0% vs 0% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
+- **Loop vs the separate baseline mode:** 0% vs 0% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect).
+
+Raw data: `results/20261022-175427-openai.json`
+
+## 2026-10-22 18:05 UTC · `qwen/qwen3.8-27b` · code `7e3295e`
+
+_Batch 1(b). qwen3.8-27b on the large multi-file tasks (split_scale.json), 1 repeat. Valid and complete. Every mode passes every task, so accuracy cannot separate the modes; only the token count differs._
+
+Model: `qwen/qwen3.8-27b` · held-out tasks: 7 (0 hard) · repeats: 1 · max retries: 3 · temperature: 0.0
+
+| Mode | Pass rate (held-out) | On the first attempt | Hard tasks only | Avg attempts | Model calls (scored tasks) | Tokens (scored tasks) |
+|---|---|---|---|---|---|---|
+| baseline | 100% (7/7) | 100% | – | 1.00 | 7 | 26,972 |
+| loop | 100% (7/7) | 100% | – | 1.00 | 7 | 26,972 |
+| loop+graph | 100% (7/7) | 100% | – | 1.00 | 7 | 14,657 |
+
+Paired comparisons (same tasks; interval = bootstrap over tasks):
+
+- **Retries (loop mode):** first attempt passes 100%, after retries 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Of 7 task runs, 0 failed the first attempt and 0 of those were repaired by the retries. The first attempt of this mode is the same request as the no-retry baseline, so the comparison is within the same runs.
+- **Context graph alone (loop+graph vs loop):** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Tokens per task: 2,094 vs 3,853.
+- **Loop vs the separate baseline mode:** 100% vs 100% (+0.0 pp, 95% interval +0.0 pp to +0.0 pp; the interval includes zero, so this is not distinguishable from no effect). Tokens per task: 3,853 vs 3,853.
+
+Raw data: `results/20261022-180527-openai.json`
+
+## 2026-10-22 18:13 UTC · `allam-2-7b` · code `7e3295e`
+
+_Batch 1(c). allam-2-7b on the main 32-task set, loop then loop+memory then full (1 repeat). INCOMPLETE: stopped by Groq's 500,000 tokens-per-day limit for this model in the middle of loop+memory (14 of 21 tasks answered) and full did not start. Only loop is a valid result (3/21)._
+
+Model: `allam-2-7b` · held-out tasks: 21 (5 hard) · repeats: 1 · max retries: 3 · temperature: 0.0
+
+| Mode | Pass rate (held-out) | On the first attempt | Hard tasks only | Avg attempts | Model calls (scored tasks) | Tokens (scored tasks) |
+|---|---|---|---|---|---|---|
+| loop | 14% (3/21) | 10% | 0% (0/5) | 3.62 | 76 | 173,153 |
+| loop+memory | **INCOMPLETE** (14/21 tasks answered; stopped early or hit API errors, so no result) | | | | | |
+
+Paired comparisons (same tasks; interval = bootstrap over tasks):
+
+- **Retries (loop mode):** first attempt passes 10%, after retries 14% (+4.8 pp, 95% interval +0.0 pp to +14.3 pp; the interval includes zero, so this is not distinguishable from no effect). Of 21 task runs, 19 failed the first attempt and 1 of those were repaired by the retries. The first attempt of this mode is the same request as the no-retry baseline, so the comparison is within the same runs.
+
+Raw data: `results/20261022-181346-openai.json`

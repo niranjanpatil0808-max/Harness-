@@ -111,7 +111,7 @@ It works for **one person** (a founder, a builder) who wants a few agents they c
 
 ## Research: the harness for weak models
 
-The repository started as an experiment: can a small open model fix more bugs if it retries against tests, learns from its mistakes and sees only the relevant code? The honest answer so far is "a little": retrying repaired 2 of 21 held-out tasks on one model, and memory and the context graph showed no measurable effect. That work is kept as research, and parts of it (memory, the code verifier, the context graph, the model adapter) power the product. See [research/README.md](research/README.md) and [RESULTS.md](RESULTS.md).
+The repository started as an experiment: can a small open model fix more bugs if it retries against tests, learns from its mistakes and sees only the relevant code? The honest answer so far is "a little": retrying repaired every first-attempt failure we saw (8 of 8 on two models, a small number), the context graph cut prompt size by about 45% on large projects without hurting the tasks that were solved, and memory still has no measured effect. That work is kept as research, and parts of it (memory, the code verifier, the context graph, the model adapter) power the product. See [research/README.md](research/README.md) and [RESULTS.md](RESULTS.md).
 
 ## Credits and inspirations
 
