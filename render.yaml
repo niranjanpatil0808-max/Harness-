@@ -11,5 +11,7 @@ services:
       - key: KINTSUGI_TOKEN
         generateValue: true
       # No model key is needed here: after you sign in, the app opens Settings > Models and you paste your own key there.
+      - key: KINTSUGI_TRUST_PROXY   # Render puts its own proxy in front, which sets X-Forwarded-For (never set this when the port is exposed directly)
+        value: "1"
       - key: KINTSUGI_DAILY_CALLS
         value: "300"

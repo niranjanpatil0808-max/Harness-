@@ -940,8 +940,8 @@ class Workspace:
         self._require_room(room)
         parse_cron(cron)
         mine = self.db.one("SELECT COUNT(*) AS n FROM jobs WHERE owner = ?", (owner,))["n"]
-        if mine >= 20 or self.db.one("SELECT COUNT(*) AS n FROM jobs")["n"] >= 100:
-            raise WorkspaceError("too many schedules (20 per person, 100 in all): delete some first")
+        if (owner != "you" and mine >= 20) or self.db.one("SELECT COUNT(*) AS n FROM jobs")["n"] >= 100:
+            raise WorkspaceError("too many schedules (20 per teammate, 100 in all): delete some first")
         return self.db.execute("INSERT INTO jobs (agent, room, cron, prompt, kind, title, owner) VALUES (?, ?, ?, ?, ?, ?, ?)",
                                (agent, room, cron, prompt, kind, title[:120], owner))
 

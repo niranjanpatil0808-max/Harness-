@@ -67,7 +67,9 @@ async function act(fn, ok) { try { const r = await fn(); if (ok) toast(ok); awai
 function md(text) {
   const box = h("div", {class: "body"});
   if (!window.marked || !window.DOMPurify) { box.style.whiteSpace = "pre-wrap"; box.textContent = text; return box; }
-  box.innerHTML = DOMPurify.sanitize(marked.parse(text, {gfm: true, breaks: true}));
+  // Text from a model or a person must never be able to restyle or imitate the app (hide an approval card, cover the screen, fake a form):
+  // no <style>, forms, frames or inline styles, and no ids/classes that the app's own styles or scripts could be matched by.
+  box.innerHTML = DOMPurify.sanitize(marked.parse(text, {gfm: true, breaks: true}), {FORBID_TAGS: ["style", "form", "input", "button", "select", "textarea", "link", "meta", "iframe", "frame", "object", "embed", "svg", "math", "base", "title"], FORBID_ATTR: ["style", "id", "name", "class", "form", "formaction"]});
   box.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener noreferrer"; });
   box.querySelectorAll("pre").forEach((pre) => {
     const code = pre.textContent;
@@ -242,6 +244,8 @@ function renderInline() {
       const code = args.code !== undefined ? args.code : JSON.stringify(args, null, 2);
       return h("div", {class: "perm"}, h("h5", {}, a.agent + " wants to use " + a.tool),
         h("div", {class: "meta"}, sandboxLine(a.tool)),
+        args.secrets && args.secrets.length ? h("div", {class: "meta"}, "It will be GIVEN these secrets (the code could print or send them): " + args.secrets.join(", ")) : null,
+        a.tool === "publish_app" ? h("div", {class: "meta"}, "This publishes a web page people can open from this workspace. Never type passwords or tokens into agent-made pages.") : null,
         h("pre", {}, code.length > 20000 ? code.slice(0, 20000) + "\n…(truncated)" : code),
         a.requested_by && a.requested_by !== me().name ? h("div", {class: "meta"}, "Asked by " + a.requested_by) : null,
         a.can_decide === false ? h("div", {class: "meta"}, "Waiting for " + (S.state.approval_policy === "admins" ? "an admin" : "someone allowed") + " to decide.")
@@ -512,7 +516,7 @@ async function generalPanel() {
     h("div", {style: "margin-top:12px"}, h("button", {class: "btn", onclick: () => { speak("Hello! This is how I sound."); }}, "Test voice")),
     h("h4", {style: "margin:18px 0 4px"}, "Your account"), h("p", {style: "margin:4px 0"}, "Signed in as ", h("strong", {}, me().name), " (" + me().role + ")."),
     h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, !isOwner() ? h("button", {class: "btn", onclick: () => confirmDialog("Make a new sign-in token?", "Your old token stops working at once, including on your other devices. This device switches to the new one.", "Make a new token", async () => { try { const r = await api("/api/me/token", {}); S.token = r.token; store.set("kt-token", S.token); try { sessionStorage.setItem("kt", S.token); } catch (e) { /* ok */ } toast("New token saved on this device"); } catch (e) { toast(e.message, true); } })}, "Make a new sign-in token") : null,
-      h("button", {class: "btn", onclick: () => confirmDialog("Sign out on this device?", isOwner() ? "You will need the access token to come back." : "You will need a new invite (or your token) to come back.", "Sign out", () => { store.set("kt-token", ""); try { sessionStorage.removeItem("kt"); } catch (e) { /* ok */ } location.reload(); })}, "Sign out on this device")));
+      h("button", {class: "btn", onclick: () => confirmDialog("Sign out on this device?", isOwner() ? "You will need the access token to come back." : "You will need a new invite (or your token) to come back.", "Sign out", () => { store.set("kt-token", ""); try { sessionStorage.removeItem("kt"); Object.keys(localStorage).filter((k) => k.startsWith("kt-draft-") || k === "kt-seen").forEach((k) => localStorage.removeItem(k)); } catch (e) { /* ok */ } location.reload(); })}, "Sign out on this device")));
 }
 
 /* ---------- settings: integrations (GitHub, Slack, Calendar, Gmail) ---------- */
@@ -1008,6 +1012,13 @@ function setupMobile() {
     tracking = "";
   }, {passive: true});
 }
+async function confirmSignIn(incoming) {
+  let who = "another account";
+  try { const r = await fetch("/api/me", {headers: {"X-Token": incoming}}); if (r.ok) { const d = await r.json(); who = d.name + " (" + d.role + ")"; } else { toast("That sign-in link is not valid", true); poll(true); return; } } catch (e) { /* show the generic wording */ }
+  dialog("Sign in as " + who + "?", "This link would replace the account this browser is signed in as. Only continue if you trust whoever sent it: they would be able to read what you type here.", h("div", {}),
+    (close) => [h("button", {class: "btn", onclick: () => { close(); poll(true); }}, "Keep my current sign-in"), h("button", {class: "btn primary", onclick: () => { S.token = incoming; store.set("kt-token", incoming); try { sessionStorage.setItem("kt", incoming); } catch (e) { /* ok */ } close(); poll(true); }}, "Sign in as " + who)],
+    () => poll(true));
+}
 function joinDialog(code) {
   const name = h("input", {type: "text", placeholder: "your name, e.g. sam", "aria-label": "Your name", autocapitalize: "none", autocomplete: "off"});
   const note = h("p", {class: "muted", style: "min-height:20px;margin:6px 0 0"});
@@ -1031,8 +1042,12 @@ function init() {
   if (inv) { S.invite = decodeURIComponent(inv[1]); history.replaceState(null, "", location.pathname); }
   if (new URLSearchParams(location.search).get("action") === "new") { S.wantNew = true; history.replaceState(null, "", location.pathname + location.hash); }
   const m = location.hash.match(/token=([^&]+)/);
-  if (m) { S.token = decodeURIComponent(m[1]); store.set("kt-token", S.token); history.replaceState(null, "", location.pathname); }
-  else S.token = store.get("kt-token") || "";
+  S.token = store.get("kt-token") || "";
+  if (m) {
+    const incoming = decodeURIComponent(m[1]); history.replaceState(null, "", location.pathname);
+    if (!S.token || S.token === incoming) { S.token = incoming; store.set("kt-token", S.token); }
+    else S.pendingToken = incoming;  // someone else's link must not silently replace who you are signed in as
+  }
   if (store.get("kt-collapsed")) $("#app").classList.add("collapsed");
   $("#scrim").addEventListener("click", closeSidebarMobile);
   $("#scroll").addEventListener("scroll", () => { const s = $("#scroll"); if (s.scrollHeight - s.scrollTop - s.clientHeight < 90) $("#jump").hidden = true; }, {passive: true});
@@ -1041,6 +1056,7 @@ function init() {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { syncUnread(); poll(true); } });
   buildComposer(); syncVoiceButtons(); $("#sidebar").replaceChildren(h("div", {class: "brand"}, h("img", {src: "/static/logo.svg", alt: ""}), "Kintsugi"));
   if (S.invite) { S.token = ""; joinDialog(S.invite); return; }  // an invite link: choose a name first
+  if (S.pendingToken) { confirmSignIn(S.pendingToken); return; }
   poll(true);
 }
 init();

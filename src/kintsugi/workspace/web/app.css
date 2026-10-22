@@ -67,7 +67,7 @@ button{cursor:pointer;background:none;border:0;padding:0}
 .bubble{background:var(--bubble);padding:10px 16px;border-radius:18px;max-width:85%;white-space:pre-wrap;overflow-wrap:anywhere}
 .who-line{font-size:13px;font-weight:600;margin-bottom:2px;display:flex;gap:8px;align-items:baseline}
 .who-line time{font-weight:400;color:var(--muted);font-size:12px}
-.body{min-width:0;flex:1;overflow-wrap:anywhere}
+.body{min-width:0;flex:1;overflow-wrap:anywhere;contain:paint;isolation:isolate}
 .body>:first-child{margin-top:0}.body>:last-child{margin-bottom:0}
 .body p{margin:.6em 0}.body ul,.body ol{padding-left:1.4em}.body a{color:var(--accent)}
 .body h1,.body h2,.body h3{font-family:var(--serif);font-weight:500;margin:1em 0 .4em;line-height:1.3}

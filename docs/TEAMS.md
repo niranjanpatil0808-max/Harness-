@@ -53,4 +53,14 @@ recorded with the name of whoever decided.
 - The owner can read everything, including other people's private chats.
 - Tokens and invite links travel through the browser: use HTTPS (hosting platforms provide it). There is no email check, password
   reset or single sign-on; losing a token means asking for a new invite.
+- **Integration and plugin tools run for anyone who can talk to an agent they are switched on for.** If you switch GitHub, Slack, Gmail or
+  Calendar on for an agent, any member of a room that agent is in can ask it to read from them. Switch integrations on only for agents
+  (and rooms) whose members you are comfortable sharing that data with.
+- **Admins** can add themselves to any shared room, read agent files and lessons, and approve risky actions in rooms they belong to,
+  but cannot read other people's private chats, tool arguments in the log, or approvals from chats they are not part of. Code that would
+  run with the server's own rights, or that is handed secret values, can only be approved by the owner; only the owner can make an agent that
+  never asks, turn on lesson sharing, or delete a private chat.
+- **Published agent apps** are shown on the workspace's address. A page made by an agent can look like anything, so never type passwords or
+  tokens into one (the approval card for publishing says so).
+- Limits per person: 30 messages a minute, 20 schedules, 20 notification devices.
 - Tested with scripted tests and two real browsers on one machine, not yet with a real group over a real deployment.
