@@ -244,6 +244,11 @@ class TestApprovalPolicy(Base):
         self.invite_and_join("kim")
         self.invite_and_join("ada", "admin")
         self.ws.sync = True  # run agents inline so the approval exists as soon as the message is posted
+        # These tests are about who may decide, not about this machine's sandbox: pretend code is isolated. (Without isolation only the
+        # owner may approve run_python, which is tested separately; CI machines have no sandbox.)
+        patcher = mock.patch("kintsugi.workspace.sandbox.status", return_value={"backend": "namespaces", "isolated": True, "network_blocked": True, "note": "test"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def pending(self, who):
         return self.call(who, "GET", "/api/state")[1]["approvals"]
