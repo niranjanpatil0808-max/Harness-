@@ -1,11 +1,55 @@
-# Kintsugi (working name)
+<h1 align="center">Kintsugi</h1>
+<p align="center"><b>A team of safe AI agents you run yourself, from your phone, on your own API key.</b></p>
 
-**A phone-first assistant you can trust with real work, running on your own API key.** AI agents that remember, work in parallel and on a schedule, go online only if you allow it, take plugins, ask before they do anything risky, run your code in a locked box, and only change themselves when a measurement says it helps. Use any model provider: you paste your key, nothing is sold or hosted for you.
+<p align="center">
+  <a href="https://github.com/niranjanpatil0808-max/KINTSUGI/actions/workflows/ci.yml"><img alt="tests" src="https://github.com/niranjanpatil0808-max/KINTSUGI/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-blue">
+  <img alt="python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue">
+  <img alt="runtime dependencies: none" src="https://img.shields.io/badge/runtime%20dependencies-none-brightgreen">
+  <img alt="bring your own key" src="https://img.shields.io/badge/AI%20provider-bring%20your%20own%20key-orange">
+</p>
 
-> Built for the Meta Global AI Developer Hackathon (Indie developer track). Python standard library only (plus two small web libraries bundled for the interface).
-> The name is a placeholder and will change.
+<p align="center">
+  <img src="docs/img/chat-approval.png" alt="A chat in Kintsugi: the agent asks to run code and the approval card shows exactly what will run" width="78%">
+  <img src="docs/img/phone-chat.png" alt="The same workspace on a phone" width="17%">
+</p>
+<p align="center"><sub>Screenshots use the built-in scripted demo model, so they show the app, not a real model's answers.</sub></p>
 
-## Where things stand
+Founders and small teams get a shared room full of AI agents that **remember, work in parallel, work on a schedule, take tasks from anyone on the team, and learn how each person likes to work**. They ask before anything risky, run code in a locked box, go online only if you allow it, and show you what they cost. You paste your own key (OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Ollama or any OpenAI-style address). Nothing is hosted or sold for you, and your data stays on your server.
+
+> Built for the Meta Global AI Developer Hackathon (Indie developer track). Python standard library only; two small web libraries are bundled for the interface. "Kintsugi" is a working name.
+
+## Why it is different
+
+| | |
+|---|---|
+| **Team first** | Invite teammates with single-use links. Shared rooms, private chats, a **task board** (give an agent a job, everyone follows it to done), **Share** an answer into a room, @mentions. |
+| **Gets to know you** | Each agent learns every person's reply style and work context over time (👍/👎 and their own messages). You can see, edit, clear or switch it off. Work context stays in private chats. |
+| **Safe by default** | Risky actions wait for approval and show the full code. Approved code runs with no network and sees only its own folder. A daily call limit protects your quota. |
+| **Your key, your cost** | Any provider, one place to switch. A usage page shows calls, tokens and an estimated cost from prices you enter. |
+| **Internet is a switch** | Each agent is Off, Ask each time, or Allow. Plugins add skills and web tools, previewed in full before install. |
+| **Phone first** | Installable app, works as an offline shell, voice in and out, push notifications that never contain your message. |
+
+<p align="center">
+  <img src="docs/img/team-tasks.png" alt="The team task board" width="48%">
+  <img src="docs/img/settings-usage.png" alt="The usage dashboard" width="48%">
+</p>
+
+## Quick start
+
+```bash
+git clone https://github.com/niranjanpatil0808-max/KINTSUGI.git && cd KINTSUGI
+pip install -e .
+kintsugi workspace serve        # prints a link with your access token
+```
+
+Open the link on your computer or phone. A short setup asks for your provider and **your own API key**, tests it, and offers a starter team. Keys are stored in your keychain, never shown again, and only sent to that provider. No computer? Open the repository in a GitHub Codespace, or follow [docs/HOSTING.md](docs/HOSTING.md) (Render, Docker). Try it offline first: `python examples/workspace_demo.py`.
+
+## Read more
+
+[Teams](docs/TEAMS.md) · [Security and its limits](SECURITY.md) · [Phone](docs/PHONE.md) · [Plugins](docs/PLUGINS.md) · [Integrations](docs/INTEGRATIONS.md) · [Hosting](docs/HOSTING.md) · [Self-improvement](docs/SELF_IMPROVEMENT.md) · [Contributing](CONTRIBUTING.md)
+
+## What works, and what has been verified
 
 | | Status |
 |---|---|
@@ -37,22 +81,7 @@ Rows marked planned do not exist yet. This table is updated as each one lands, a
 
 ## What it is for
 
-It works for **one person** (a founder, a builder) who wants a few agents they can actually trust, and for a **small team**: the owner invites teammates with single-use links, gives them a role, and they get their own logins, private chats and shared rooms. Agents cannot run harmful code without approval, cannot see your other files or the network when they run code, cannot overspend your model quota, and everything they know and do can be seen and deleted. What a team still lacks: per-person agent memory (agents share one memory among everyone who talks to them), single sign-on, and integrations beyond GitHub, Slack, Calendar and Gmail.
-
-## Quick start
-
-```bash
-git clone https://github.com/niranjanpatil0808-max/KINTSUGI.git && cd KINTSUGI
-pip install -e .
-python -m unittest discover -s tests         # 250+ offline tests
-python examples/workspace_demo.py            # an offline tour, no key needed (a recording: docs/demo.html)
-
-kintsugi workspace serve                     # creates a starter team and prints a link with your access token
-```
-
-Open the link on your computer or phone. The app opens **Settings > Models** the first time: pick your provider (OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Together, Ollama, or any OpenAI-style address), paste **your own API key**, press Test. The key is stored in your keychain, never shown again, and only sent to that provider. (Server-side settings `KINTSUGI_API_KEY` / `KINTSUGI_BASE_URL` / `KINTSUGI_MODEL` still work as a fallback.)
-
-**On a phone with no computer:** open the repository in a GitHub Codespace (Code > Codespaces), or deploy it with the recipes in [docs/HOSTING.md](docs/HOSTING.md). Add your key as a secret, never in a chat or in the repository.
+It works for **one person** (a founder, a builder) who wants a few agents they can actually trust, and for a **small team**: the owner invites teammates with single-use links, gives them a role, and they get their own logins, private chats and shared rooms. Agents cannot run harmful code without approval, cannot see your other files or the network when they run code, cannot overspend your model quota, and everything they know and do can be seen and deleted. What a team still lacks: single sign-on, a fully separate memory per person (files an agent writes and its lessons from mistakes are shared; chat notes, uploads and summaries are kept per chat), and integrations beyond GitHub, Slack, Calendar and Gmail.
 
 ## How it keeps you safe
 
@@ -69,10 +98,11 @@ Open the link on your computer or phone. The app opens **Settings > Models** the
 
 ## Honest limitations
 
+- **Nothing has been tried at scale with real services yet.** Providers, push services, GitHub, Slack, Google and real phones were tested only against fakes and a phone-sized browser, and no real team has used it. Treat it as a strong beta.
 - **Real-model reliability is unproven.** On the first real runs a tiny model (`allam-2-7b`) completed 6 of 15 practice tasks, and made up answers rather than running tools until safeguards were added. Better models should do better, but that has not been measured. No Meta model has been tested yet.
 - **The benefit of lessons and self-improvement is not measured** on real conversations. Tests show the mechanisms work, not that they make an agent better.
 - **Free hosting loses data** when the service restarts unless you turn on the encrypted backup (needs a private GitHub repo and a passphrase you must not lose).
-- **The owner token is one shared secret; no TLS of its own** (hosting platforms provide it). Teammates get their own logins, but agents share one memory per agent.
+- **The owner token is one shared secret; no TLS of its own** (hosting platforms provide it). Teammates get their own logins and the security work has been reviewed by independent AI reviewers, but it has not had a human professional audit.
 - **The practice suite is small.** A difference of a few points is noise.
 - Everything the measured research showed, and did not show, is in [research/README.md](research/README.md).
 
@@ -101,11 +131,12 @@ Ideas only; all code here is written from scratch. Licenses were checked on each
 
 ```
 src/kintsugi/workspace/   the product: core.py agents.py tools.py perms.py sandbox.py keychain.py scheduler.py backup.py
-                          server.py db.py dojo.py improve.py cli.py  web/ (the interface)
+                          server.py db.py team.py tasks.py personal.py compact.py uploads.py providers.py plugins.py
+                          integrations.py dojo.py improve.py cli.py  web/ (app.js, extras.js, app.css: the interface)
 src/kintsugi/             engine modules the product reuses: model.py memory.py graph.py loop.py verifier.py
-SECURITY.md  Dockerfile  render.yaml  .devcontainer/  docs/ (PHONE, WORKSPACE, HOSTING, SELF_IMPROVEMENT, demo.html)
+SECURITY.md  CONTRIBUTING.md  Dockerfile  render.yaml  .devcontainer/  docs/ (TEAMS, PHONE, PLUGINS, INTEGRATIONS, HOSTING, STATUS...)
 examples/                 workspace_demo.py, smoke and model-comparison scripts
-tests/                    offline tests (python -m unittest discover -s tests) and tests/ui (browser tests)
+tests/                    ~550 offline tests (python -m unittest discover -s tests) and tests/ui (19 browser suites)
 research/                 the original weak-model experiment (write-up); benchmark/, results/ and RESULTS.md move here soon
 ```
 
