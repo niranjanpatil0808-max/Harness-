@@ -39,6 +39,22 @@ class TestParseReply(unittest.TestCase):
         calls, _ = parse_reply('```tool\n{"args": {}}\n```')
         self.assertIn("_error", calls[0])
 
+    def test_small_models_that_skip_the_code_fence_are_understood(self):
+        calls, plain = parse_reply('write_file {"path": "notes.txt", "content": "hello"}')
+        self.assertEqual(calls, [{"tool": "write_file", "args": {"path": "notes.txt", "content": "hello"}}])
+        self.assertEqual(plain, "")
+        calls, plain = parse_reply('Sure.\nread_file {"path": "x"}\nThen I will answer.')
+        self.assertEqual([c["tool"] for c in calls], ["read_file"])
+        self.assertEqual(plain, "Sure.\n\nThen I will answer.")
+        self.assertEqual(parse_reply('{"tool": "list_files", "args": {}}')[0], [{"tool": "list_files", "args": {}}])
+        self.assertEqual(parse_reply('tool: remember {"text": "hi"}')[0][0]["tool"], "remember")
+
+    def test_unfenced_parsing_does_not_fire_on_prose_code_or_unknown_names(self):
+        for reply in ('You could call write_file {"path": "a"} yourself.',
+                      '```python\nwrite_file {"path": "a"}\n```',
+                      'unknown_tool {"a": 1}', 'write_file {not json}', '{"just": "data"}'):
+            self.assertEqual(parse_reply(reply)[0], [], reply)
+
     def test_several_calls(self):
         calls, _ = parse_reply(tool("list_files") + "\n" + tool("remember", text="x"))
         self.assertEqual([c["tool"] for c in calls], ["list_files", "remember"])

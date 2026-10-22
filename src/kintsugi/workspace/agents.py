@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 from kintsugi.memory import MemoryStore, tokens
 
-from .tools import Ctx, describe_tools, execute
+from .tools import TOOLS, Ctx, describe_tools, execute
 
 if TYPE_CHECKING:
     from .core import Workspace
@@ -30,7 +30,7 @@ FENCE_RE = re.compile(r"```([a-zA-Z]*)[ \t]*\n(.*?)```", re.S)
 SYSTEM = """You are {name}, an AI assistant in a shared workspace. {persona}
 You work in rooms with people and other agents. Be brief and useful.
 
-To use a tool, reply with a block like this (at most {max_tools} blocks per reply):
+To use a tool, reply with a block like this, INCLUDING the three backticks (at most {max_tools} blocks per reply):
 ```tool
 {{"tool": "write_file", "args": {{"path": "notes.txt", "content": "hello"}}}}
 ```
@@ -106,8 +106,52 @@ def parse_reply(reply: str) -> tuple[list[dict], str]:
             return ""
         return match.group(0)
 
-    plain = FENCE_RE.sub(take, reply).strip()
-    return calls, plain
+    plain = FENCE_RE.sub(take, reply)
+    plain = _take_unfenced(plain, calls)
+    return calls, plain.strip()
+
+
+UNFENCED_RE = re.compile(r"^[ \t]*(?:tool[ \t]*:[ \t]*)?([a-z_]+)[ \t]*[(:]?[ \t]*(?=\{)", re.M)
+BARE_RE = re.compile(r"^[ \t]*(?=\{)", re.M)
+FENCED_SPAN_RE = re.compile(r"(```.*?```)", re.S)
+
+
+def _take_unfenced(text: str, calls: list[dict]) -> str:
+    """Small models often skip the code fence and write `write_file {"path": ...}` or a bare tool JSON line.
+    Accept those, but only outside code blocks and only for tool names that exist."""
+    decoder = json.JSONDecoder()
+    out = []
+    for index, piece in enumerate(FENCED_SPAN_RE.split(text)):
+        if index % 2:  # a code block that was not a tool call: leave it alone
+            out.append(piece)
+            continue
+        position, kept = 0, []
+        while True:
+            named = UNFENCED_RE.search(piece, position)
+            bare = BARE_RE.search(piece, position)
+            match = min((m for m in (named, bare) if m), key=lambda m: m.start(), default=None)
+            if match is None:
+                break
+            try:
+                data, end = decoder.raw_decode(piece, match.end())
+            except json.JSONDecodeError:
+                kept.append(piece[position:match.end()])
+                position = match.end()
+                continue
+            name = match.group(1) if match is named else None  # None: a bare {"tool": ...} object
+            if name is not None and name in TOOLS and isinstance(data, dict):
+                calls.append({"tool": name, "args": data})
+            elif name is None and isinstance(data, dict) and isinstance(data.get("tool"), str):
+                calls.append({"tool": data["tool"], "args": data.get("args", {})})
+            else:
+                kept.append(piece[position:end])
+                position = end
+                continue
+            kept.append(piece[position:match.start()])
+            position = end
+        kept.append(piece[position:])
+        out.append("".join(kept))
+    return "".join(out)
 
 
 def build_context(ws: "Workspace", room: str, message_id: int, lessons_text: str, notes: list[dict]) -> str:
