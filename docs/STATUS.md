@@ -140,3 +140,35 @@ Done and pushed (commit "Settings page, usage dashboard, setup wizard, ..."):
 Still open from QA list: toast position on phone, numeric clamp messages ("Saved (limit set to N)"), schedule "server's clock" text.
 Next: security round 2 (3 independent reviewers launched: new backend endpoints; web frontend/XSS/headers; backup/sandbox/scheduler/
 published apps). Fix confirmed findings with regression tests, rerun everything, push, then report to the user.
+
+## Security round 2, reviewer A (new backend) — CONFIRMED, FIX CHECKLIST (PoCs in /tmp/rev1/*.py while the container lives)
+1. HIGH stop race: core._run sets _busy_room/_stop before taking the per-agent lock and clears them in finally -> a queued 2nd run
+   overwrites room (member stops agent in owner's private chat) and loses stops. Fix: per-run bookkeeping set/cleared inside the lock; /api/stop also checks can_use_agent.
+2. MED compact race: summary written after forget() (delete room / remove person / purge / switch off) -> old DM summary inherited by a
+   new person with the same name. Fix: generation counter bumped by forget; re-check room exists + enabled + rows exist before write.
+3. MED uploads follow symlinks (uploads dir or dangling file symlink planted by agent code) -> writes outside agent folder. Fix: refuse symlinked dir, safe_path, os.open O_EXCL|O_NOFOLLOW.
+4. MED admin resets member token -> reads member's DMs. Fix: reset gives an invite-style link only the owner sees? Decision: owner-only reset (admins: ask owner) + system notice.
+5. MED uploads shared per agent across rooms: admin can download a member's DM upload; other rooms' members get it via read_file. Fix: uploads/<room>/, download only if viewer can see that room, read_file of uploads/<other room> refused for the run's room.
+6. LOW /api/state busy/activity leaks agents working in rooms you can't see. Filter by busy_room visibility.
+7. LOW uploads 20 MB cap vs agent folder 5 MB -> fills folder. Count uploads in the same 5 MB cap.
+8. LOW template half-applied when a person owns an agent name. Check names up front.
+Unconfirmed: summary needs <summary> tags; scrub only replying agent's secrets; /api/find unthrottled.
+
+## Security round 2, reviewer B (web frontend) — CONFIRMED, FIX CHECKLIST (scripts /tmp/rev2/)
+1. HIGH approval card shows args.code for ANY tool -> agent adds a decoy "code" key to schedule/publish_app/plugin POST/slack post; real args hidden.
+   Fix: server drops undeclared args before storing approval; card renders every arg by key; code specially only for run_python.
+2. MED card truncates code >20k chars but full code runs. Fix: server refuses approvable args > limit (e.g. 20k); card shows size warning above, disables Allow if truncated.
+3. FUNC exportChat only gets newest 50 (history returns newest 50 after id). Fix: /api/messages?before= / ascending mode.
+Unconfirmed: silent sign-in from #token link on a device with no token (login CSRF) -> always confirm naming the account;
+#invite overwrites existing sign-in without confirm; long-lived token in links (prefer one-time code); sessionStorage copy unused;
+APP_CSP lacks frame-ancestors 'none'.
+
+## Security round 2, reviewer C (backup/sandbox/scheduler) — CONFIRMED, FIX CHECKLIST (PoCs /tmp/rev3/)
+1. CRITICAL sandbox.run_python: if sandboxed code prints exactly "namespaces unavailable", it is re-run UNISOLATED (as root). Fix: explicit flag, never output-based fallback.
+2. HIGH decide() runs with situation "approval#N"; requester_of treats N as a MESSAGE id -> wrong requester (owner) -> cross-room guard skipped. Fix: use approvals.requested_by; requester_of only for "room#msgid".
+3. HIGH schedule tool creates jobs with owner "you" -> member-induced jobs run with owner authority, survive member removal. Fix: owner = real requester; refuse if none.
+4. HIGH backup restore leaves 0755/0644 modes (db world-readable; drop-user sandbox reads db). Fix: re-lock tree after unpack.
+5. MED FIFO in agent folder -> backup unrestorable. Fix: snapshot keeps only regular files/dirs.
+6. MED run_python cap bypass via back-dated mtime. Fix: snapshot pre-run file set; remove new/changed files regardless of mtime.
+Notes: published apps sound; DST skipped-hour miss (low); backup rollback needs passphrase (low).
+Progress on A/B/C fixes: A1 A2 A3 A5 A6 A7 done (uploads now outside agent folder, per chat) + summary tags; remaining below.

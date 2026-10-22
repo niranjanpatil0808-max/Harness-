@@ -21,7 +21,7 @@ from typing import Callable
 from kintsugi.memory import tokens
 from kintsugi.model import Model, ModelInfraError, ModelRequestError, OpenAIAdapter, QuotaExhausted
 
-from . import compact, perms, providers
+from . import compact, perms, providers, tasks, uploads
 from .db import Database
 from .keychain import Keychain
 
@@ -731,6 +731,8 @@ class Workspace:
         for table in ("notes", "jobs", "approvals", "proposals"):
             self.db.execute(f"DELETE FROM {table} WHERE agent = ?", (name,))
         self._clear_agent_grants(name)
+        tasks.forget_agent(self, name)
+        uploads.forget_agent(self, name)
         self.db.execute("DELETE FROM messages WHERE sender = ?", (name,))
         compact.forget(self)  # summaries may quote what it wrote
         self.db.execute("DELETE FROM members WHERE member = ?", (name,))
@@ -758,6 +760,8 @@ class Workspace:
             self.db.execute(f"DELETE FROM {table} WHERE room = ?", (room,))
         self.db.execute("DELETE FROM rooms WHERE name = ?", (room,))
         compact.forget(self, room)
+        tasks.forget_room(self, room)
+        uploads.forget_room(self, room)
         self.audit(None, "room-deleted", room)
 
     def purge_messages(self, older_than_days: float) -> int:
@@ -853,8 +857,8 @@ class Workspace:
                              (room, after, limit))
         return list(reversed(rows))
 
-    def post(self, room: str, sender: str, text: str, hops: int = 0, human: bool = False) -> int:
-        """Add a message and wake the agents it is addressed to. `human=True` forbids posing as an agent."""
+    def post(self, room: str, sender: str, text: str, hops: int = 0, human: bool = False, wake: bool = True) -> int:
+        """Add a message and wake the agents it is addressed to. `human=True` forbids posing as an agent; `wake=False` only shows it."""
         kind = self._require_room(room)["kind"]
         text = text.strip()
         if not text:
@@ -874,12 +878,37 @@ class Workspace:
                                      (room, sender, text, self.clock(), hops))
         if is_agent:
             self.notify_if_away("message", [m for m in self.members(room) if self.team.is_person(m)])
+        else:  # a person @mentioned by a teammate gets a nudge too
+            named = [m for m in set(MENTION_RE.findall(text)) if m != sender and m in self.members(room) and self.team.is_person(m)]
+            if named:
+                self.notify_if_away("mention", named)
+        if not wake:
+            return message_id
         for agent in self._targets(room, kind, sender, text):
             if hops >= MAX_HOPS:
                 self.audit(agent, "loop-guard", f"{room}: not waking {agent} after {hops} hops")
                 continue
             self._dispatch(agent, room, message_id, hops + 1)
         return message_id
+
+    def share(self, message_id: int, room: str, sender: str) -> int:
+        """Copy a message (say, a good answer from a private chat) into a room, credited, without waking anyone."""
+        src = self.db.one("SELECT * FROM messages WHERE id = ?", (int(message_id),))
+        if src is None:
+            raise WorkspaceError("no such message")
+        origin = self._require_room(src["room"])
+        if origin["kind"] == "dm":
+            where = "a private chat with " + (", ".join(m for m in self.members(src["room"]) if m != sender) or "an agent")
+        else:
+            where = "#" + src["room"]
+        head = f"Shared by {sender} from {where} ({src['sender']} wrote):\n\n"
+        quoted = "\n".join("> " + line for line in src["text"].splitlines())
+        room_kind = self._require_room(room)["kind"]
+        if room_kind == "dm" and sender not in self.members(room):
+            raise WorkspaceError("you can only share into chats you are part of")
+        mid = self.post(room, sender, (head + quoted)[:MAX_MESSAGE_CHARS], human=True, wake=False)
+        self.audit(None, "shared", f"message {src['id']} from {src['room']} to {room} by {sender}")
+        return mid
 
     def _targets(self, room: str, kind: str, sender: str, text: str) -> list[str]:
         members = set(self.members(room))
@@ -927,25 +956,42 @@ class Workspace:
     def _run(self, agent: str, room: str, message_id: int, hops: int) -> None:
         from .agents import run_agent
 
-        with self._lock:
-            self._busy.add(agent)
-            self._busy_room[agent] = room
-            self._stop.discard(agent)
-            self._activity[agent] = "thinking"
-        try:
-            with self._agent_locks[agent]:
+        with self._agent_locks[agent]:
+            # who is working where is recorded only by the run that holds the agent's lock, so a queued message can never
+            # change the room a Stop is checked against, or clear a Stop meant for the run in progress
+            with self._lock:
+                before = (agent in self._busy, self._busy_room.get(agent), agent in self._stop, self._activity.get(agent))
+                self._busy.add(agent)
+                self._busy_room[agent] = room
+                self._stop.discard(agent)
+                self._activity[agent] = "thinking"
+            try:
+                outcome = "failed"
                 try:
+                    tasks.started(self, agent, message_id)
                     run_agent(self, agent, room, message_id, hops)
+                    outcome = "ran"
                 except (ModelInfraError, QuotaExhausted, ModelRequestError, RuntimeError) as err:
                     self._run_failed(agent, room, hops, f"{agent} could not get an answer from the model: {err}", err)
                 except Exception as err:  # a bug must show up in the room, never vanish on a worker thread
                     self._run_failed(agent, room, hops, f"{agent} hit an internal error: {type(err).__name__}: {err}", err)
-        finally:
-            with self._lock:
-                self._busy.discard(agent)
-                self._stop.discard(agent)
-                self._activity.pop(agent, None)
-                self._busy_room.pop(agent, None)
+                try:
+                    tasks.finish(self, agent, room, message_id, outcome, self.stop_requested(agent))
+                except Exception as err:  # the board is a view: it must never break a run
+                    self.audit(agent, "task-error", f"{type(err).__name__}: {str(err)[:150]}")
+            finally:
+                with self._lock:
+                    was_busy, was_room, was_stopped, was_activity = before
+                    if was_busy:  # a nested run (synchronous mode, A -> B -> A): give the outer run its state back
+                        self._busy_room[agent] = was_room
+                        self._activity[agent] = was_activity or "thinking"
+                        if was_stopped:
+                            self._stop.add(agent)
+                    else:
+                        self._busy.discard(agent)
+                        self._stop.discard(agent)
+                        self._activity.pop(agent, None)
+                        self._busy_room.pop(agent, None)
 
     def _run_async(self, agent: str, room: str, message_id: int, hops: int) -> None:
         try:

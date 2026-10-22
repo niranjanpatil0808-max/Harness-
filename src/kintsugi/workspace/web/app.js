@@ -244,9 +244,9 @@ async function attachFile(file, input) {
   if (file.size > 1_500_000) { toast("That file is larger than 1.5 MB", true); return; }
   try {
     const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result).split(",")[1] || ""); fr.onerror = reject; fr.readAsDataURL(file); });
-    const r = await api("/api/upload", {agent, name: file.name, data});
+    const r = await api("/api/upload", {agent, room: S.room, name: file.name, data});
     const ta = $("#msg"); ta.value = ((curRoom() || {}).kind === "dm" ? "" : "@" + agent + " ") + "I gave you the file " + r.path + ". " + ta.value; ta.dispatchEvent(new Event("input")); ta.focus();
-    toast("Saved as " + r.path + " in " + agent + "'s files");
+    toast("Gave " + agent + " the file " + r.path + " (only this chat can see it)");
   } catch (e) { toast(e.message, true); }
 }
 async function askAgain(agent) {

@@ -73,7 +73,16 @@ def _text(args: dict, key: str, limit: int = MAX_FILE_BYTES, required: bool = Tr
     return value
 
 
-def _path(ctx: Ctx, value: str) -> Path:
+def _path(ctx: Ctx, value: str, uploads_ok: bool = False) -> Path:
+    from . import uploads
+
+    if uploads.is_upload_path(value):  # files people gave in this chat (kept apart per chat, read-only to the agent)
+        if not uploads_ok:
+            raise ToolError("uploads/ holds files people gave you; it is read-only (write elsewhere in your folder)")
+        try:
+            return uploads.resolve(ctx.ws, ctx.agent, ctx.room, value)
+        except uploads.UploadError as err:
+            raise ToolError(str(err)) from None
     try:
         return safe_path(ctx.ws.files_dir(ctx.agent), value)
     except PathError as err:
@@ -106,15 +115,15 @@ def send_message(ctx: Ctx, args: dict) -> str:
 
 
 def read_file(ctx: Ctx, args: dict) -> str:
-    path = _path(ctx, _text(args, "path", 300))
-    if not path.is_file():
+    path = _path(ctx, _text(args, "path", 300), uploads_ok=True)
+    if path.is_symlink() or not path.is_file():
         raise ToolError("no such file")
     content = path.read_text(errors="replace")
     return content[:MAX_READ_CHARS] + ("\n...(truncated)" if len(content) > MAX_READ_CHARS else "")
 
 
 def list_files(ctx: Ctx, args: dict) -> str:
-    path = _path(ctx, _text(args, "path", 300, required=False) or ".")
+    path = _path(ctx, _text(args, "path", 300, required=False) or ".", uploads_ok=True)
     if not path.is_dir():
         raise ToolError("not a folder")
     entries = sorted(path.iterdir(), key=lambda p: p.name)

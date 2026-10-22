@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import compact, sandbox
+from . import compact, sandbox, tasks
 from .core import Workspace, WorkspaceError
 from .keychain import _write_private
 from .sandbox import PathError, safe_path
@@ -200,6 +200,11 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return self._json(401, {"error": "missing or wrong access token"})
             self._guard(lambda: self._json(200, self._post(url.path, self._body(2_200_000 if url.path == "/api/upload" else MAX_BODY))), url.path)
 
+        def _sees_run(self, agent: str) -> bool:
+            """Whether this person may know that an agent is working right now (and on what): only in chats they can see."""
+            room = ws.busy_room(agent)
+            return room is None or ws.team.can_see_room(self.who, room)
+
         def _rate_limit(self, name: str, limit: int = 30, window: float = 60.0) -> None:
             """One person cannot spend the whole team's model quota with a flood of messages."""
             now = time.time()
@@ -215,7 +220,13 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             from . import uploads
 
             try:
-                name, data = uploads.read_for_download(ws, query["agent"][0], query["path"][0])
+                room = (query.get("room") or [None])[0]
+                if uploads.is_upload_path(query["path"][0]):  # a file someone gave in a chat: only people in that chat get it back
+                    if room is None or not ws.team.can_see_room(self.who, room):
+                        raise Forbidden("that file belongs to a chat you are not part of")
+                elif not self.who.at_least("admin"):
+                    raise Forbidden("only admins can download agents' files")
+                name, data = uploads.read_for_download(ws, query["agent"][0], query["path"][0], room if uploads.is_upload_path(query["path"][0]) else None)
             except uploads.UploadError as err:
                 raise WorkspaceError(str(err)) from None
             safe_name = re.sub(r"[^A-Za-z0-9._ -]", "_", name)[:80]
@@ -293,7 +304,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                                     "integrations": ws.integrations.enabled_for(a["name"])}
                                    for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in rooms],
-                        "approvals": approvals, "jobs": jobs, "busy": ws.busy(), "activity": ws.agent_activity(),
+                        "approvals": approvals, "jobs": jobs, "busy": [a for a in ws.busy() if self._sees_run(a)], "activity": {a: t for a, t in ws.agent_activity().items() if self._sees_run(a)}, "open_tasks": tasks.open_counts(ws, self.who),
                         "sandbox": sandbox.status(), "provider": ws.provider(), "search_configured": ws.search_settings()["configured"], "internet_enabled": ws.internet_settings()["enabled"],
                         "providers": [{"id": p["id"], "label": p["label"], "model": p["model"], "default": p["default"]} for p in ws.providers()["profiles"]] if who.at_least("admin") else [],
                         "model_ready": bool(ws.providers()["profiles"]) or ws.providers()["env_fallback"] or ws.model_factory is not core_mod.default_model_factory,
@@ -316,6 +327,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/find":
                 rooms = None if self.who.role == "owner" else [r["name"] for r in ws.list_rooms() if ws.team.can_see_room(self.who, r["name"])]
                 return ws.find_messages((query.get("q") or [""])[0], rooms)
+            if path == "/api/tasks":
+                return tasks.listing(ws, self.who, (query.get("room") or [None])[0])
             if path == "/api/templates":
                 from . import templates
 
@@ -454,7 +467,10 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                     raise Forbidden("you can only give files to agents you share a chat with")
                 self._rate_limit("upload:" + self.who.name, limit=20)
                 try:
-                    return {"path": uploads.save(ws, agent, str(body.get("name", "")), str(body.get("data", "")))}
+                    room = str(body.get("room") or "")
+                    if not ws.team.can_see_room(self.who, room) or agent not in ws.members(room):
+                        raise Forbidden("give files to an agent in a chat you share with it")
+                    return {"path": uploads.save(ws, agent, str(body.get("name", "")), str(body.get("data", "")), room)}
                 except uploads.UploadError as err:
                     raise WorkspaceError(str(err)) from None
             if path == "/api/templates/apply":
@@ -463,10 +479,27 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return templates.apply(ws, str(body["id"]), self.who.name)
             if path == "/api/team/reset":
                 return {"token": ws.team.reset_token(self.who, str(body["name"]))}
+            if path == "/api/share":
+                self._rate_limit(self.who.name)
+                src = ws.db.one("SELECT room FROM messages WHERE id = ?", (int(body["id"]),))
+                target = str(body["room"])
+                if src is None or not ws.team.can_see_room(self.who, src["room"]):
+                    raise WorkspaceError("no such message")
+                sender = "you" if self.who.role == "owner" else self.who.name
+                if sender not in ws.members(target):
+                    raise Forbidden("you can only share into rooms you belong to")
+                return {"id": ws.share(int(body["id"]), target, sender)}
+            if path == "/api/tasks/create":
+                self._rate_limit(self.who.name)
+                sender = "you" if self.who.role == "owner" else self.who.name
+                return tasks.create(ws, self.who, sender, str(body["room"]), str(body["agent"]), str(body.get("title") or ""))
+            if path == "/api/tasks/update":
+                sender = "you" if self.who.role == "owner" else self.who.name
+                return {"task": tasks.update(ws, self.who, sender, int(body["id"]), str(body["action"]))}
             if path == "/api/stop":
                 agent = str(body["agent"])
                 room = ws.busy_room(agent)
-                if room is not None and not ws.team.can_see_room(self.who, room):
+                if not ws.team.can_use_agent(self.who, agent) or (room is not None and not ws.team.can_see_room(self.who, room)):
                     raise Forbidden("that agent is working in a chat you are not part of")
                 return {"stopping": ws.request_stop(agent)}
             if path == "/api/compaction":  # owner only (not in any role table)

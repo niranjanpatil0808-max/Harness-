@@ -47,6 +47,12 @@ CREATE TABLE IF NOT EXISTS usage_log (
     calls INTEGER NOT NULL DEFAULT 0, prompt_tokens INTEGER NOT NULL DEFAULT 0, completion_tokens INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (day, agent, provider, model));
 CREATE TABLE IF NOT EXISTS usage (day TEXT PRIMARY KEY, calls INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL, agent TEXT NOT NULL, title TEXT NOT NULL,
+    created_by TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued', message_id INTEGER, result_id INTEGER,
+    approval_id INTEGER, created REAL NOT NULL, updated REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS tasks_room ON tasks(room, updated);
+CREATE INDEX IF NOT EXISTS tasks_message ON tasks(message_id);
 CREATE TABLE IF NOT EXISTS audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, agent TEXT, event TEXT NOT NULL,
     detail TEXT NOT NULL DEFAULT '');

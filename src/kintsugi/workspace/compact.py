@@ -44,12 +44,21 @@ def summary(ws: "Workspace", room: str) -> str:
     return _load(ws, room)["text"] if enabled(ws) else ""
 
 
+def _generation(ws: "Workspace", room: str) -> tuple[int, int]:
+    gens = ws.__dict__.setdefault("_summary_generations", {})
+    return gens.get(None, 0), gens.get(room, 0)
+
+
 def forget(ws: "Workspace", room: str | None = None) -> None:
-    """Drop the summary of one room, or of every room (after messages were deleted for privacy)."""
-    if room is None:
-        ws.db.execute("DELETE FROM settings WHERE key LIKE ?", (KEY + "%",))
-    else:
-        ws.db.execute("DELETE FROM settings WHERE key = ?", (KEY + room,))
+    """Drop the summary of one room, or of every room (after messages were deleted for privacy). A summary being written
+    right now for that room is thrown away when it finishes."""
+    with _guard:
+        gens = ws.__dict__.setdefault("_summary_generations", {})
+        gens[room] = gens.get(room, 0) + 1
+        if room is None:
+            ws.db.execute("DELETE FROM settings WHERE key LIKE ?", (KEY + "%",))
+        else:
+            ws.db.execute("DELETE FROM settings WHERE key = ?", (KEY + room,))
 
 
 def maybe_update(ws: "Workspace", room: str, model, oldest_visible_id: int, agent: str = "") -> bool:
@@ -62,6 +71,8 @@ def maybe_update(ws: "Workspace", room: str, model, oldest_visible_id: int, agen
     if not lock.acquire(blocking=False):  # another agent in this room is already doing it
         return False
     try:
+        with _guard:
+            generation = _generation(ws, room)
         state = _load(ws, room)
         rows = ws.db.query("SELECT id, sender, text FROM messages WHERE room = ? AND id > ? AND id < ? AND sender != 'system' "
                            "ORDER BY id LIMIT ?", (room, state["upto"], oldest_visible_id, MAX_FOLD))
@@ -80,7 +91,12 @@ def maybe_update(ws: "Workspace", room: str, model, oldest_visible_id: int, agen
         text = ws._scrub(agent, (text or "").strip())[:MAX_CHARS]
         if not text:
             return False
-        ws.set_setting(KEY + room, json.dumps({"upto": rows[-1]["id"], "text": text}))
+        with _guard:  # only keep it if nothing it was made from was deleted meanwhile
+            if (_generation(ws, room) != generation or not enabled(ws)
+                    or ws.db.one("SELECT 1 FROM rooms WHERE name = ?", (room,)) is None
+                    or ws.db.one("SELECT 1 FROM messages WHERE id = ?", (rows[-1]["id"],)) is None):
+                return False
+            ws.set_setting(KEY + room, json.dumps({"upto": rows[-1]["id"], "text": text}))
         return True
     finally:
         lock.release()

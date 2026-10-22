@@ -163,17 +163,20 @@ def b64(text: str) -> str:
 
 class TestUploads(Base):
     def test_a_text_file_is_saved_safely_and_never_overwrites(self):
-        first = self.call("owner", "POST", "/api/upload", {"agent": "alice", "name": "notes.md", "data": b64("# notes\nhello")})[1]["path"]
-        second = self.call("owner", "POST", "/api/upload", {"agent": "alice", "name": "notes.md", "data": b64("other")})[1]["path"]
+        first = self.call("owner", "POST", "/api/upload", {"agent": "alice", "room": "team", "name": "notes.md", "data": b64("# notes\nhello")})[1]["path"]
+        second = self.call("owner", "POST", "/api/upload", {"agent": "alice", "room": "team", "name": "notes.md", "data": b64("other")})[1]["path"]
         self.assertEqual((first, second), ("uploads/notes.md", "uploads/notes (2).md"))
-        self.assertEqual((self.ws.files_dir("alice") / first).read_text(), "# notes\nhello")
+        from kintsugi.workspace import uploads
+
+        self.assertEqual(uploads.resolve(self.ws, "alice", "team", first).read_text(), "# notes\nhello")
+        self.assertFalse((self.ws.files_dir("alice") / "uploads").exists())  # kept outside the agent's own folder
 
     def test_bad_files_are_refused_with_a_reason(self):
         bad = [("a.pdf", b64("x")), ("../evil.txt", b64("x")), (".hidden.txt", b64("x")), ("a/b.txt", b64("x")), ("run.exe", b64("x")), ("a.txt", b64("")),
                ("a.txt", "!!notbase64!!"), ("a.txt", base64.b64encode(b"ab\x00cd").decode()), ("a.txt", base64.b64encode(b"\xff\xfe\xfa").decode()),
                ("a.txt", b64("x" * 1_600_000)), ("x" * 100 + ".txt", b64("x"))]
         for name, data in bad:
-            status, body = self.call("owner", "POST", "/api/upload", {"agent": "alice", "name": name, "data": data})
+            status, body = self.call("owner", "POST", "/api/upload", {"agent": "alice", "room": "team", "name": name, "data": data})
             self.assertEqual(status, 400, (name, body))
         self.assertEqual(list((self.ws.files_dir("alice") / "uploads").iterdir()) if (self.ws.files_dir("alice") / "uploads").exists() else [], [])
 
@@ -181,8 +184,8 @@ class TestUploads(Base):
         self.ws.create_agent("bob")
         self.ws.create_room("bobs", ["bob", "you"])
         self.join("sam", rooms=["team"])
-        self.assertEqual(self.call("sam", "POST", "/api/upload", {"agent": "alice", "name": "a.txt", "data": b64("hi")})[0], 200)
-        self.assertEqual(self.call("sam", "POST", "/api/upload", {"agent": "bob", "name": "a.txt", "data": b64("hi")})[0], 403)
+        self.assertEqual(self.call("sam", "POST", "/api/upload", {"agent": "alice", "room": "team", "name": "a.txt", "data": b64("hi")})[0], 200)
+        self.assertEqual(self.call("sam", "POST", "/api/upload", {"agent": "bob", "room": "team", "name": "a.txt", "data": b64("hi")})[0], 403)
 
     def test_download_is_for_admins_and_sent_as_an_inert_attachment(self):
         (self.ws.files_dir("alice")).mkdir(parents=True, exist_ok=True)
@@ -195,13 +198,13 @@ class TestUploads(Base):
         self.assertNotIn("<", resp.getheader("Content-Disposition"))
         self.join("sam")
         self.assertEqual(self.call("sam", "GET", "/api/download?agent=alice&path=page.html")[0], 403)
-        for bad in ("../../token", "/etc/passwd", "uploads/../../../workspace.db"):
-            self.assertEqual(self.call("owner", "GET", f"/api/download?agent=alice&path={bad}")[0], 400, bad)
+        for bad in ("../../token", "/etc/passwd", "uploads/../../../workspace.db", "uploads/../../../workspace.db&room=team"):
+            self.assertIn(self.call("owner", "GET", f"/api/download?agent=alice&path={bad}")[0], (400, 403), bad)
 
     def test_the_agent_can_read_what_was_uploaded(self):
         from kintsugi.workspace.tools import Ctx, execute
 
-        path = self.call("owner", "POST", "/api/upload", {"agent": "alice", "name": "data.csv", "data": b64("a,b\n1,2")})[1]["path"]
+        path = self.call("owner", "POST", "/api/upload", {"agent": "alice", "room": "team", "name": "data.csv", "data": b64("a,b\n1,2")})[1]["path"]
         out = execute(Ctx(self.ws, "alice", "team", 0, "team#1"), "read_file", {"path": path})
         self.assertEqual((out.status, "1,2" in out.output), ("ok", True))
 
