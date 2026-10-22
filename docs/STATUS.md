@@ -48,3 +48,23 @@ Four independent reviewers were launched (each in its own worktree). Results so 
   join-any-shared-room is allowed (document it).
 - Before the hackathon demo: try a real key on a phone; try GitHub/Slack/Gmail with real credentials using "Test connection"; run `examples/workspace_demo.py`.
 - Reminder for the owner: choose the final name; add real keys only in the app (Settings > Models), never in chat or the repo.
+
+## Internet-facing review (reviewer 2) findings, received 2026-10-22: FIX CHECKLIST (mark done as fixed)
+
+1. HIGH  Gmail IMAP did not verify TLS (`imaplib.IMAP4_SSL` without ssl_context) -> pass `ssl.create_default_context()`.
+2. MED-HIGH  Provider keys/tokens followed redirects to any host (urllib default handler copies Authorization/x-api-key/X-Subscription-Token): model.py request_json + list_models,
+   providers.py, websearch.py, backup.py (GitHub token), push.py -> one opener with a NoRedirect handler used everywhere.
+3. MED  push.endpoint_ok accepts spaces/non-ASCII/CRLF/backslash; send_one only catches URLError/OSError -> a member can kill the notify thread -> strict regex, catch Exception, delete invalid rows.
+4. MED  webfetch TOTAL_SECONDS not applied to the header phase (header slowloris) -> one deadline for the whole roundtrip (socket timeout = remaining).
+5. MED  ICS parser: 2000-iteration cap (old daily events vanish), UTC-only recurrence (DST wrong), all-day dates shifted by tz, VALARM description leaks, RECURRENCE-ID not handled,
+   unsupported BYDAY/BYMONTHDAY forms misapplied, UNTIL date exclusive, OverflowError crash on huge INTERVAL (only ValueError caught), lowercase begin:vevent, quadratic _unfold.
+6. MED-LOW  redirect `Location` text echoed (200 chars) into the FetchError -> reaches model/lessons -> report hostname only.
+7. MED-LOW  plugin param `..` survives quoting and climbs path with the API key attached -> reject `.`/`..` values.
+8. LOW-MED  Gmail search: backslash breaks the IMAP command, non-ASCII query raises UnicodeEncodeError, BODY.PEEK[] downloads whole message -> UTF-8 search, escape, partial fetch.
+9. LOW  plugin manifest: HEADER_RE needs fullmatch (trailing newline), restrict `prefix` to printable ASCII, wrap urlsplit ValueError, full-length fingerprint.
+10. LOW  _public misses IPv6 embedding IPv4 (::127.0.0.1, 64:ff9b::/96 NAT64, ::ffff:0:0:0/96, 2002::/16), deny fec0::/10 and 192.88.99.0/24.
+11. LOW  IDN hosts: Host header must use idna.
+12. LOW  backup: no rollback protection, download without size cap, restore_if_empty only catches BackupError (tar/OSError crash at startup).
+13. LOW  keychain not crash-safe/thread-safe: temp file + os.replace + lock.
+Minor: to_text double html.unescape; web_search result URL control chars; Retry-After HTTP-date ValueError in model.py.
+(Reviewer verified fine: core SSRF literal/DNS checks, redirects, pinned connection, plugin archive reading, template quoting, backup crypto basics, secrets in errors.)
