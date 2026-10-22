@@ -1,0 +1,285 @@
+{
+  "version": 1,
+  "lessons": [
+    {
+      "id": "L001",
+      "text": "When iterating over a collection that you may modify, first collect the items to change in a separate list or use a copy of the keys; this prevents runtime errors from mutating the collection during iteration.",
+      "error_type": "RuntimeError",
+      "keywords": [
+        "adds",
+        "after",
+        "already",
+        "cache",
+        "capacity",
+        "change",
+        "class",
+        "clock",
+        "collect",
+        "collection",
+        "copy",
+        "current",
+        "data",
+        "default",
+        "del",
+        "discards",
+        "during",
+        "entries",
+        "entry",
+        "errors",
+        "evict",
+        "exactly",
+        "existing",
+        "expired",
+        "expires",
+        "expiry",
+        "extend",
+        "first",
+        "full",
+        "get",
+        "init",
+        "item",
+        "items",
+        "iter",
+        "iterating",
+        "iteration",
+        "key",
+        "keys",
+        "last",
+        "least",
+        "len",
+        "lifetime",
+        "limit",
+        "list",
+        "live",
+        "marks",
+        "may",
+        "missing",
+        "modify",
+        "most",
+        "mutating",
+        "new",
+        "next",
+        "number",
+        "oldest",
+        "over",
+        "prevents",
+        "put",
+        "reading",
+        "recently",
+        "removes",
+        "replaces",
+        "restarts",
+        "runtime",
+        "seconds",
+        "separate",
+        "size",
+        "still",
+        "stored",
+        "stores",
+        "time",
+        "ttl",
+        "ttlcache",
+        "used",
+        "while"
+      ],
+      "status": "promoted",
+      "seen": 1,
+      "uses": 11,
+      "wins": 11,
+      "evidence": [
+        {
+          "task": "h03_ttl_cache",
+          "event": "created",
+          "error": "RuntimeError"
+        },
+        {
+          "task": "h03_ttl_cache",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "h05_topo_order",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s03_binary_search",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s05_word_count",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s06_chunk",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s08_merge_intervals",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s09_rotate",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s11_duration",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s12_moving_average",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s14_fibonacci",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s16_top_k",
+          "event": "used",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "id": "L002",
+      "text": "When ordering items with dependencies, always include nodes that appear only as dependencies, use a deterministic priority (e.g., alphabetical) when multiple items are ready, and explicitly detect cycles to avoid returning an incorrect order.",
+      "error_type": "AssertionError",
+      "keywords": [
+        "add",
+        "alphabetical",
+        "alphabetically",
+        "always",
+        "appear",
+        "append",
+        "avoid",
+        "come",
+        "contains",
+        "cycle",
+        "cycles",
+        "dep",
+        "dependencies",
+        "dependency",
+        "depends",
+        "detect",
+        "deterministic",
+        "dict",
+        "empty",
+        "entries",
+        "error",
+        "explicitly",
+        "first",
+        "get",
+        "gives",
+        "graph",
+        "harmless",
+        "include",
+        "including",
+        "incorrect",
+        "inside",
+        "items",
+        "itself",
+        "list",
+        "lists",
+        "mapping",
+        "multiple",
+        "node",
+        "nodes",
+        "order",
+        "ordering",
+        "part",
+        "pick",
+        "priority",
+        "raise",
+        "ready",
+        "repeated",
+        "returning",
+        "same",
+        "seen",
+        "set",
+        "several",
+        "smallest",
+        "takes",
+        "time",
+        "too",
+        "topo",
+        "valid",
+        "visit"
+      ],
+      "status": "promoted",
+      "seen": 1,
+      "uses": 11,
+      "wins": 11,
+      "evidence": [
+        {
+          "task": "h05_topo_order",
+          "event": "created",
+          "error": "AssertionError"
+        },
+        {
+          "task": "h05_topo_order",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s02_palindrome",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s03_binary_search",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s05_word_count",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s06_chunk",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s08_merge_intervals",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s09_rotate",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s11_duration",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s12_moving_average",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s15_brackets",
+          "event": "used",
+          "passed": true
+        },
+        {
+          "task": "s16_top_k",
+          "event": "used",
+          "passed": true
+        }
+      ]
+    }
+  ]
+}
