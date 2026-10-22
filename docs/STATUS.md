@@ -124,3 +124,19 @@ Test hygiene note: stale `serve_mock.py` servers on port 8804 cause false browse
 ## Current plan (after limits reset; user asked: 1) friendlier UI, 2) major upgrades, 3) then security)
 Backend done so far (uncommitted until tests): stop-an-agent (/api/stop + live activity in /api/state), usage tracking (usage_log, /api/usage, prices), name clash fixed (agent_activity).
 Next: message search (/api/find), starter templates (/api/templates), file upload/download, then UI overhaul (settings page with sections, first-run wizard, quick switcher, message actions, Stop button, usage tab, QA fixes), tests, then security round 2.
+
+
+## Update: UI overhaul + upgrades (2026-10-22, later)
+Done and pushed (commit "Settings page, usage dashboard, setup wizard, ..."):
+- web/extras.js (loaded after app.js, cached by sw.js): Settings page with grouped nav (overrides settingsDialog; keeps #settings-body,
+  wraps panel refreshes via a `fill` override so the heading stays), Usage panel (+ owner price form, "Remember long chats" switch),
+  first-run wizard `setupWizard()` (owner, when model_ready is false; members get `noModelNotice()`), `openSwitcher()` (Ctrl/Cmd+K),
+  `startersDialog()` (also "Start from a team" in New chat), `exportChat(room)` (Markdown download, paginates /api/messages).
+- app.js: Team panel "Reset sign-in" + `signInLinkDialog` (link shown once); Details drawer "Save this chat (Markdown)".
+- compact.py: running room summary of messages older than the 12 in view (BATCH 16, MAX_FOLD 60, 1800 chars), scrubbed with ws._scrub,
+  labelled as data in build_context, deleted on delete_room / delete_agent / purge / when switched off; POST /api/compaction owner-only.
+- Tests: tests/ui/upgrades.js (new, in run_all.sh), team.js (reset sign-in), selectors moved from `.tab` to `.set-item` for settings;
+  run_all.sh accepts SUITES="a b". tests/test_workspace_compact.py (7). Full run: 515 unit OK, 17 browser suites OK.
+Still open from QA list: toast position on phone, numeric clamp messages ("Saved (limit set to N)"), schedule "server's clock" text.
+Next: security round 2 (3 independent reviewers launched: new backend endpoints; web frontend/XSS/headers; backup/sandbox/scheduler/
+published apps). Fix confirmed findings with regression tests, rerun everything, push, then report to the user.

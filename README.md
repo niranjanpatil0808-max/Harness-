@@ -27,6 +27,9 @@
 | **Encrypted backup** to your private GitHub repo, restored automatically on an empty free host | **Works** against a fake GitHub in tests; **not yet tried against the real GitHub** ([docs/HOSTING.md](docs/HOSTING.md)) |
 | **Teams:** separate logins through single-use invite links, owner/admin/member roles, who may approve, shared rooms plus private chats ([docs/TEAMS.md](docs/TEAMS.md)) | **Works** (permission matrix tests and a two-browser test); not yet used by a real group over a real deployment |
 | **Integrations:** GitHub (read-only, repo allow-list), Slack (read; posting is off by default and always asks), Calendar (read-only secret iCal address), Gmail (read-only IMAP) — no app registration ([docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)) | **Works** against local fakes; **not yet tried against the real GitHub, Slack, Google Calendar or Gmail** |
+| **Easier to use:** first-run setup (pick a provider, test your key, pick a starter team), a Settings page with sections, Ctrl/Cmd+K search across chats, agents, settings and messages, Stop button, Copy / Ask again, attach text files, save a chat as Markdown | **Works** in browser tests (desktop and phone size) |
+| **Usage dashboard:** calls per day, per agent and per model; tokens when your provider reports them; a cost estimate from prices you enter | **Works**; the estimate is only as good as the prices you type, your provider's bill is the final word |
+| **Long chats:** agents see the last 12 messages plus a short running summary of older ones (one extra model call per 16 older messages; owner can switch it off) | **Works** in tests with scripted models; summary quality depends on your model |
 
 Rows marked planned do not exist yet. This table is updated as each one lands, and it says what has and has not been verified.
 
