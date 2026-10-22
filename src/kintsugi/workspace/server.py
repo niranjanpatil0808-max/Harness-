@@ -22,6 +22,7 @@ from . import sandbox
 from .core import Workspace, WorkspaceError
 from .keychain import _write_private
 from .sandbox import PathError, safe_path
+from . import core as core_mod
 from .scheduler import Scheduler
 
 MAX_BODY = 64_000
@@ -201,12 +202,14 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 # newest message per room, and newest one written by someone other than the reader: that drives "unread"
                 latest = {row["room"]: {"last_id": row["last_id"], "last_other": row["last_other"] or 0} for row in ws.db.query(
                     "SELECT room, MAX(id) AS last_id, MAX(CASE WHEN sender != 'you' THEN id END) AS last_other FROM messages GROUP BY room")}
-                return {"agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools", "model", "playbook")},
+                return {"agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools", "model", "provider", "playbook")},
                                     "secrets": ws.keychain.names(a["name"]), "apps": _apps(ws, a["name"])}
                                    for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in ws.list_rooms()],
                         "approvals": ws.approvals(), "jobs": ws.list_jobs(), "busy": ws.busy(),
                         "sandbox": sandbox.status(), "provider": ws.provider(), "search_configured": ws.search_settings()["configured"],
+                        "providers": [{"id": p["id"], "label": p["label"], "model": p["model"], "default": p["default"]} for p in ws.providers()["profiles"]],
+                        "model_ready": bool(ws.providers()["profiles"]) or ws.providers()["env_fallback"] or ws.model_factory is not core_mod.default_model_factory,
                         "improve": {k: v for k, v in ws.improver.status().items() if k != "last"},
                         "usage": {"calls": ws.calls_today(), "limit": ws.daily_calls}}
             if path == "/api/messages":
@@ -238,6 +241,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                         "providers": {k: {kk: v[kk] for kk in ("label", "signup", "note")} for k, v in PROVIDERS.items()}}
             if path == "/api/backup":
                 return ws.backups.status()
+            if path == "/api/providers":
+                return ws.providers()
             if path == "/api/tone":
                 from .core import TONE_LABELS, TONES
 
@@ -353,6 +358,15 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/search/remove":
                 ws.remove_search_key()
                 return {"ok": True}
+            if path == "/api/providers/save":  # the key is write-only: no endpoint ever returns it
+                return ws.set_provider(str(body["id"]), str(body["kind"]), str(body["base_url"]), str(body.get("model") or ""),
+                                       str(body.get("key") or "") or None, str(body.get("label") or ""), bool(body.get("keyless")), bool(body.get("make_default")))
+            if path == "/api/providers/remove":
+                return ws.remove_provider(str(body["id"]))
+            if path == "/api/providers/default":
+                return ws.set_default_provider(str(body["id"]))
+            if path == "/api/providers/test":
+                return ws.test_provider(str(body["id"]), str(body.get("model") or "") or None)
             if path == "/api/backup/run":
                 if not ws.backups.start(force=True):
                     raise WorkspaceError("a backup is already running")
@@ -373,7 +387,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             if path == "/api/improve/revert":
                 return {"reverted": ws.improver.revert(str(body["agent"]), str(body["kind"]))}
             if path == "/api/agent/model":
-                ws.set_model(str(body["agent"]), str(body.get("model") or "") or None)
+                ws.set_model(str(body["agent"]), str(body.get("model") or "") or None, str(body.get("provider") or "") or None)
                 return {"ok": True}
             if path == "/api/agent/playbook":
                 from .improve import clean_playbook

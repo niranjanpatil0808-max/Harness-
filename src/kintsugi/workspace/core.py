@@ -21,7 +21,7 @@ from typing import Callable
 from kintsugi.memory import tokens
 from kintsugi.model import Model, ModelInfraError, ModelRequestError, OpenAIAdapter, QuotaExhausted
 
-from . import perms
+from . import perms, providers
 from .db import Database
 from .keychain import Keychain
 
@@ -190,12 +190,131 @@ class Workspace:
             raise WorkspaceError("model names use letters, digits and . _ : / @ + -")
         return model or None
 
-    def set_model(self, name: str, model: str | None) -> None:
-        """Choose which model an agent uses (None = the workspace default)."""
+    def set_model(self, name: str, model: str | None, provider: str | None = None) -> None:
+        """Choose which model (and which saved provider) an agent uses. None = the workspace default."""
         self.get_agent(name)
-        self.db.execute("UPDATE agents SET model = ? WHERE name = ?", (self._clean_model(model), name))
+        provider = (provider or "").strip() or None
+        if provider and provider not in self._provider_state()["profiles"]:
+            raise WorkspaceError(f"there is no saved provider named '{provider}' (add it in Settings > Models)")
+        self.db.execute("UPDATE agents SET model = ?, provider = ? WHERE name = ?", (self._clean_model(model), provider, name))
         self._models.pop(name, None)
-        self.audit(name, "model-changed", model or "default")
+        self.audit(name, "model-changed", f"{provider or 'default provider'} / {model or 'default model'}")
+
+    # --- model providers: the owner's own keys (write-only, kept in the keychain, sent only to that provider) ---
+
+    def _provider_state(self) -> dict:
+        try:
+            state = json.loads(self.get_setting("providers", "") or "{}")
+        except json.JSONDecodeError:
+            state = {}
+        profiles = state.get("profiles") if isinstance(state.get("profiles"), dict) else {}
+        default = state.get("default") if state.get("default") in profiles else None
+        return {"default": default, "profiles": profiles}
+
+    @staticmethod
+    def _provider_key_name(pid: str) -> str:
+        return "PROVIDER_" + pid.upper().replace("-", "_") + "_KEY"
+
+    def _provider_key(self, pid: str) -> str | None:
+        name = self._provider_key_name(pid)
+        return self.keychain.env_for(self.SEARCH_AGENT, [name])[name] if name in self.keychain.names(self.SEARCH_AGENT) else None
+
+    def providers(self) -> dict:
+        state = self._provider_state()
+        rows = [{"id": pid, "label": p.get("label") or pid, "kind": p["kind"], "base_url": p["base_url"], "model": p.get("model", ""),
+                 "keyless": bool(p.get("keyless")), "has_key": self._provider_key(pid) is not None, "default": pid == state["default"]}
+                for pid, p in state["profiles"].items()]
+        env = bool(os.environ.get("KINTSUGI_API_KEY") or os.environ.get("GROQ_API_KEY"))
+        return {"profiles": rows, "default": state["default"], "env_fallback": env,
+                "presets": {k: {kk: v.get(kk, "") for kk in ("label", "kind", "base_url", "model", "signup", "keyless")} for k, v in providers.PRESETS.items()}}
+
+    def set_provider(self, pid: str, kind: str, base_url: str, model: str = "", key: str | None = None,
+                     label: str = "", keyless: bool = False, make_default: bool = False) -> dict:
+        pid = (pid or "").strip().lower()
+        if not providers.ID_RE.match(pid):
+            raise WorkspaceError("a provider name is 2-24 characters: lowercase letters, digits and '-', starting with a letter")
+        if kind not in providers.KINDS:
+            raise WorkspaceError("kind must be one of: " + ", ".join(providers.KINDS))
+        try:
+            base_url, model = providers.clean_base_url(base_url), providers.clean_model(model)
+        except providers.ProviderError as err:
+            raise WorkspaceError(str(err)) from None
+        state = self._provider_state()
+        if pid not in state["profiles"] and len(state["profiles"]) >= 12:
+            raise WorkspaceError("at most 12 providers")
+        if key:
+            self.keychain.set(self.SEARCH_AGENT, self._provider_key_name(pid), key.strip())
+        if not keyless and self._provider_key(pid) is None:
+            raise WorkspaceError("paste your API key for this provider (it is stored in your keychain and never shown again)")
+        state["profiles"][pid] = {"kind": kind, "base_url": base_url, "model": model, "label": (label or pid)[:60], "keyless": bool(keyless)}
+        if make_default or state["default"] is None:
+            state["default"] = pid
+        self.set_setting("providers", json.dumps(state))
+        self._models.clear()
+        self.audit(None, "provider-saved", f"{pid} {kind} {base_url}" + (" key-updated" if key else ""))
+        return self.providers()
+
+    def remove_provider(self, pid: str) -> dict:
+        state = self._provider_state()
+        if pid not in state["profiles"]:
+            raise WorkspaceError("no such provider")
+        del state["profiles"][pid]
+        state["default"] = state["default"] if state["default"] != pid else next(iter(state["profiles"]), None)
+        self.keychain.delete(self.SEARCH_AGENT, self._provider_key_name(pid))
+        self.db.execute("UPDATE agents SET provider = NULL WHERE provider = ?", (pid,))
+        self.set_setting("providers", json.dumps(state))
+        self._models.clear()
+        self.audit(None, "provider-removed", pid)
+        return self.providers()
+
+    def set_default_provider(self, pid: str) -> dict:
+        state = self._provider_state()
+        if pid not in state["profiles"]:
+            raise WorkspaceError("no such provider")
+        state["default"] = pid
+        self.set_setting("providers", json.dumps(state))
+        self._models.clear()
+        return self.providers()
+
+    def build_model(self, provider: str | None = None, model: str | None = None) -> Model:
+        """A real model from the saved providers (or, if none are saved, the KINTSUGI_API_KEY environment settings)."""
+        state = self._provider_state()
+        pid = provider if provider in state["profiles"] else state["default"]
+        if pid is None:
+            if not state["profiles"]:
+                try:
+                    return OpenAIAdapter(model=model) if model else OpenAIAdapter()
+                except RuntimeError:
+                    raise providers.ProviderError("No AI model is set up yet. Open Settings > Models and add your API key.") from None
+            pid = next(iter(state["profiles"]))
+        profile = state["profiles"][pid]
+        key = self._provider_key(pid)
+        if key is None and not profile.get("keyless"):
+            raise providers.ProviderError(f"The provider '{pid}' has no API key. Open Settings > Models and paste it.")
+        return providers.build(profile, key, model)
+
+    def test_provider(self, pid: str, model: str | None = None) -> dict:
+        """Ask the model to say OK (proves key, address and model) and list the models this key can use."""
+        state = self._provider_state()
+        if pid not in state["profiles"]:
+            raise WorkspaceError("no such provider")
+        listing: list[str] = []
+        try:
+            adapter = self.build_model(pid, model or state["profiles"][pid].get("model") or "list-only")
+            try:
+                listing = adapter.list_models()
+            except Exception:  # not every service lists models; the real test is below
+                listing = []
+            chosen = model or state["profiles"][pid].get("model") or ""
+            if not chosen:
+                return {"ok": True, "models": listing, "reply": "", "note": "The key works. Choose a model, then test again."} if listing else \
+                    {"ok": False, "models": [], "reply": "", "error": "Type a model name, then test again."}
+            reply = self.build_model(pid, chosen).complete([{"role": "user", "content": "Reply with the single word OK."}])
+        except providers.ProviderError as err:
+            return {"ok": False, "models": listing, "reply": "", "error": str(err)}
+        except (ModelRequestError, ModelInfraError, QuotaExhausted, RuntimeError) as err:
+            return {"ok": False, "models": listing, "reply": "", "error": self.keychain.redact(self.SEARCH_AGENT, str(err))[:400]}
+        return {"ok": True, "models": listing, "reply": reply[:80]}
 
     def set_playbook(self, name: str, playbook: str) -> None:
         """The rules an agent has learned. Plain text only; it can never change permissions or tools."""
@@ -248,7 +367,7 @@ class Workspace:
         if self.study_model_factory is not None:
             return self.study_model_factory(model_name)
         if self.model_factory is default_model_factory:
-            return OpenAIAdapter(model=model_name) if model_name else OpenAIAdapter()
+            return self.build_model(None, model_name)
         return self.model_factory(model_name or "study")
 
     @property
@@ -290,9 +409,9 @@ class Workspace:
 
     def model_for(self, agent: str) -> Model:
         if agent not in self._models:
-            if self.model_factory is default_model_factory:  # the real API: honour the agent's own model choice
-                chosen = self.get_agent(agent)["model"]
-                base = OpenAIAdapter(model=chosen) if chosen else OpenAIAdapter()
+            if self.model_factory is default_model_factory:  # the real API: honour the agent's own provider and model choice
+                row = self.get_agent(agent)
+                base = self.build_model(row["provider"], row["model"])
             else:
                 base = self.model_factory(agent)
             self._models[agent] = _Budgeted(base, self)

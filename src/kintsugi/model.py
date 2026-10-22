@@ -55,6 +55,41 @@ class Model:
         raise NotImplementedError
 
 
+def request_json(request: urllib.request.Request, timeout: float, max_retries: int) -> dict:
+    """Send a prepared request and return the parsed JSON reply, with the retry and error rules every adapter shares:
+    400/422 -> ModelRequestError (the request is bad), rate limits and server errors -> wait and retry, then
+    ModelInfraError, a daily quota -> QuotaExhausted, anything else (bad key, unknown model) -> RuntimeError."""
+    delay = 2.0
+    for attempt in range(max_retries + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as err:
+            body_text = err.read()[:500].decode("utf-8", "replace")
+            detail = f"Model API error {err.code}: {body_text!r}"
+            per_minute = "per minute" in body_text.lower()
+            if err.code in (400, 422) or (err.code == 413 and not per_minute):
+                raise ModelRequestError(detail) from err
+            if err.code == 413:  # request + max_tokens larger than the per-minute token limit
+                raise ModelInfraError(f"{detail} (lower KINTSUGI_MAX_TOKENS)") from err
+            if err.code not in (429, 500, 502, 503, 504, 529):
+                raise RuntimeError(detail) from err  # bad key, unknown model...: a setup problem
+            retry_after = err.headers.get("retry-after")
+            wait = float(retry_after) if retry_after else delay
+            if wait > MAX_WAIT:  # a daily quota, not a short rate limit
+                raise QuotaExhausted(f"{detail} (asked to wait {wait:.0f}s)") from err
+            if attempt == max_retries:
+                raise ModelInfraError(detail) from err
+            time.sleep(wait)
+            delay *= 2
+        except (urllib.error.URLError, TimeoutError) as err:
+            if attempt == max_retries:
+                raise ModelInfraError(f"Model API unreachable: {err}") from err
+            time.sleep(delay)
+            delay *= 2
+    raise ModelInfraError("Model API gave no answer")  # unreachable; keeps the type checker happy
+
+
 class OpenAIAdapter(Model):
     def __init__(
         self,
@@ -107,35 +142,7 @@ class OpenAIAdapter(Model):
                 "User-Agent": USER_AGENT,
             },
         )
-        delay = 2.0
-        for attempt in range(self.max_retries + 1):
-            try:
-                with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                    data = json.load(response)
-                break
-            except urllib.error.HTTPError as err:
-                body_text = err.read()[:500].decode("utf-8", "replace")
-                detail = f"Model API error {err.code}: {body_text!r}"
-                per_minute = "per minute" in body_text.lower()
-                if err.code in (400, 422) or (err.code == 413 and not per_minute):
-                    raise ModelRequestError(detail) from err
-                if err.code == 413:  # request + max_tokens larger than the per-minute token limit
-                    raise ModelInfraError(f"{detail} (lower KINTSUGI_MAX_TOKENS)") from err
-                if err.code not in (429, 500, 502, 503, 504):
-                    raise RuntimeError(detail) from err  # bad key, unknown model...: a setup problem
-                retry_after = err.headers.get("retry-after")
-                wait = float(retry_after) if retry_after else delay
-                if wait > MAX_WAIT:  # a daily quota, not a short rate limit
-                    raise QuotaExhausted(f"{detail} (asked to wait {wait:.0f}s)") from err
-                if attempt == self.max_retries:
-                    raise ModelInfraError(detail) from err
-                time.sleep(wait)
-                delay *= 2
-            except (urllib.error.URLError, TimeoutError) as err:
-                if attempt == self.max_retries:
-                    raise ModelInfraError(f"Model API unreachable: {err}") from err
-                time.sleep(delay)
-                delay *= 2
+        data = request_json(request, self.timeout, self.max_retries)
         self.usage.calls += 1
         usage = data.get("usage") or {}
         self.usage.prompt_tokens += usage.get("prompt_tokens", 0)

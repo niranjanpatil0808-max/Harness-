@@ -528,6 +528,34 @@ async function searchPanel() {
     out, h("p", {class: "muted", style: "font-size:13px;margin-top:14px"}, "Privacy: each search sends the words the agent chose to " + d.providers[d.provider].label + ". Secrets are never included, but think about what you ask. Search is counted and capped, and every search appears in the Log."));
 }
 
+/* ---------- settings: models (your own API key) ---------- */
+async function modelsPanel() {
+  const d = await api("/api/providers");
+  const out = h("div", {id: "model-test"});
+  const rows = d.profiles.map((p) => h("div", {class: "card"}, h("div", {style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"},
+    h("strong", {style: "flex:1"}, p.label + (p.default ? "  · default" : "")), h("span", {class: "muted", style: "font-size:13px"}, p.model || "no model chosen"),
+    h("button", {class: "btn", onclick: async () => { try { const r = await api("/api/providers/test", {id: p.id}); fill(out, r.ok ? h("div", {class: "card"}, h("strong", {}, "Works. "), r.reply ? "The model said: " + r.reply : (r.note || ""), r.models.length ? h("div", {class: "muted", style: "font-size:13px;margin-top:4px"}, "Models you can use: " + r.models.slice(0, 40).join(", ")) : null) : h("div", {class: "card"}, "Problem: " + r.error)); } catch (e) { toast(e.message, true); } }}, "Test"),
+    p.default ? null : h("button", {class: "btn", onclick: async () => { await act(() => api("/api/providers/default", {id: p.id}), "Default changed"); fill($("#settings-body"), await modelsPanel()); }}, "Make default"),
+    h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + p.label + "?", "Its saved key is deleted. Agents using it fall back to the default provider.", "Remove", async () => { await act(() => api("/api/providers/remove", {id: p.id}), "Provider removed"); fill($("#settings-body"), await modelsPanel()); })}, "Remove"))));
+  const preset = h("select", {"aria-label": "Provider type"}, Object.entries(d.presets).map(([k, p]) => h("option", {value: k}, p.label)));
+  const url = h("input", {type: "text", "aria-label": "Address", autocapitalize: "none", placeholder: "https://api.example.com/v1"});
+  const key = h("input", {type: "password", "aria-label": "API key", autocomplete: "off", placeholder: "Paste your API key"});
+  const model = h("input", {type: "text", "aria-label": "Model name", autocapitalize: "none", placeholder: "model name (you can test first to see a list)"});
+  const kind = h("select", {"aria-label": "Kind"}, [["openai", "OpenAI-style API"], ["anthropic", "Anthropic (Claude)"], ["gemini", "Google Gemini"]].map(([v, l]) => h("option", {value: v}, l)));
+  const note = h("small", {class: "muted", style: "display:block;margin-top:4px"});
+  const fillPreset = () => { const p = d.presets[preset.value]; url.value = p.base_url; model.value = p.model; kind.value = p.kind; key.placeholder = p.keyless ? "No key needed for a model on this computer" : "Paste your API key";
+    note.replaceChildren(p.signup ? h("span", {}, "Get a key at ", h("a", {href: p.signup, target: "_blank", rel: "noopener"}, p.signup.replace("https://", ""))) : "", " The model name is only a suggestion: use Test to see what your key can use."); };
+  preset.onchange = fillPreset; fillPreset();
+  const save = async () => { const p = d.presets[preset.value], id = preset.value === "custom" ? "custom-" + Math.random().toString(36).slice(2, 6) : preset.value;
+    const ok = await act(() => api("/api/providers/save", {id, label: p.label, kind: kind.value, base_url: url.value, model: model.value, key: key.value, keyless: !!p.keyless, make_default: !d.profiles.length}), "Saved");
+    if (ok) { key.value = ""; fill($("#settings-body"), await modelsPanel()); } };
+  const row = (label, el) => h("div", {style: "margin:10px 0"}, h("label", {style: "margin:0 0 4px"}, label), el);
+  return h("div", {}, h("p", {style: "margin-top:0"}, "This app runs on your own API key. Add any provider; agents use the default one unless you pick another for an agent. Your key is stored in your keychain, never shown again, and only ever sent to the address you enter here."),
+    d.profiles.length ? rows : h("div", {class: "card"}, d.env_fallback ? "Using the key from this server's settings. Add a provider here to override it." : "No model is set up yet. Add one below to start."), out,
+    h("h4", {style: "margin:18px 0 0"}, "Add a provider"), row("Service", preset), row("Address", url), kind, row("API key", key), row("Model", model), note,
+    h("div", {style: "margin-top:12px"}, h("button", {class: "btn primary", onclick: save}, "Save")));
+}
+
 /* ---------- settings: backup ---------- */
 async function backupPanel() {
   const d = await api("/api/backup");
@@ -666,10 +694,11 @@ function improveTab(a) {
   if (!data) return h("p", {class: "muted"}, "Loading…");
   const mine = data.proposals.filter((p) => p.agent === a.name), applied = (k) => mine.find((p) => p.status === "applied" && p.kind === k);
   const model = h("input", {type: "text", value: a.model || "", placeholder: "default model", "aria-label": "Model", autocapitalize: "none"});
+  const provider = h("select", {"aria-label": "Provider"}, [h("option", {value: ""}, "Default provider")].concat((S.state.providers || []).map((p) => h("option", {value: p.id, selected: a.provider === p.id}, p.label + (p.default ? " (default)" : "")))));
   const playbook = h("textarea", {rows: 6, "aria-label": "Playbook", placeholder: "- Short rules this agent learned, one per line, each starting with a dash."}, a.playbook || "");
   return [h("p", {class: "muted"}, "The workspace tests " + a.name + " on practice tasks and proposes a better model or a better playbook. Only those two things can change; never permissions, code or secrets."),
-    h("h4", {}, "Model"), h("div", {class: "stack"}, model,
-      h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, h("button", {class: "btn", onclick: () => act(() => api("/api/agent/model", {agent: a.name, model: model.value.trim()}), "Model saved")}, "Save model"),
+    h("h4", {}, "Model"), h("div", {class: "stack"}, provider, model,
+      h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, h("button", {class: "btn", onclick: () => act(() => api("/api/agent/model", {agent: a.name, model: model.value.trim(), provider: provider.value}), "Model saved")}, "Save model"),
         applied("model") ? h("button", {class: "btn", onclick: () => act(() => api("/api/improve/revert", {agent: a.name, kind: "model"}), "Model change undone")}, "Undo the last improvement") : null)),
     h("h4", {}, "Playbook (rules in its prompt)"), h("div", {class: "stack"}, playbook,
       h("div", {style: "display:flex;gap:8px;flex-wrap:wrap"}, h("button", {class: "btn", onclick: () => act(() => api("/api/agent/playbook", {agent: a.name, playbook: playbook.value}), "Playbook saved")}, "Save playbook"),
@@ -709,8 +738,8 @@ async function improvePanel() {
   content.append(h("div", {style: "display:flex;justify-content:flex-end;margin-top:8px"}, h("button", {class: "btn primary", onclick: save}, "Save settings")));
   return content;
 }
-const SETTINGS_TABS = [["general", "General"], ["search", "Search"], ["improve", "Improve"], ["backup", "Backup"]];
-const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel()};
+const SETTINGS_TABS = [["general", "General"], ["models", "Models"], ["search", "Search"], ["improve", "Improve"], ["backup", "Backup"]];
+const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel(), models: () => modelsPanel()};
 async function settingsDialog(tab) {
   if (typeof tab !== "string") tab = S.settingsTab || "general";
   S.settingsOpen = true;
@@ -797,6 +826,7 @@ async function poll(now) {
     S.state = await api("/api/state");
     if (!S.room || !curRoom()) { const first = rooms().find((r) => r.kind !== "dm") || rooms()[0]; if (first) { S.room = first.name; S.last[S.room] = 0; S.stick = true; const ta = $("#msg"); if (ta) ta.value = store.get("kt-draft-" + S.room) || ""; } }
     focusAgent(); syncUnread(); renderSidebar(); renderTopbar(); updateComposer();
+    if (S.state.model_ready === false && !S.askedModel && !S.settingsOpen && !$("#dialog-root .dialog")) { S.askedModel = true; settingsDialog("models"); }
     if (S.room) {
       const after = S.last[S.room] || 0, fresh = await api("/api/messages?room=" + encodeURIComponent(S.room) + "&after=" + after);
       const msgs = fresh.filter((m) => m.id > after);

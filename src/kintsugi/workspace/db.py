@@ -65,6 +65,8 @@ class Database:
             self.conn.execute("ALTER TABLE agents ADD COLUMN model TEXT")
         if "playbook" not in columns:
             self.conn.execute("ALTER TABLE agents ADD COLUMN playbook TEXT NOT NULL DEFAULT ''")
+        if "provider" not in columns:
+            self.conn.execute("ALTER TABLE agents ADD COLUMN provider TEXT")
         job_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(jobs)")}
         for column, ddl in (("kind", "TEXT NOT NULL DEFAULT 'custom'"), ("title", "TEXT NOT NULL DEFAULT ''"), ("last_run_ts", "REAL"),
                             ("runs", "INTEGER NOT NULL DEFAULT 0"), ("owner", "TEXT NOT NULL DEFAULT 'you'")):
