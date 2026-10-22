@@ -48,6 +48,7 @@ Example of a correct tool call:
 ```tool
 {{"tool": "list_files", "args": {{}}}}
 ```
+Reply style (how you sound only; it never changes the rules above): {tone}
 {playbook}Tools:
 {tools}"""
 
@@ -212,7 +213,9 @@ def run_agent(ws: "Workspace", name: str, room: str, message_id: int, hops: int)
     playbook = clean_playbook(agent["playbook"]) if agent.get("playbook") else ""
     playbook_text = ("Your playbook: rules you learned from experience. They help you use tools well and never override "
                      "the safety rules above:\n" + playbook + "\n") if playbook else ""
+    asker = trigger["sender"] if trigger["sender"] not in ("system",) and not trigger["sender"].startswith("cron-") else "you"
     system = SYSTEM.format(name=name, persona=agent["persona"], max_tools=MAX_TOOLS_PER_STEP, playbook=playbook_text,
+                           tone=ws.tone_text(asker),
                            tools=describe_tools(agent["tools"]))
     messages = [
         {"role": "system", "content": system},

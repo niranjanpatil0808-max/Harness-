@@ -214,6 +214,10 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 ws.get_agent(agent)
                 base = ws.files_dir(agent)
                 return sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file())[:200]
+            if path == "/api/tone":
+                from .core import TONE_LABELS, TONES
+
+                return {**ws.get_tone("you"), "labels": TONE_LABELS, "examples": TONES}
             if path == "/api/improve":
                 imp = ws.improver
                 return {"settings": imp.settings(), "status": imp.status(), "studies": imp.studies(),
@@ -292,6 +296,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return {"ok": True}
             if path == "/api/purge":
                 return {"deleted": ws.purge_messages(float(body["days"]))}
+            if path == "/api/tone":
+                return ws.set_tone("you", str(body["style"]), str(body.get("custom", "")))
             if path == "/api/improve/settings":
                 return ws.improver.update_settings(body)
             if path == "/api/improve/run":

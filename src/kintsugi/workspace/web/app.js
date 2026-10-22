@@ -332,8 +332,16 @@ function stopSpeaking() { if (CAN_SPEAK) speechSynthesis.cancel(); }
 function maybeSpeak(msgs) { if (voice().speak) for (const m of msgs) if (isAgent(m.sender)) speak(m.text); }
 
 /* ---------- settings: general ---------- */
-function generalPanel() {
+async function generalPanel() {
   const v = voice();
+  let tone = {style: "fun", custom: "", labels: {}, examples: {}};
+  try { tone = await api("/api/tone"); } catch (e) { /* shown by the poll */ }
+  const custom = h("textarea", {rows: 2, maxlength: 300, placeholder: "e.g. Talk like a calm coach. Short sentences.", "aria-label": "Custom style"}, tone.custom || "");
+  custom.hidden = tone.style !== "custom";
+  const hint = h("small", {class: "muted", style: "display:block;margin-top:4px"}, tone.examples[tone.style] || "");
+  const style = h("select", {"aria-label": "Reply style", onchange: () => { custom.hidden = style.value !== "custom"; hint.textContent = style.value === "custom" ? "Your own words. It can change how replies sound, never the safety rules." : (tone.examples[style.value] || ""); }},
+    Object.entries(tone.labels).map(([k, l]) => h("option", {value: k, selected: tone.style === k}, l)));
+  const saveStyle = () => act(() => api("/api/tone", {style: style.value, custom: custom.value}), "Style saved");
   const speakBox = h("input", {type: "checkbox", checked: v.speak, disabled: !CAN_SPEAK, style: "width:auto", onchange: (e) => { saveVoice({...voice(), speak: e.target.checked}); if (!e.target.checked) stopSpeaking(); }});
   const handsBox = h("input", {type: "checkbox", checked: v.handsfree, disabled: !SR || !CAN_SPEAK, style: "width:auto", onchange: (e) => { const nv = {...voice(), handsfree: e.target.checked}; if (e.target.checked) nv.speak = true; saveVoice(nv); speakBox.checked = nv.speak; }});
   const lang = h("select", {"aria-label": "Voice language", onchange: (e) => saveVoice({...voice(), lang: e.target.value})}, LANGS.map(([c, l]) => h("option", {value: c, selected: v.lang === c}, l)));
@@ -344,6 +352,9 @@ function generalPanel() {
     h("label", {style: "display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:10px 0"}, speakBox, h("span", {}, "Read replies aloud" + (CAN_SPEAK ? "" : " (not available in this browser)"))),
     h("label", {style: "display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:10px 0"}, handsBox, h("span", {}, "Hands-free conversation: after each spoken reply, listen again and send what I say.")),
     row("Voice language", lang, "Your phone's speech service does the listening and talking. On Chrome (Android) it is Google's, on iPhone it is Apple's, so your voice may leave your phone for that company. Nothing is recorded or kept by this app."),
+    h("h4", {style: "margin:18px 0 4px"}, "How replies sound"),
+    h("div", {style: "margin:8px 0"}, style, hint, custom, h("button", {class: "btn", style: "margin-top:8px", onclick: saveStyle}, "Save style")),
+    h("small", {class: "muted", style: "display:block"}, "Your choice affects the replies you get. It only changes the style: safety rules, approvals and the sandbox stay exactly the same."),
     h("h4", {style: "margin:18px 0 4px"}, "Appearance"), row("Theme", theme),
     h("h4", {style: "margin:18px 0 4px"}, "This app"),
     canInstall() ? h("button", {class: "btn", onclick: installApp}, "Install on this device") : h("p", {class: "muted", style: "margin:4px 0"}, IS_STANDALONE() ? "You are using the installed app." : "To install: use your browser's menu and choose “Install app” or “Add to Home screen”."),

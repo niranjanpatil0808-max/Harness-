@@ -40,6 +40,20 @@ class WorkspaceError(ValueError):
     """A request the workspace refuses (unknown agent, bad name, not a member...)."""
 
 
+TONES = {
+    "regular": "Be clear, friendly and neutral.",
+    "fun": ("Be witty and direct, with a light sense of humour, like a sharp friend. Keep it short; a quick joke or playful "
+            "aside is welcome when it fits. Never insult or mock anyone, never use profanity, and drop the jokes for serious "
+            "topics (money, health, safety, legal) and for anything the user seems stressed about."),
+    "concise": "Be extremely brief: answer in as few words as you can while staying correct.",
+}
+TONE_LABELS = {"fun": "Fun: witty and direct", "regular": "Regular: clear and neutral", "concise": "Brief: as few words as possible", "custom": "Custom"}
+DEFAULT_TONE = "fun"
+# A custom style is the user's own words, but it must not be a way to loosen the rules above it.
+TONE_FORBIDDEN = re.compile(r"(ignore|disregard|override|bypass|disable|forget|approv|without ask|system prompt|instruction|secret|token|"
+                            r"password|credential|api[ _-]?key|sandbox|unfiltered|uncensored|no rules|jailbreak|https?:|never refuse|always obey)", re.I)
+
+
 class BudgetExceeded(RuntimeError):
     """The workspace's daily model-call limit is used up (protects your API quota from runaway loops)."""
 
@@ -185,6 +199,38 @@ class Workspace:
         self.get_agent(name)
         self.db.execute("UPDATE agents SET playbook = ? WHERE name = ?", (playbook[:1500], name))
         self.audit(name, "playbook-changed", f"{len(playbook)} characters")
+
+    # --- the tone each person chooses for the replies they get ---------------------
+
+    def get_tone(self, user: str = "you") -> dict:
+        raw = self.get_setting(f"tone:{user}", "") or self.get_setting("tone:you", "")
+        try:
+            saved = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            saved = {}
+        style = saved.get("style") if saved.get("style") in TONE_LABELS else DEFAULT_TONE
+        return {"style": style, "custom": saved.get("custom", "")}
+
+    def set_tone(self, user: str, style: str, custom: str = "") -> dict:
+        if style not in TONE_LABELS:
+            raise WorkspaceError("style must be one of: " + ", ".join(TONE_LABELS))
+        custom = " ".join(str(custom).split())[:300]
+        if style == "custom":
+            if len(custom) < 5:
+                raise WorkspaceError("describe the style you want in a few words")
+            if TONE_FORBIDDEN.search(custom):
+                raise WorkspaceError("a style can change how replies sound, not the rules. Remove words about ignoring rules, "
+                                     "approvals, secrets, the sandbox, links or instructions.")
+        self.set_setting(f"tone:{user}", json.dumps({"style": style, "custom": custom}))
+        self.audit(None, "tone-changed", f"{user}: {style}")
+        return self.get_tone(user)
+
+    def tone_text(self, user: str = "you") -> str:
+        """The sentence added to an agent's prompt for this person's replies (style only, never rules)."""
+        tone = self.get_tone(user)
+        if tone["style"] == "custom" and tone["custom"] and not TONE_FORBIDDEN.search(tone["custom"]):
+            return tone["custom"]
+        return TONES.get(tone["style"], TONES[DEFAULT_TONE])
 
     def get_setting(self, key: str, default: str = "") -> str:
         row = self.db.one("SELECT value FROM settings WHERE key = ?", (key,))
