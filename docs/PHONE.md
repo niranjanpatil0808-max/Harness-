@@ -13,6 +13,8 @@ chats, files or the access token.
 
 ## Talk to it
 
+- **No @ needed.** In a group room, the **To** chips above the box choose who answers (the box says "Message @alice"). Tap another chip to switch. Typing your own `@name` always wins. In a direct chat there is nothing to pick.
+- In a new chat, **starter ideas** appear above the box (tap one to fill the box, then edit or send). They disappear after your first message.
 - Tap the **microphone** to speak; your words appear as you talk. Tap the **speaker** to have replies read aloud. In
   **Settings > General** you can switch on a hands-free loop (it speaks the reply, then listens again) and pick a language.
 - It uses your browser's own speech (free). On Android Chrome that is Google's, on iPhone it is Apple's, so **your voice may be

@@ -217,7 +217,7 @@ function renderThread(msgs) {
   if (S.threadRoom !== S.room) { th.replaceChildren(); S.threadRoom = S.room; }
   const wasNear = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 90 || S.stick;
   if (msgs.length) th.querySelector(".hello")?.remove();
-  msgs.forEach((m) => th.append(bodyOf(m)));
+  msgs.forEach((m) => { th.append(bodyOf(m)); if (m.sender === "you") (S.talked = S.talked || {})[S.room] = true; });
   const only = th.children.length === 1 && th.firstChild.classList.contains("hello");
   if (!th.children.length || (only && sigChanged("hello", [S.room, agents().map((a) => a.name)]))) th.replaceChildren(emptyState());
   if (msgs.length) { if (wasNear) { sc.scrollTop = sc.scrollHeight; $("#jump").hidden = true; } else $("#jump").hidden = false; }
@@ -257,7 +257,7 @@ function buildComposer() {
   const pop = h("div", {class: "mentions", id: "mentions", role: "listbox", hidden: true});
   const spk = CAN_SPEAK ? h("button", {class: "icon-btn", id: "spk", "aria-label": "Read replies aloud", "aria-pressed": "false", title: "Read replies aloud", onclick: toggleSpeakSetting}, icon("speaker")) : null;
   const mic = SR ? h("button", {class: "icon-btn", id: "mic", "aria-label": "Speak your message", title: "Speak your message", onclick: toggleListening}, icon("mic")) : null;
-  fill(wrap, h("div", {class: "composer"}, pop, h("div", {class: "box"}, ta, spk, mic, send)),
+  fill(wrap, h("div", {class: "composer"}, pop, h("div", {id: "starters", class: "strip"}), h("div", {id: "to", class: "strip"}), h("div", {class: "box"}, ta, spk, mic, send)),
     h("div", {class: "hint", id: "hint"}, "Enter to send · Shift+Enter for a new line · @ to mention an agent"));
   ta.addEventListener("input", () => {
     ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 220) + "px";
@@ -288,17 +288,36 @@ function pickMention(name) {
   ta.value = before + ta.value.slice(pos); ta.selectionStart = ta.selectionEnd = before.length; $("#mentions").hidden = true; ta.dispatchEvent(new Event("input")); ta.focus();
 }
 async function sendMsg() {
-  const ta = $("#msg"), text = ta.value.trim();
+  const ta = $("#msg"); let text = ta.value.trim();
   if (!text || !S.room || S.sending) return;
+  const target = recipient(); if (target && !/(^|\s)@[a-z]/.test(text)) text = "@" + target + " " + text;  // no need to type @ in a room
   stopSpeaking(); S.sending = true; S.stick = true; ta.value = ""; ta.dispatchEvent(new Event("input"));
+  (S.talked = S.talked || {})[S.room] = true; updateComposer();
   try { await api("/api/say", {room: S.room, text}); S.fast = 12; await poll(true); }
   catch (e) { toast(e.message, true); ta.value = text; ta.dispatchEvent(new Event("input")); }
   finally { S.sending = false; ta.focus(); }
 }
+/* who a plain message in a room goes to: the agent you picked, else the one you last spoke to, else the first */
+function recipient() {
+  const r = curRoom(); if (!r || r.kind === "dm") return null;
+  const ra = roomAgents(r), pick = (S.to || {})[r.name];
+  return ra.includes(pick) ? pick : ra[0] || null;
+}
+function starterIdeas() {
+  const ideas = [["Write a short todo list into a file", "write a short todo list into todo.txt"], ["Work something out with Python", "use python to compute 17 × 23 and show me the result"],
+    ["Remember a preference", "remember that I prefer metric units"], ["What can you do?", "what can you do for me? Keep it short."]];
+  if (S.state && S.state.search_configured) ideas.splice(1, 0, ["Search the web", "search the web for the latest news about AI and summarise it with sources"]);
+  return ideas;
+}
 function updateComposer() {
   const r = curRoom(), ta = $("#msg"); if (!ta) return;
-  ta.placeholder = !agents().length ? "Create an agent first" : r ? (r.kind === "dm" ? "Message " + roomLabel(r) : "Message #" + r.name + " (use @ to mention an agent)") : "Pick a chat";
+  ta.placeholder = !agents().length ? "Create an agent first" : r ? (r.kind === "dm" ? "Message " + roomLabel(r) : "Message " + (recipient() ? "@" + recipient() : "#" + r.name)) : "Pick a chat";
   ta.disabled = !r;
+  const to = $("#to"), st = $("#starters"); if (!to) return;
+  const ra = r && r.kind !== "dm" ? roomAgents(r) : [];
+  if (sigChanged("to", [r && r.name, ra, recipient()])) fill(to, ra.length > 1 ? [h("span", {class: "muted", style: "font-size:13px"}, "To"), ...ra.map((n) => h("button", {class: "chip" + (n === recipient() ? " on" : ""), "aria-pressed": n === recipient(), onclick: () => { (S.to = S.to || {})[r.name] = n; S.sig.to = null; updateComposer(); $("#msg").focus(); }}, "@" + n))] : []);
+  const show = !!r && agents().length > 0 && !(S.talked || {})[r.name];
+  if (sigChanged("starters", [show, r && r.name, S.state && S.state.search_configured])) fill(st, show ? starterIdeas().map(([label, text]) => h("button", {class: "chip", onclick: () => { ta.value = text; ta.dispatchEvent(new Event("input")); ta.focus(); }}, label)) : []);
 }
 
 /* ---------- voice (the browser's own speech: free; audio may be processed by Google or Apple) ---------- */

@@ -206,7 +206,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                                    for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in ws.list_rooms()],
                         "approvals": ws.approvals(), "jobs": ws.list_jobs(), "busy": ws.busy(),
-                        "sandbox": sandbox.status(), "provider": ws.provider(),
+                        "sandbox": sandbox.status(), "provider": ws.provider(), "search_configured": ws.search_settings()["configured"],
                         "improve": {k: v for k, v in ws.improver.status().items() if k != "last"},
                         "usage": {"calls": ws.calls_today(), "limit": ws.daily_calls}}
             if path == "/api/messages":

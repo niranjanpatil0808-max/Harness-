@@ -103,6 +103,8 @@ pre:hover .copy,.copy:focus-visible{opacity:1}
 .hello p{color:var(--muted);margin:0 0 20px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 .chip{border:1px solid var(--line2);border-radius:999px;padding:7px 14px;background:var(--surface);font-size:14px}
+.strip{display:flex;gap:8px;overflow-x:auto;align-items:center;padding:0 2px 8px;scrollbar-width:none}.strip:empty{display:none}.strip .chip{white-space:nowrap;flex:none}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .chip:hover{border-color:var(--accent);color:var(--accent)}
 
 /* composer */
