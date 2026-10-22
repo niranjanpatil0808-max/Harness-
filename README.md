@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/img/chat-approval.png" alt="A chat in Kintsugi: the agent asks to run code and the approval card shows exactly what will run" width="78%">
+  <img src="docs/img/team-tasks.png" alt="The team task board: give an agent a task in a shared room and everyone follows it to done" width="78%">
   <img src="docs/img/phone-chat.png" alt="The same workspace on a phone" width="17%">
 </p>
 <p align="center"><sub>Screenshots use the built-in scripted demo model, so they show the app, not a real model's answers.</sub></p>
@@ -34,7 +34,7 @@ You stay in control: agents ask before anything risky, run code in a locked box,
 | **Phone first** | Installable app, works as an offline shell, voice in and out, push notifications that never contain your message. |
 
 <p align="center">
-  <img src="docs/img/team-tasks.png" alt="The team task board" width="48%">
+  <img src="docs/img/chat-approval.png" alt="An agent asks to run code and the approval card shows exactly what will run" width="48%">
   <img src="docs/img/settings-usage.png" alt="The usage dashboard" width="48%">
 </p>
 
