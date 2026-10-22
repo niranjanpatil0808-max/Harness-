@@ -1,0 +1,50 @@
+# Project status and handoff (kept up to date so nothing is lost)
+
+Last updated: 2026-10-22. Branch: `claude/ecstatic-cray-g930so` (never merged to `main`; do not merge or open a PR unless the owner asks).
+Product: **Kintsugi** (working name; the owner will choose the final name). Built for the Meta Global AI Developer Hackathon (applications close
+Oct 25, 2026). Owner: a "shadow operator" in India; wants honesty; free-only budget.
+
+## What exists (all pushed)
+
+Stage 0 tidy; Stage 1 phone app (PWA, voice, tone, web search, automations, time zones, push, unread); backup (encrypted, to a private GitHub repo);
+easier UX (To: chips, starter ideas); bring-your-own-key providers (OpenAI-style, Anthropic, Gemini); per-agent internet Off/Ask/Allow + guarded
+`web_fetch`; parallel agents (`@all`, configurable); plugins (skills on demand + guarded HTTP tools); Stage 2 teams (invite links, owner/admin/member,
+approval policy, private chats + shared rooms); Stage 3 integrations (GitHub read-only + allow-list, Slack read / approved post, Calendar via secret iCal,
+Gmail read-only IMAP). Learned from the DeepSeek Harness source (cloned at /home/user/deepseek-ai/deepseek-harness, outside the repo, MIT):
+cross-site redirects refused, skills loaded on demand. Docs: README, SECURITY.md, docs/{PHONE,WORKSPACE,HOSTING,SELF_IMPROVEMENT,PLUGINS,TEAMS,INTEGRATIONS}.md.
+
+Tests: `python -m unittest discover -s tests` (~470 tests, ~2.5 min) and `bash tests/ui/run_all.sh` (15 browser suites, ~15 min; needs node + playwright).
+Run them in the background and wait with ONE `while ! grep -q done log; do sleep 4; done` (do not stack waiters; do not use `pkill -f`, it kills the shell).
+
+## Honest verification gaps (say these to the owner)
+
+Nothing has been tried against REAL services: provider keys (OpenAI/Anthropic/Gemini/Groq...), live web fetch, GitHub plugin download, GitHub/Slack/Google Calendar/
+Gmail, real push services, real phones (PWA/voice), a real team over a real deployment. All tested against local fakes. Llama (Meta) not yet tested with a real key.
+
+## Current task: "make it better, fix security bugs and normal bugs, ready for real users"
+
+Four independent reviewers were launched (each in its own worktree). Results so far:
+
+1. **Core/sandbox/tools review (DONE, partial)**: 12 findings, ALL FIXED and regression-tested in `tests/test_workspace_review_fixes.py`:
+   unique sandbox uids (crc32 collided), deleting an agent now clears plugin/integration grants + proposals, a run cannot resurrect a deleted agent's files and an
+   unknown sender cannot post, approvals decided exactly once and never stuck on error, tool argument types, `fix_code` retries clamp, self-improvement cannot reset an
+   agent's provider (`set_model(keep_provider=True)`), message text cannot forge `<message>` blocks, run-failure text scrubbed of keys, dojo agents get no code tools
+   when the sandbox is not isolated, playbook/tone filters see through invisible/fullwidth characters. Not covered by that reviewer (it stopped early): cron/DST, websearch,
+   backup/team/plugins paths, drop-privileges fallback details.
+2. **Hardening already done by me**: removing a person deletes their DMs/jobs/tone; admins cannot approve `fix_code` or unisolated `run_python` and cannot set tier
+   "dangerous"; fetch has a 30 s total deadline (`read1`); per-person 30 messages/minute limit (HTTP 429).
+3. **STILL RUNNING when this file was written** (reports arrive as notifications; fix what they CONFIRM, add a regression test for each, run both test suites, push):
+   - access-control / roles / web-UI XSS reviewer
+   - internet-facing code reviewer (SSRF, plugins, integrations, ICS/IMAP parsers, backup crypto, tar handling, secret leakage)
+   - browser QA reviewer (phone + desktop flows, screenshots)
+   If their reports are lost, re-run equivalent reviews (briefs are easy to rewrite from the scopes above).
+
+## Other pending items
+
+- Scheduled task `trig_011LM215tRj3ag7w3oMdssrw` fires 2026-10-22T17:35Z into the original session: starts the old research experiment batch and, at the end, an
+  ARCHIVE STEP that moves `benchmark/`, `results/`, `RESULTS.md` under `research/` and fixes paths/workflows/tests. Product work in `src/kintsugi/workspace` does not conflict.
+  Before it runs: `git pull --rebase origin claude/ecstatic-cray-g930so`.
+- Ideas not built: per-person agent memory; single sign-on; Python-code plugins; Outlook/Drive/Notion/Linear; compaction; ephemeral helper agents; admin
+  join-any-shared-room is allowed (document it).
+- Before the hackathon demo: try a real key on a phone; try GitHub/Slack/Gmail with real credentials using "Test connection"; run `examples/workspace_demo.py`.
+- Reminder for the owner: choose the final name; add real keys only in the app (Settings > Models), never in chat or the repo.
