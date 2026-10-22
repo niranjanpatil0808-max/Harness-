@@ -202,12 +202,12 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 # newest message per room, and newest one written by someone other than the reader: that drives "unread"
                 latest = {row["room"]: {"last_id": row["last_id"], "last_other": row["last_other"] or 0} for row in ws.db.query(
                     "SELECT room, MAX(id) AS last_id, MAX(CASE WHEN sender != 'you' THEN id END) AS last_other FROM messages GROUP BY room")}
-                return {"agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools", "model", "provider", "playbook")},
+                return {"agents": [{**{k: a[k] for k in ("name", "persona", "tier", "tools", "model", "provider", "internet", "playbook")},
                                     "secrets": ws.keychain.names(a["name"]), "apps": _apps(ws, a["name"])}
                                    for a in ws.list_agents()],
                         "rooms": [{**r, "members": ws.members(r["name"]), **latest.get(r["name"], {"last_id": 0, "last_other": 0})} for r in ws.list_rooms()],
                         "approvals": ws.approvals(), "jobs": ws.list_jobs(), "busy": ws.busy(),
-                        "sandbox": sandbox.status(), "provider": ws.provider(), "search_configured": ws.search_settings()["configured"],
+                        "sandbox": sandbox.status(), "provider": ws.provider(), "search_configured": ws.search_settings()["configured"], "internet_enabled": ws.internet_settings()["enabled"],
                         "providers": [{"id": p["id"], "label": p["label"], "model": p["model"], "default": p["default"]} for p in ws.providers()["profiles"]],
                         "model_ready": bool(ws.providers()["profiles"]) or ws.providers()["env_fallback"] or ws.model_factory is not core_mod.default_model_factory,
                         "improve": {k: v for k, v in ws.improver.status().items() if k != "last"},
@@ -243,6 +243,8 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return ws.backups.status()
             if path == "/api/providers":
                 return ws.providers()
+            if path == "/api/internet":
+                return ws.internet_settings()
             if path == "/api/tone":
                 from .core import TONE_LABELS, TONES
 
@@ -357,6 +359,11 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return {"results": results}
             if path == "/api/search/remove":
                 ws.remove_search_key()
+                return {"ok": True}
+            if path == "/api/internet":
+                return ws.set_internet(body.get("enabled"), body.get("fetch_cap"))
+            if path == "/api/agent/internet":
+                ws.set_agent_internet(str(body["agent"]), str(body["mode"]))
                 return {"ok": True}
             if path == "/api/providers/save":  # the key is write-only: no endpoint ever returns it
                 return ws.set_provider(str(body["id"]), str(body["kind"]), str(body["base_url"]), str(body.get("model") or ""),

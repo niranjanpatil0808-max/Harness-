@@ -528,6 +528,20 @@ async function searchPanel() {
     out, h("p", {class: "muted", style: "font-size:13px;margin-top:14px"}, "Privacy: each search sends the words the agent chose to " + d.providers[d.provider].label + ". Secrets are never included, but think about what you ask. Search is counted and capped, and every search appears in the Log."));
 }
 
+const NET_MODES = [["off", "Off", "This agent cannot use the internet."], ["ask", "Ask", "Every search or page fetch waits for your yes, showing exactly what it will look up."], ["allow", "Allow", "This agent may search and read public pages by itself."]];
+
+/* ---------- settings: internet ---------- */
+async function internetPanel() {
+  const d = await api("/api/internet");
+  const on = h("input", {type: "checkbox", checked: d.enabled, "aria-label": "Let agents use the internet"});
+  const cap = h("input", {type: "number", min: 1, max: 1000, value: d.fetch_cap, "aria-label": "Page fetches per day"});
+  return h("div", {}, h("p", {style: "margin-top:0"}, "You decide whether the AI can go online. Each agent has its own Off / Ask / Allow setting (open the agent's details). This switch overrides all of them."),
+    h("label", {style: "display:flex;gap:10px;align-items:center;margin:12px 0"}, on, "Let agents use the internet at all"),
+    h("div", {style: "margin:12px 0"}, h("label", {style: "margin:0 0 4px"}, "Page fetches per day"), cap, h("small", {class: "muted", style: "display:block;margin-top:2px"}, "Used today: " + d.fetched_today + ". Stops runaway loops.")),
+    h("button", {class: "btn primary", onclick: async () => { const ok = await act(() => api("/api/internet", {enabled: on.checked, fetch_cap: +cap.value}), "Saved"); if (ok) fill($("#settings-body"), await internetPanel()); }}, "Save"),
+    h("p", {class: "muted", style: "font-size:13px;margin-top:16px"}, "What agents can do online: read one public web page as text (never internal addresses, downloads or logins) and, with a key under Search, look things up. Web text is always treated as untrusted information, never as instructions, and every online action appears in the Log."));
+}
+
 /* ---------- settings: models (your own API key) ---------- */
 async function modelsPanel() {
   const d = await api("/api/providers");
@@ -601,7 +615,7 @@ function renderDrawer() {
   const a = agents().find((x) => x.name === focusAgent());
   const editing = d.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
   if (editing) return;
-  const data = {a, tab: S.tab, c: S.cache[S.tab], jobs: S.state.jobs, file: S.file, room: S.room, names: agents().map((x) => x.name)};
+  const data = {a, tab: S.tab, c: S.cache[S.tab], jobs: S.state.jobs, file: S.file, room: S.room, names: agents().map((x) => x.name), net: S.state.internet_enabled, prov: S.state.providers};
   if (!sigChanged("drawer", data)) return;
   const r = curRoom(), choices = (r && roomAgents(r).length ? roomAgents(r) : agents().map((x) => x.name));
   fill(d,
@@ -628,6 +642,9 @@ function tabBody(a) {
       h("h4", {}, "Permissions"), h("div", {class: "seg", role: "group"}, tiers.map(([t]) => h("button", {class: a.tier === t ? "on" : "", "aria-pressed": a.tier === t,
         onclick: () => act(() => api("/api/tier", {agent: a.name, tier: t}), "Permission: " + t)}, t))),
       h("p", {class: "muted", style: "font-size:13px"}, tiers.find((t) => t[0] === a.tier)[1] + ". Tools outside its allow-list are always refused."),
+      h("h4", {}, "Internet"), h("div", {class: "seg", role: "group", "aria-label": "Internet access"}, NET_MODES.map(([m, label]) => h("button", {class: a.internet === m ? "on" : "", "aria-pressed": a.internet === m,
+        onclick: () => act(() => api("/api/agent/internet", {agent: a.name, mode: m}), "Internet: " + label)}, label))),
+      h("p", {class: "muted", style: "font-size:13px"}, NET_MODES.find((m) => m[0] === a.internet)[2] + (S.state.internet_enabled === false ? " (The workspace switch in Settings > Internet is OFF, so nothing goes online.)" : "")),
       h("h4", {}, "Secrets"), a.secrets.length ? a.secrets.map((n) => h("div", {class: "card", style: "display:flex;align-items:center;gap:8px"}, h("code", {style: "flex:1"}, n), h("small", {}, "value hidden"),
         h("button", {class: "btn danger", onclick: () => confirmDialog("Remove " + n + "?", "The agent will no longer be able to use it.", "Remove", () => act(() => api("/api/secret/delete", {agent: a.name, name: n}), "Removed"))}, "Remove"))) : h("p", {class: "muted"}, "None."),
       secretForm(a),
@@ -738,8 +755,8 @@ async function improvePanel() {
   content.append(h("div", {style: "display:flex;justify-content:flex-end;margin-top:8px"}, h("button", {class: "btn primary", onclick: save}, "Save settings")));
   return content;
 }
-const SETTINGS_TABS = [["general", "General"], ["models", "Models"], ["search", "Search"], ["improve", "Improve"], ["backup", "Backup"]];
-const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel(), models: () => modelsPanel()};
+const SETTINGS_TABS = [["general", "General"], ["models", "Models"], ["internet", "Internet"], ["search", "Search"], ["improve", "Improve"], ["backup", "Backup"]];
+const SETTINGS_PANELS = {general: () => generalPanel(), search: () => searchPanel(), improve: () => improvePanel(), backup: () => backupPanel(), models: () => modelsPanel(), internet: () => internetPanel()};
 async function settingsDialog(tab) {
   if (typeof tab !== "string") tab = S.settingsTab || "general";
   S.settingsOpen = true;

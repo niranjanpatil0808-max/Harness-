@@ -488,6 +488,52 @@ class Workspace:
             self.db.execute("INSERT INTO usage (day, calls) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET calls = calls + 1",
                             (f"search-{self._day()}",))
 
+    # --- internet access for agents: the owner decides (workspace switch + per agent Off / Ask / Allow) ---
+
+    INTERNET_MODES = ("off", "ask", "allow")
+
+    def internet_settings(self) -> dict:
+        try:
+            saved = json.loads(self.get_setting("internet", "") or "{}")
+        except json.JSONDecodeError:
+            saved = {}
+        return {"enabled": bool(saved.get("enabled", True)), "fetch_cap": min(max(int(saved.get("fetch_cap", 60)), 1), 1000),
+                "fetched_today": self.fetches_today()}
+
+    def set_internet(self, enabled: bool | None = None, fetch_cap: int | None = None) -> dict:
+        current = self.internet_settings()
+        enabled = current["enabled"] if enabled is None else bool(enabled)
+        cap = current["fetch_cap"] if fetch_cap is None else min(max(int(fetch_cap), 1), 1000)
+        self.set_setting("internet", json.dumps({"enabled": enabled, "fetch_cap": cap}))
+        self.audit(None, "internet-settings", f"enabled={enabled} fetch_cap={cap}")
+        return self.internet_settings()
+
+    def set_agent_internet(self, name: str, mode: str) -> None:
+        self.get_agent(name)
+        if mode not in self.INTERNET_MODES:
+            raise WorkspaceError("internet access must be one of: " + ", ".join(self.INTERNET_MODES))
+        self.db.execute("UPDATE agents SET internet = ? WHERE name = ?", (mode, name))
+        self.audit(name, "internet-changed", mode)
+
+    def internet_mode(self, name: str) -> str:
+        """What this agent may do online right now: off, ask or allow (the workspace switch overrides everything)."""
+        if not self.internet_settings()["enabled"]:
+            return "off"
+        mode = self.get_agent(name)["internet"]
+        return mode if mode in self.INTERNET_MODES else "off"
+
+    def fetches_today(self) -> int:
+        row = self.db.one("SELECT calls FROM usage WHERE day = ?", (f"fetch-{self._day()}",))
+        return row["calls"] if row else 0
+
+    def spend_fetch(self) -> None:
+        with self._lock:
+            cap = self.internet_settings()["fetch_cap"]
+            if self.fetches_today() >= cap:
+                raise WorkspaceError(f"today's limit of {cap} page fetches is used up (the owner can raise it in Settings > Internet)")
+            self.db.execute("INSERT INTO usage (day, calls) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET calls = calls + 1",
+                            (f"fetch-{self._day()}",))
+
     def web_search(self, query: str, count: int = 5) -> list[dict]:
         """Run one search with the owner's key. Raises SearchError/WorkspaceError with messages fit to show."""
         from .websearch import SearchError, search

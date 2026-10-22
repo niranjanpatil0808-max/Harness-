@@ -68,6 +68,7 @@ class WithProvider(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.ws = Workspace(self.tmp.name, model_factory=lambda n: MockModel(["ok"]), encrypt_keychain=False)
         self.ws.create_agent("alice")
+        self.ws.set_agent_internet("alice", "allow")  # these tests are about search itself; the Off/Ask/Allow gate is tested in test_workspace_internet.py
         self.ws.create_room("r", ["alice", "you"])
 
     def tearDown(self):
