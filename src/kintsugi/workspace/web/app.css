@@ -163,3 +163,28 @@ pre.view{background:var(--code);border:1px solid var(--line);border-radius:10px;
   .bubble{max-width:92%}
 }
 @media(min-width:861px){#scrim{display:none}}
+
+/* phone polish: thumb-sized targets, no accidental zoom, safe areas, smooth scrolling */
+html{-webkit-text-size-adjust:100%}
+button,a,input,select,textarea,summary{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#scroll,.d-body,.nav,.dialog{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+@media(max-width:860px){
+  input,select,textarea{font-size:16px}  /* iOS zooms into smaller fields */
+  .icon-btn{width:44px;height:44px}
+  .item{padding:11px 12px}
+  .btn,.pill-btn{min-height:44px}
+  #topbar{padding:calc(8px + env(safe-area-inset-top)) 12px 8px calc(12px + env(safe-area-inset-left))}
+  #sidebar{padding-top:calc(12px + env(safe-area-inset-top));padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+  #drawer{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+  .box{border-radius:24px}
+  .send{width:44px;height:44px;border-radius:14px}
+  .hint{display:none}
+  #thread,#inline{padding-left:12px;padding-right:12px}
+  .dialog{max-height:92dvh}
+  .overlay{align-items:end;padding:0}
+  .overlay .dialog{width:100%!important;border-radius:20px 20px 0 0;max-height:92dvh}
+}
+@media(display-mode:standalone){body{overscroll-behavior-y:none}}
+
+.icon-btn.rec{background:var(--danger);color:#fff;animation:pulse 1.1s ease-in-out infinite}
+.box .icon-btn{flex:none;align-self:flex-end}

@@ -21,4 +21,4 @@ kintsugi = "kintsugi.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"kintsugi.workspace" = ["web/*.html", "web/*.css", "web/*.js", "web/*.svg", "web/vendor/*"]
+"kintsugi.workspace" = ["web/*.html", "web/*.css", "web/*.js", "web/*.svg", "web/*.webmanifest", "web/icons/*", "web/vendor/*"]

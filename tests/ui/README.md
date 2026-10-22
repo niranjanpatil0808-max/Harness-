@@ -11,4 +11,6 @@ rm -rf /tmp/ws && KINTSUGI_TOKEN=tok123 python tests/ui/serve_mock.py /tmp/ws 88
 node tests/ui/safety.js           # secrets never shown or exported, Safety tab, export, delete an agent, isolation wording
 ```
 
-Each prints `no errors` on success. Screenshots go to `$SHOTS` (default `/tmp`).
+`pwa.js` checks the service worker, that `/api` is never cached, the manifest, thumb-sized touch targets and the offline shell on a phone-sized screen; `voice.js` fakes the browser's speech engines to check speech-to-text, read-aloud (backlog never spoken), the hands-free loop, a blocked microphone and an unsupported browser. `improve.js` covers self-improvement.
+
+To run them all: `tests/ui/run_all.sh` (set `CHROMIUM` and `PLAYWRIGHT_MODULE` if needed). Each prints `no errors` on success. Screenshots go to `$SHOTS` (default `/tmp`).

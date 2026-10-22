@@ -2,7 +2,9 @@
 /* Kintsugi workspace UI. Plain JavaScript, no build step. Markdown via marked, sanitised by DOMPurify (both vendored). */
 
 const $ = (s) => document.querySelector(s);
-const S = {token: "", state: null, room: null, agent: null, last: {}, msgs: {}, stick: true, drawer: false, tab: "agent",
+const IS_STANDALONE = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const S = {loadedRooms: {}, installEvent: null, token: "", state: null, room: null, agent: null, last: {}, msgs: {}, stick: true, drawer: false, tab: "agent",
            cache: {}, sig: {}, fast: 0, sending: false, file: null};
 
 function h(tag, attrs, ...kids) {
@@ -25,7 +27,7 @@ const ICONS = {
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', side: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15"/>',
   panel: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M14.5 4.5v15"/>', send: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   theme: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
-  close: '<path d="M6 6l12 12M18 6 6 18"/>', gear: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>', plus: '<path d="M12 5v14M5 12h14"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>', mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', speaker: '<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/>', gear: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>', plus: '<path d="M12 5v14M5 12h14"/>',
 };
 function icon(name, size = 18) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -96,7 +98,7 @@ function sigChanged(key, data) { const s = JSON.stringify(data); if (S.sig[key] 
 function renderSidebar() {
   const st = S.state; if (!st) return;
   const pend = {}; st.approvals.forEach((a) => (pend[a.room] = (pend[a.room] || 0) + 1));
-  if (!sigChanged("side", [st.rooms, st.agents.map((a) => a.name), st.busy, pend, S.room, st.improve])) return;
+  if (!sigChanged("side", [st.rooms, st.agents.map((a) => a.name), st.busy, pend, S.room, st.improve, !!S.installEvent, IS_STANDALONE()])) return;
   const roomItem = (r) => h("button", {class: "item" + (r.name === S.room ? " on" : ""), onclick: () => openRoom(r.name)},
     r.kind === "dm" ? avatar(roomLabel(r)) : h("span", {class: "muted", style: "width:24px;text-align:center"}, "#"),
     h("span", {class: "t"}, roomLabel(r)), busyIn(r).length ? h("span", {class: "dot", title: "working"}) : null,
@@ -112,10 +114,22 @@ function renderSidebar() {
       h("h4", {}, "Agents"),
       st.agents.map((a) => h("button", {class: "item", title: a.persona || a.name, onclick: () => dmWith(a.name)},
         avatar(a.name), h("span", {class: "t"}, a.name), st.busy.includes(a.name) ? h("span", {class: "dot"}) : h("span", {class: "muted", style: "font-size:12px"}, a.tier))),
-      h("button", {class: "item muted", onclick: newAgentDialog}, h("span", {style: "width:24px;text-align:center"}, "+"), "New agent")),
+      h("button", {class: "item muted", onclick: newAgentDialog}, h("span", {style: "width:24px;text-align:center"}, "+"), "New agent"),
+      canInstall() ? h("button", {class: "item muted", onclick: installApp}, h("span", {style: "width:24px;text-align:center"}, "⤓"), "Install the app") : null),
     h("div", {class: "side-foot"}, avatar("you"), h("span", {class: "who"}, "you"),
       h("button", {class: "icon-btn", "aria-label": "Change theme", title: "Theme", onclick: cycleTheme}, icon("theme")),
       h("button", {class: "icon-btn", "aria-label": "Settings", title: "Settings: self-improvement", onclick: settingsDialog}, icon("gear"))));
+}
+const canInstall = () => !IS_STANDALONE() && (!!S.installEvent || IS_IOS);
+async function installApp() {
+  if (S.installEvent) {
+    S.installEvent.prompt();
+    try { await S.installEvent.userChoice; } catch (e) { /* dismissed */ }
+    S.installEvent = null; S.sig.side = null; renderSidebar(); return;
+  }
+  dialog("Install on your iPhone or iPad", "Safari has no install button, but it takes two taps:", h("ol", {style: "line-height:1.8"},
+    h("li", {}, "Tap the Share button (the square with an arrow) in Safari."), h("li", {}, "Choose “Add to Home Screen”, then tap Add.")),
+    (close) => [h("button", {class: "btn primary", onclick: close}, "Got it")]);
 }
 function toggleSidebar() {
   const app = $("#app");
@@ -221,7 +235,9 @@ function buildComposer() {
   const ta = h("textarea", {id: "msg", rows: 1, "aria-label": "Message", autocomplete: "off", enterkeyhint: "send"});
   const send = h("button", {class: "send", id: "send", "aria-label": "Send", disabled: true, onclick: sendMsg}, icon("send"));
   const pop = h("div", {class: "mentions", id: "mentions", role: "listbox", hidden: true});
-  fill(wrap, h("div", {class: "composer"}, pop, h("div", {class: "box"}, ta, send)),
+  const spk = CAN_SPEAK ? h("button", {class: "icon-btn", id: "spk", "aria-label": "Read replies aloud", "aria-pressed": "false", title: "Read replies aloud", onclick: toggleSpeakSetting}, icon("speaker")) : null;
+  const mic = SR ? h("button", {class: "icon-btn", id: "mic", "aria-label": "Speak your message", title: "Speak your message", onclick: toggleListening}, icon("mic")) : null;
+  fill(wrap, h("div", {class: "composer"}, pop, h("div", {class: "box"}, ta, spk, mic, send)),
     h("div", {class: "hint", id: "hint"}, "Enter to send · Shift+Enter for a new line · @ to mention an agent"));
   ta.addEventListener("input", () => {
     ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 220) + "px";
@@ -254,7 +270,7 @@ function pickMention(name) {
 async function sendMsg() {
   const ta = $("#msg"), text = ta.value.trim();
   if (!text || !S.room || S.sending) return;
-  S.sending = true; S.stick = true; ta.value = ""; ta.dispatchEvent(new Event("input"));
+  stopSpeaking(); S.sending = true; S.stick = true; ta.value = ""; ta.dispatchEvent(new Event("input"));
   try { await api("/api/say", {room: S.room, text}); S.fast = 12; await poll(true); }
   catch (e) { toast(e.message, true); ta.value = text; ta.dispatchEvent(new Event("input")); }
   finally { S.sending = false; ta.focus(); }
@@ -265,9 +281,78 @@ function updateComposer() {
   ta.disabled = !r;
 }
 
+/* ---------- voice (the browser's own speech: free; audio may be processed by Google or Apple) ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const CAN_SPEAK = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+const LANGS = [["", "Automatic (my phone's language)"], ["en-US", "English (US)"], ["en-GB", "English (UK)"], ["en-IN", "English (India)"], ["hi-IN", "Hindi"], ["mr-IN", "Marathi"],
+  ["es-ES", "Spanish"], ["fr-FR", "French"], ["de-DE", "German"], ["pt-BR", "Portuguese (Brazil)"], ["ar-SA", "Arabic"], ["ja-JP", "Japanese"], ["zh-CN", "Chinese"]];
+const voice = () => { try { return {speak: false, handsfree: false, lang: "", ...JSON.parse(store.get("kt-voice") || "{}")}; } catch (e) { return {speak: false, handsfree: false, lang: ""}; } };
+function saveVoice(v) { store.set("kt-voice", JSON.stringify(v)); syncVoiceButtons(); }
+const voiceLang = () => voice().lang || navigator.language || "en-US";
+let recog = null, listening = false;
+function syncVoiceButtons() {
+  const spk = $("#spk"), mic = $("#mic");
+  if (spk) { spk.setAttribute("aria-pressed", String(!!voice().speak)); spk.style.color = voice().speak ? "var(--accent)" : ""; }
+  if (mic) { mic.classList.toggle("rec", listening); mic.setAttribute("aria-label", listening ? "Stop listening" : "Speak your message"); }
+}
+function toggleSpeakSetting() { const v = voice(); v.speak = !v.speak; saveVoice(v); if (!v.speak) stopSpeaking(); toast(v.speak ? "Replies will be read aloud" : "Read-aloud off"); }
+function toggleListening() { if (listening) { if (recog) recog.stop(); return; } stopSpeaking(); startListening(); }
+function startListening() {
+  if (!SR) { toast("This browser can't do voice input. Chrome and Safari can.", true); return; }
+  const ta = $("#msg"); if (!ta || ta.disabled) return;
+  const base = ta.value.trim() ? ta.value.trim() + " " : "";
+  let heard = "";
+  recog = new SR(); recog.lang = voiceLang(); recog.interimResults = true; recog.continuous = false; recog.maxAlternatives = 1;
+  recog.onstart = () => { listening = true; syncVoiceButtons(); };
+  recog.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) { const r = e.results[i]; if (r.isFinal) heard += r[0].transcript; else interim += r[0].transcript; }
+    ta.value = base + heard + interim; ta.dispatchEvent(new Event("input"));
+  };
+  recog.onerror = (e) => {
+    const why = {"not-allowed": "Microphone blocked. Allow it for this site in your browser settings.", "service-not-allowed": "Voice input is turned off for this browser.",
+      "no-speech": "I didn't hear anything.", "audio-capture": "No microphone found.", "network": "Voice input needs an internet connection."};
+    if (e.error !== "aborted") toast(why[e.error] || "Voice error: " + e.error, true);
+  };
+  recog.onend = () => { listening = false; syncVoiceButtons(); if (voice().handsfree && heard.trim()) sendMsg(); };
+  try { recog.start(); } catch (e) { /* already running */ }
+}
+function speakable(text) {
+  return text.replace(/```[\s\S]*?```/g, " (code omitted) ").replace(/`([^`]*)`/g, "$1").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, " link ").replace(/[*_#>~|]/g, "").replace(/\s+/g, " ").trim().slice(0, 700);
+}
+function speak(text) {
+  if (!CAN_SPEAK) return;
+  const t = speakable(text); if (!t) return;
+  const u = new SpeechSynthesisUtterance(t); u.lang = voiceLang();
+  u.onend = () => { if (voice().handsfree && SR && !speechSynthesis.speaking && !S.sending) setTimeout(startListening, 300); };
+  speechSynthesis.speak(u);
+}
+function stopSpeaking() { if (CAN_SPEAK) speechSynthesis.cancel(); }
+function maybeSpeak(msgs) { if (voice().speak) for (const m of msgs) if (isAgent(m.sender)) speak(m.text); }
+
+/* ---------- settings: general ---------- */
+function generalPanel() {
+  const v = voice();
+  const speakBox = h("input", {type: "checkbox", checked: v.speak, disabled: !CAN_SPEAK, style: "width:auto", onchange: (e) => { saveVoice({...voice(), speak: e.target.checked}); if (!e.target.checked) stopSpeaking(); }});
+  const handsBox = h("input", {type: "checkbox", checked: v.handsfree, disabled: !SR || !CAN_SPEAK, style: "width:auto", onchange: (e) => { const nv = {...voice(), handsfree: e.target.checked}; if (e.target.checked) nv.speak = true; saveVoice(nv); speakBox.checked = nv.speak; }});
+  const lang = h("select", {"aria-label": "Voice language", onchange: (e) => saveVoice({...voice(), lang: e.target.value})}, LANGS.map(([c, l]) => h("option", {value: c, selected: v.lang === c}, l)));
+  const theme = h("select", {"aria-label": "Theme", onchange: (e) => { store.set("kt-theme", e.target.value); applyTheme(); }}, [["", "Match my phone"], ["light", "Light"], ["dark", "Dark"]].map(([c, l]) => h("option", {value: c, selected: (store.get("kt-theme") || "") === c}, l)));
+  const row = (label, el, note) => h("div", {style: "margin:12px 0"}, h("label", {style: "margin:0 0 4px"}, label), el, note ? h("small", {class: "muted", style: "display:block;margin-top:2px"}, note) : null);
+  return h("div", {}, h("h4", {style: "margin:0 0 4px"}, "Voice"),
+    !SR ? h("p", {class: "muted", style: "margin:4px 0"}, "Voice input is not available in this browser (Chrome and Safari support it).") : null,
+    h("label", {style: "display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:10px 0"}, speakBox, h("span", {}, "Read replies aloud" + (CAN_SPEAK ? "" : " (not available in this browser)"))),
+    h("label", {style: "display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:10px 0"}, handsBox, h("span", {}, "Hands-free conversation: after each spoken reply, listen again and send what I say.")),
+    row("Voice language", lang, "Your phone's speech service does the listening and talking. On Chrome (Android) it is Google's, on iPhone it is Apple's, so your voice may leave your phone for that company. Nothing is recorded or kept by this app."),
+    h("h4", {style: "margin:18px 0 4px"}, "Appearance"), row("Theme", theme),
+    h("h4", {style: "margin:18px 0 4px"}, "This app"),
+    canInstall() ? h("button", {class: "btn", onclick: installApp}, "Install on this device") : h("p", {class: "muted", style: "margin:4px 0"}, IS_STANDALONE() ? "You are using the installed app." : "To install: use your browser's menu and choose “Install app” or “Add to Home screen”."),
+    h("div", {style: "margin-top:12px"}, h("button", {class: "btn", onclick: () => { speak("Hello! This is how I sound."); }}, "Test voice")));
+}
+
 /* ---------- navigation ---------- */
 function openRoom(name) {
-  S.room = name; S.last[name] = 0; S.stick = true; S.sig = {}; closeSidebarMobile(); focusAgent();
+  S.room = name; S.last[name] = 0; S.loadedRooms[name] = false; S.stick = true; S.sig = {}; closeSidebarMobile(); focusAgent();
   const ta = $("#msg"); if (ta) { ta.value = store.get("kt-draft-" + name) || ""; ta.dispatchEvent(new Event("input")); }
   poll(true);
 }
@@ -399,9 +484,8 @@ function improveTab(a) {
     h("h4", {}, "Proposals for " + a.name), mine.length ? mine.slice(0, 8).map((p) => proposalCard(p)) : h("p", {class: "muted"}, "Nothing yet. Run a study from Settings (the gear in the sidebar)."),
     h("button", {class: "btn", onclick: settingsDialog}, "Open self-improvement settings")];
 }
-async function settingsDialog() {
-  let data;
-  try { data = await api("/api/improve"); S.improve = data; } catch (e) { toast(e.message, true); return; }
+async function improvePanel() {
+  const data = await api("/api/improve"); S.improve = data;
   const st = data.settings;
   const cadence = h("select", {"aria-label": "Run automatically"}, CADENCES.map(([v, l]) => h("option", {value: v, selected: (st.enabled ? st.cadence_days : 0) === v}, l)));
   const calls = h("input", {type: "number", min: 20, max: 1000, value: st.max_calls, "aria-label": "Model calls per study"});
@@ -428,10 +512,25 @@ async function settingsDialog() {
     h("label", {style: "display:flex;gap:8px;align-items:flex-start;font-weight:400"}, auto, h("span", {}, "Apply clear wins automatically (a gain of at least 20 points on the practice tasks and no unsafe actions). Off means I review every change.")),
     h("label", {style: "display:flex;gap:8px;align-items:flex-start;font-weight:400"}, share, h("span", {}, "Also learn from each agent's own lessons. This sends those lessons to " + (S.state ? S.state.provider : "your model provider") + ".")),
     h("p", {class: "muted", style: "font-size:13px"}, "Honest limits: the practice suite is small, so differences of a few points are noise. It cannot prove an agent is better on your real work."));
+  content.append(h("div", {style: "display:flex;justify-content:flex-end;margin-top:8px"}, h("button", {class: "btn primary", onclick: save}, "Save settings")));
+  return content;
+}
+const SETTINGS_TABS = [["general", "General"], ["improve", "Improve"]];
+const SETTINGS_PANELS = {general: () => generalPanel(), improve: () => improvePanel()};
+async function settingsDialog(tab) {
+  if (typeof tab !== "string") tab = S.settingsTab || "general";
   S.settingsOpen = true;
-  const closeSettings = dialog("Settings", null, content, (close) => [h("button", {class: "btn", onclick: close}, "Close"), h("button", {class: "btn primary", onclick: save}, "Save settings")], () => { S.settingsOpen = false; });
-  closeSettings.dialog.style.width = "min(640px,100%)";
-  renderImproveSections(data);
+  const body = h("div", {id: "settings-body"}), bar = h("div", {class: "tabs", role: "tablist", style: "padding:0;margin:0 0 12px"});
+  const show = async (key) => {
+    S.settingsTab = key;
+    fill(bar, SETTINGS_TABS.map(([k, label]) => h("button", {class: "tab" + (k === key ? " on" : ""), role: "tab", "aria-selected": k === key, onclick: () => show(k)}, label)));
+    fill(body, h("p", {class: "muted"}, "Loading…"));
+    try { fill(body, await SETTINGS_PANELS[key]()); } catch (e) { fill(body, h("p", {class: "muted"}, e.message)); }
+    if (key === "improve") renderImproveSections(S.improve);
+  };
+  const close = dialog("Settings", null, h("div", {}, bar, body), (c) => [h("button", {class: "btn primary", onclick: c}, "Done")], () => { S.settingsOpen = false; });
+  close.dialog.style.width = "min(640px,100%)";
+  await show(tab);
 }
 async function loadImproveSections() { try { S.improve = await api("/api/improve"); renderImproveSections(S.improve); } catch (e) { /* the poll shows connection problems */ } }
 function renderImproveSections(d) {
@@ -508,13 +607,21 @@ async function poll(now) {
       const after = S.last[S.room] || 0, fresh = await api("/api/messages?room=" + encodeURIComponent(S.room) + "&after=" + after);
       const msgs = fresh.filter((m) => m.id > after);
       if (msgs.length) S.last[S.room] = msgs[msgs.length - 1].id;
+      const wasLoaded = !!S.loadedRooms[S.room];
       renderThread(msgs);
+      S.loadedRooms[S.room] = true;
+      if (wasLoaded) maybeSpeak(msgs);  // never read the backlog aloud, only what arrives while you are here
     } else renderThread([]);
     renderInline();
     if (S.drawer) { await loadTab(); renderDrawer(); }
     if (S.settingsOpen) await loadImproveSections();
+    if (S.wantNew && S.state) { S.wantNew = false; newChatDialog(); }
     $("#main").classList.remove("offline");
-  } catch (e) { if (!/access token/.test(e.message)) toast(e.message === "Failed to fetch" ? "Can't reach the workspace. Retrying…" : e.message, true); }
+  } catch (e) {
+    if (!/access token/.test(e.message)) toast(e.message === "Failed to fetch" ? "Can't reach the workspace. Retrying…" : e.message, true);
+    if (!S.state && !/access token/.test(e.message)) fill($("#thread"), h("div", {class: "hello"}, h("img", {src: "/static/logo.svg", alt: ""}),
+      h("h2", {}, navigator.onLine ? "Can't reach your workspace" : "You're offline"), h("p", {}, "Your chats are safe on your server. They will appear as soon as the connection is back.")));
+  }
   finally {
     polling = false;
     if (again) { again = false; poll(); return; }
@@ -525,8 +632,33 @@ async function poll(now) {
 }
 
 /* ---------- start ---------- */
+function setupMobile() {
+  syncVoiceButtons();
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => { /* private mode or unsupported: the app works without it */ });
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); S.installEvent = e; S.sig.side = null; renderSidebar(); });
+  window.addEventListener("appinstalled", () => { S.installEvent = null; S.sig.side = null; renderSidebar(); toast("Installed. Open it from your home screen."); });
+  window.addEventListener("offline", () => toast("You're offline. The app will catch up when you're back.", true));
+  window.addEventListener("online", () => { toast("Back online"); poll(true); });
+  // keep the composer above the on-screen keyboard (iOS does not shrink the layout viewport)
+  if (window.visualViewport) {
+    const fit = () => { $("#app").style.height = matchMedia("(max-width:860px)").matches ? visualViewport.height + "px" : ""; if (matchMedia("(max-width:860px)").matches) window.scrollTo(0, 0); };
+    visualViewport.addEventListener("resize", fit); visualViewport.addEventListener("scroll", fit); fit();
+  }
+  // swipe in from the left edge to open the sidebar, swipe left on it to close
+  let sx = 0, sy = 0, tracking = "";
+  document.addEventListener("touchstart", (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; tracking = sx < 24 ? "open" : $("#app").classList.contains("open") ? "close" : ""; }, {passive: true});
+  document.addEventListener("touchend", (e) => {
+    if (!tracking || !matchMedia("(max-width:860px)").matches) return;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = Math.abs(t.clientY - sy);
+    if (tracking === "open" && dx > 70 && dy < 50 && !$("#app").classList.contains("open")) toggleSidebar();
+    if (tracking === "close" && dx < -70 && dy < 50) closeSidebarMobile();
+    tracking = "";
+  }, {passive: true});
+}
 function init() {
   applyTheme();
+  setupMobile();
+  if (new URLSearchParams(location.search).get("action") === "new") { S.wantNew = true; history.replaceState(null, "", location.pathname + location.hash); }
   const m = location.hash.match(/token=([^&]+)/);
   if (m) { S.token = decodeURIComponent(m[1]); store.set("kt-token", S.token); history.replaceState(null, "", location.pathname); }
   else S.token = store.get("kt-token") || "";
@@ -536,7 +668,7 @@ function init() {
   $("#jump").addEventListener("click", () => { const s = $("#scroll"); s.scrollTop = s.scrollHeight; $("#jump").hidden = true; });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#dialog-root .dialog")) { if (S.drawer) toggleDrawer(false); closeSidebarMobile(); } });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(true); });
-  buildComposer(); $("#sidebar").replaceChildren(h("div", {class: "brand"}, h("img", {src: "/static/logo.svg", alt: ""}), "Kintsugi"));
+  buildComposer(); syncVoiceButtons(); $("#sidebar").replaceChildren(h("div", {class: "brand"}, h("img", {src: "/static/logo.svg", alt: ""}), "Kintsugi"));
   poll(true);
 }
 init();

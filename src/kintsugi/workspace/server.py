@@ -27,12 +27,22 @@ from .scheduler import Scheduler
 MAX_BODY = 64_000
 WEB = Path(__file__).parent / "web"
 PAGE_CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
-            "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+            "connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
 APP_LINK_SECONDS = 3600
 MAX_FAILURES, FAILURE_WINDOW = 10, 60  # wrong tokens per client per minute before it is turned away
 MIN_PUBLIC_TOKEN = 24
 APP_CSP = ("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; "
            "style-src 'unsafe-inline'; img-src data:")
+
+
+def web_version() -> str:
+    """A short hash of the interface files: a new build gets a new service-worker cache, so phones update."""
+    digest = hashlib.sha256()
+    for path in sorted(WEB.rglob("*")):
+        if path.is_file():
+            digest.update(path.relative_to(WEB).as_posix().encode())
+            digest.update(path.read_bytes())
+    return digest.hexdigest()[:12]
 
 
 def load_token(ws: Workspace) -> str:
@@ -147,6 +157,11 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
             query = parse_qs(url.query)
             if url.path == "/healthz":  # for hosting platforms; reveals nothing
                 return self._json(200, {"ok": True})
+            if url.path == "/manifest.webmanifest":
+                return self._send(200, (WEB / "manifest.webmanifest").read_bytes(), "application/manifest+json")
+            if url.path == "/sw.js":  # served from the root so it can control the whole app
+                body = (WEB / "sw.js").read_bytes().replace(b"__VERSION__", web_version().encode())
+                return self._send(200, body, "text/javascript; charset=utf-8", {"Service-Worker-Allowed": "/", "X-Frame-Options": "DENY"})
             if url.path in ("/", "/index.html"):
                 return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8",
                                   {"Content-Security-Policy": PAGE_CSP, "X-Frame-Options": "DENY"})
@@ -322,7 +337,7 @@ def make_server(ws: Workspace, host: str = "127.0.0.1", port: int = 8765, token:
                 return self._json(404, {"error": "not found"})
             if not target.is_file() or target.name == "index.html":
                 return self._json(404, {"error": "not found"})
-            ctype = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml"}.get(
+            ctype = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png"}.get(
                 target.suffix, "application/octet-stream")
             self._send(200, target.read_bytes(), ctype + "; charset=utf-8" if ctype.startswith("text") else ctype)
 

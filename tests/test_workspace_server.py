@@ -288,6 +288,55 @@ class TestServer(unittest.TestCase):
         self.assertEqual(self.ws.get_agent("alice")["playbook"], "- Read a file before changing it.")  # unchanged
         self.assertEqual(self.call("POST", "/api/agent/playbook", {"agent": "alice", "playbook": ""})[0], 200)
 
+    def test_the_app_is_installable_manifest_icons_and_service_worker(self):
+        import re
+        import struct
+
+        status, data, resp = self.call("GET", "/manifest.webmanifest", token=None)
+        self.assertEqual(status, 200)
+        self.assertIn("manifest+json", resp.getheader("Content-Type"))
+        manifest = json.loads(data)
+        self.assertEqual((manifest["display"], manifest["start_url"], manifest["scope"]), ("standalone", "/", "/"))
+        self.assertTrue(manifest["name"] and manifest["short_name"] and manifest["theme_color"] and manifest["background_color"])
+        purposes = {i["purpose"] for i in manifest["icons"]}
+        self.assertEqual(purposes, {"any", "maskable"})
+        for icon in manifest["icons"]:
+            status, png, resp = self.call("GET", icon["src"], token=None)
+            self.assertEqual((status, resp.getheader("Content-Type")), (200, "image/png"), icon["src"])
+            width, height = struct.unpack(">II", png[16:24])
+            self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n")
+            self.assertEqual(f"{width}x{height}", icon["sizes"], icon["src"])
+        self.assertTrue(any(i["sizes"] == "192x192" for i in manifest["icons"]) and any(i["sizes"] == "512x512" for i in manifest["icons"]))
+        page = self.call("GET", "/", token=None)[1].decode()
+        for needle in ('rel="manifest"', "apple-touch-icon", 'name="theme-color"', "viewport-fit=cover"):
+            self.assertIn(needle, page)
+        status, apple, _ = self.call("GET", "/static/icons/apple-touch-icon.png", token=None)
+        self.assertEqual(struct.unpack(">II", apple[16:24]), (180, 180))
+
+        status, worker, resp = self.call("GET", "/sw.js", token=None)
+        self.assertEqual(status, 200)
+        self.assertEqual(resp.getheader("Service-Worker-Allowed"), "/")
+        self.assertNotIn(b"__VERSION__", worker)
+        text = worker.decode()
+        self.assertRegex(text, r'const VERSION = "[0-9a-f]{12}"')
+        # everything the worker precaches must really be served, or installing the worker fails
+        shell = re.search(r"const SHELL = \[(.*?)\];", text, re.S).group(1)
+        paths = re.findall(r'"(/[^"]*)"', shell)
+        self.assertGreater(len(paths), 5)
+        for path in paths:
+            self.assertEqual(self.call("GET", path, token=None)[0], 200, path)
+        # it must leave your data alone: the API and apps are never cached
+        self.assertIn('url.pathname.startsWith("/api/")', text)
+        self.assertIn('url.pathname.startsWith("/apps/")', text)
+        self.assertNotIn("X-Token", text)
+        self.assertIn("worker-src 'self'", self.call("GET", "/", token=None)[2].getheader("Content-Security-Policy"))
+
+    def test_the_service_worker_version_tracks_the_interface_files(self):
+        from kintsugi.workspace.server import web_version
+
+        self.assertEqual(web_version(), web_version())
+        self.assertRegex(web_version(), r"^[0-9a-f]{12}$")
+
     def test_token_can_come_from_the_environment(self):
         from unittest import mock
 

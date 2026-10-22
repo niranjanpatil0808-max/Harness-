@@ -11,6 +11,7 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8804';
   await p.waitForSelector('.sys');
   // open settings, run a models-only study
   await p.click('button[aria-label="Settings"]');
+  await p.click('.tab:has-text("Improve")');
   await p.waitForSelector('text=Run a study');
   await p.screenshot({ path: SHOTS + '/i1_settings.png' });
   await p.click('text=Compare models only');
