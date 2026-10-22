@@ -1,0 +1,524 @@
+{
+  "meta": {
+    "started": "2026-10-22T17:54:27+00:00",
+    "git_commit": "7e3295e",
+    "mock": false,
+    "modes": [
+      "baseline",
+      "loop",
+      "loop+graph"
+    ],
+    "repeats": 1,
+    "temperature": 0.0,
+    "extra": {},
+    "split_file": "split_scale.json",
+    "split": {
+      "note": "Large-project suite: one 17-module shop codebase with a different bug injected per task. Written before any model was run on it. Memory warms up on 3 tasks; 7 are scored.",
+      "warmup": [
+        "L06_parse_money",
+        "L09_reserve_stock",
+        "L10_format_money"
+      ],
+      "heldout": [
+        "L01_shipping_bands",
+        "L02_tax_rounding",
+        "L03_loyalty_tiers",
+        "L04_tax_after_discount",
+        "L05_low_stock",
+        "L07_default_region",
+        "L08_free_shipping_base"
+      ],
+      "hard": []
+    },
+    "model": "allam-2-7b",
+    "base_url": "https://api.groq.com/openai/v1",
+    "finished": "2026-10-22T18:05:27+00:00"
+  },
+  "runs": {
+    "baseline": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "L01_shipping_bands",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L02_tax_rounding",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L03_loyalty_tiers",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L04_tax_after_discount",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L05_low_stock",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L07_default_region",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L08_free_shipping_base",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 0,
+          "prompt_tokens": 0,
+          "completion_tokens": 0
+        }
+      }
+    ],
+    "loop": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "L01_shipping_bands",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L02_tax_rounding",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L03_loyalty_tiers",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L04_tax_after_discount",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L05_low_stock",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L07_default_region",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L08_free_shipping_base",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 0,
+              "tokens": 0
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 1,
+            "error_types": [
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 0,
+          "prompt_tokens": 0,
+          "completion_tokens": 0
+        }
+      }
+    ],
+    "loop+graph": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "L01_shipping_bands",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3315
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 2,
+            "error_types": [
+              "ImportError",
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L02_tax_rounding",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 4,
+              "tokens": 14006
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "ImportError",
+              "IndentationError",
+              "IndentationError",
+              "IndentationError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/unittest/loader.py\", line 339, in _get_module_from_name\n    __import__(name)\n  File \"/tmp/kintsugi-71exe4q5/task/test_tax_rounding.py\", line 3, in <module>\n    from taxes import price_with_tax, tax_for\n  File \"/tmp/kintsugi-71exe4q5/task/taxes.py\", line 8\n    def tax_for(cents, region):\n                               ^\nIndentationError: expected an indented block after function definition on line 8\n\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)",
+            "last_reply": "```python\n# file: taxes.py\nfrom config import DEFAULT_REGION, TAX_RATES_BPS\nfrom pricing import price_with_tax, tax_for\nfrom money import percent_of\n\n\n\n\ndef tax_for(cents, region):"
+          },
+          {
+            "task_id": "L03_loyalty_tiers",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3605
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 2,
+            "error_types": [
+              "ImportError",
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L04_tax_after_discount",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 4097
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 2,
+            "error_types": [
+              "FormatError",
+              "ModelError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "Model API error 400: '{\"error\":{\"message\":\"Please reduce the length of the messages or completion.\",\"type\":\"invalid_request_error\",\"param\":\"messages\",\"code\":\"context_length_exceeded\"}}\\n'",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L05_low_stock",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 4,
+              "tokens": 14404
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "SyntaxError",
+              "IndentationError",
+              "IndentationError",
+              "IndentationError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "dule_from_name(name)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/unittest/loader.py\", line 339, in _get_module_from_name\n    __import__(name)\n  File \"/tmp/kintsugi-0m4ecc2h/task/test_low_stock.py\", line 3, in <module>\n    from inventory import Stock\n  File \"/tmp/kintsugi-0m4ecc2h/task/inventory.py\", line 10\n    class Stock:\n                ^\nIndentationError: expected an indented block after class definition on line 10\n\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)",
+            "last_reply": "```python\n# file: inventory.py\n\"\"\"Stock keeping.\"\"\"\n\nfrom typing import List\n\nfrom config import LOW_STOCK_THRESHOLD\n\n\n\n\nclass Stock:"
+          },
+          {
+            "task_id": "L07_default_region",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 4,
+              "tokens": 12376
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "ImportError",
+              "ImportError",
+              "IndentationError",
+              "IndentationError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/unittest/loader.py\", line 339, in _get_module_from_name\n    __import__(name)\n  File \"/tmp/kintsugi-0l7fxi43/task/test_default_region.py\", line 3, in <module>\n    from taxes import tax_for, tax_rate_bps\n  File \"/tmp/kintsugi-0l7fxi43/task/taxes.py\", line 4\n    def tax_for(cents, region):\n                               ^\nIndentationError: expected an indented block after function definition on line 4\n\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)",
+            "last_reply": "```python\n# file: taxes.py\nfrom config import DEFAULT_REGION, TAX_RATES_BPS\n\n\ndef tax_for(cents, region):"
+          },
+          {
+            "task_id": "L08_free_shipping_base",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 4,
+              "tokens": 15877
+            },
+            "scored": true,
+            "passed": false,
+            "num_attempts": 4,
+            "error_types": [
+              "SyntaxError",
+              "SyntaxError",
+              "SyntaxError",
+              "FormatError"
+            ],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "No usable code block found. Reply with the full fixed file in a ```python block starting with '# file: <path>'.",
+            "last_reply": "```python\n```"
+          }
+        ],
+        "usage": {
+          "calls": 19,
+          "prompt_tokens": 53585,
+          "completion_tokens": 14095
+        }
+      }
+    ]
+  },
+  "summary": {
+    "baseline": {
+      "repeats": 1,
+      "pass_rate_mean": 0.0,
+      "pass_rate_min": 0.0,
+      "pass_rate_max": 0.0,
+      "avg_attempts": 1,
+      "first_attempt_rate_mean": 0,
+      "rejected_tasks": 7,
+      "calls_scored": 0,
+      "tokens_scored": 0
+    },
+    "loop": {
+      "repeats": 1,
+      "pass_rate_mean": 0.0,
+      "pass_rate_min": 0.0,
+      "pass_rate_max": 0.0,
+      "avg_attempts": 1,
+      "first_attempt_rate_mean": 0,
+      "rejected_tasks": 7,
+      "calls_scored": 0,
+      "tokens_scored": 0
+    },
+    "loop+graph": {
+      "repeats": 1,
+      "pass_rate_mean": 0.0,
+      "pass_rate_min": 0.0,
+      "pass_rate_max": 0.0,
+      "avg_attempts": 3.142857142857143,
+      "first_attempt_rate_mean": 0,
+      "rejected_tasks": 3,
+      "calls_scored": 19,
+      "tokens_scored": 67680
+    }
+  }
+}

@@ -1,0 +1,464 @@
+{
+  "meta": {
+    "started": "2026-10-22T18:05:27+00:00",
+    "git_commit": "7e3295e",
+    "mock": false,
+    "modes": [
+      "baseline",
+      "loop",
+      "loop+graph"
+    ],
+    "repeats": 1,
+    "temperature": 0.0,
+    "extra": {},
+    "split_file": "split_scale.json",
+    "split": {
+      "note": "Large-project suite: one 17-module shop codebase with a different bug injected per task. Written before any model was run on it. Memory warms up on 3 tasks; 7 are scored.",
+      "warmup": [
+        "L06_parse_money",
+        "L09_reserve_stock",
+        "L10_format_money"
+      ],
+      "heldout": [
+        "L01_shipping_bands",
+        "L02_tax_rounding",
+        "L03_loyalty_tiers",
+        "L04_tax_after_discount",
+        "L05_low_stock",
+        "L07_default_region",
+        "L08_free_shipping_base"
+      ],
+      "hard": []
+    },
+    "model": "qwen/qwen3.8-27b",
+    "base_url": "https://api.groq.com/openai/v1",
+    "finished": "2026-10-22T18:13:46+00:00"
+  },
+  "runs": {
+    "baseline": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "L01_shipping_bands",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3891
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L02_tax_rounding",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3798
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L03_loyalty_tiers",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3864
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L04_tax_after_discount",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3973
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L05_low_stock",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3895
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L07_default_region",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3723
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L08_free_shipping_base",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3828
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 7,
+          "prompt_tokens": 25660,
+          "completion_tokens": 1312
+        }
+      }
+    ],
+    "loop": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "L01_shipping_bands",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3891
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L02_tax_rounding",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3798
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L03_loyalty_tiers",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3864
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L04_tax_after_discount",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3973
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L05_low_stock",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3895
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L07_default_region",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3723
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L08_free_shipping_base",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 3828
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 7,
+          "prompt_tokens": 25660,
+          "completion_tokens": 1312
+        }
+      }
+    ],
+    "loop+graph": [
+      {
+        "repeat": 0,
+        "tasks": [
+          {
+            "task_id": "L01_shipping_bands",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1931
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L02_tax_rounding",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1902
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L03_loyalty_tiers",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 2163
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L04_tax_after_discount",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 2769
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L05_low_stock",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1961
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L07_default_region",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 1825
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          },
+          {
+            "task_id": "L08_free_shipping_base",
+            "kind": "scale",
+            "difficulty": "medium",
+            "usage": {
+              "calls": 1,
+              "tokens": 2106
+            },
+            "scored": true,
+            "passed": true,
+            "num_attempts": 1,
+            "error_types": [],
+            "lessons_used": [],
+            "lessons_learned": [],
+            "last_output": "",
+            "last_reply": ""
+          }
+        ],
+        "usage": {
+          "calls": 7,
+          "prompt_tokens": 13345,
+          "completion_tokens": 1312
+        }
+      }
+    ]
+  },
+  "summary": {
+    "baseline": {
+      "repeats": 1,
+      "pass_rate_mean": 1.0,
+      "pass_rate_min": 1.0,
+      "pass_rate_max": 1.0,
+      "avg_attempts": 1,
+      "first_attempt_rate_mean": 1,
+      "calls_scored": 7,
+      "tokens_scored": 26972
+    },
+    "loop": {
+      "repeats": 1,
+      "pass_rate_mean": 1.0,
+      "pass_rate_min": 1.0,
+      "pass_rate_max": 1.0,
+      "avg_attempts": 1,
+      "first_attempt_rate_mean": 1,
+      "calls_scored": 7,
+      "tokens_scored": 26972
+    },
+    "loop+graph": {
+      "repeats": 1,
+      "pass_rate_mean": 1.0,
+      "pass_rate_min": 1.0,
+      "pass_rate_max": 1.0,
+      "avg_attempts": 1,
+      "first_attempt_rate_mean": 1,
+      "calls_scored": 7,
+      "tokens_scored": 14657
+    }
+  }
+}
