@@ -138,6 +138,7 @@ function renderSidebar() {
       h("button", {class: "item muted", onclick: () => automationsDialog()}, h("span", {style: "width:24px;text-align:center"}, "⏰"), "Automations", jobBadge()),
       canInstall() ? h("button", {class: "item muted", onclick: installApp}, h("span", {style: "width:24px;text-align:center"}, "⤓"), "Install the app") : null),
     h("div", {class: "side-foot"}, avatar(me().name), h("span", {class: "who"}, me().name, me().role !== "owner" ? h("small", {class: "muted", style: "margin-left:6px"}, me().role) : null),
+      h("button", {class: "icon-btn", "aria-label": "How to use", title: "How to use", onclick: () => helpDialog(), style: "font-weight:700"}, "?"),
       h("button", {class: "icon-btn", "aria-label": "Change theme", title: "Theme", onclick: cycleTheme}, icon("theme")),
       h("button", {class: "icon-btn", "aria-label": "Settings", title: "Settings", onclick: settingsDialog}, icon("gear"))));
 }
@@ -193,7 +194,7 @@ function renderTopbar(force) {
          h("div", {style: "min-width:0"}, h("div", {class: "title"}, (r.kind === "dm" ? "" : "# ") + roomLabel(r)),
            h("div", {class: "sub"}, r.kind === "dm" ? ((st.agents.find((a) => a.name === roomLabel(r)) || {}).persona || "Direct message") : "Members: " + r.members.join(", ")))] : h("div", {class: "title"}, "Kintsugi"),
     h("span", {class: "sp"}),
-    n ? h("button", {class: "pill-btn warn", onclick: () => { const a = st.approvals[0]; if (a.room !== S.room) openRoom(a.room); else $("#scroll").scrollTop = $("#scroll").scrollHeight; }}, n + " waiting for approval") : null,
+    n ? h("button", {class: "pill-btn warn", onclick: () => { const a = st.approvals[0]; if (a.room !== S.room) openRoom(a.room); else $("#scroll").scrollTop = $("#scroll").scrollHeight; }}, h("span", {class: "pill-n"}, String(n)), h("span", {class: "pill-long"}, " waiting for approval")) : null,
     imp.running ? h("button", {class: "pill-btn", onclick: settingsDialog, title: imp.progress || ""}, SPARK(), "Studying…") : null,
     imp.pending ? h("button", {class: "pill-btn", onclick: settingsDialog}, imp.pending + " improvement" + (imp.pending > 1 ? "s" : "") + " to review") : null,
     isAdmin() ? h("button", {class: "pill-btn", "aria-pressed": S.drawer, onclick: () => toggleDrawer()}, icon("panel", 16), "Details") : null);
@@ -996,13 +997,13 @@ function connectDialog(failed) {
   const input = h("input", {type: "password", placeholder: "Access token", autocomplete: "off", "aria-label": "Access token"});
   const go = (close) => { S.token = input.value.trim(); store.set("kt-token", S.token); try { sessionStorage.setItem("kt", S.token); } catch (e) { /* ok */ } close(); poll(true); };
   dialog("Sign in", failed ? "That sign-in did not work. It may have been changed or removed. Paste your access token (the owner's) or the personal token from your invite, or ask whoever runs this workspace for a new link."
-    : "Paste your access token: the owner's token, or the personal token from your invite. It stays in this browser.",
+    : "Paste your access token. If you set this up yourself, it is the password you chose (the KINTSUGI_TOKEN setting). If someone invited you, use the personal token from your invite. It stays in this browser.",
     h("form", {onsubmit: (e) => e.preventDefault()}, input),
     (close) => [h("button", {class: "btn primary", onclick: () => go(close)}, "Sign in")]);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#dialog-root .btn.primary").click(); });
 }
 function newChatDialog() {
-  const list = agents().map((a) => h("button", {class: "item", onclick: () => { close(); dmWith(a.name); }}, avatar(a.name), h("span", {class: "t"}, a.name), h("small", {class: "muted"}, a.persona.slice(0, 40))));
+  const list = agents().map((a) => h("button", {class: "item", onclick: () => { close(); dmWith(a.name); }}, avatar(a.name), h("span", {class: "t"}, a.name), h("small", {class: "muted persona-hint"}, a.persona.slice(0, 40))));
   const close = dialog("New chat", "Message one agent directly, or start a group room.", h("div", {},
     list.length ? list : h("p", {class: "muted"}, "No agents yet."),
     h("div", {style: "display:flex;gap:8px;margin-top:10px"}, isAdmin() ? h("button", {class: "btn", onclick: () => { close(); newRoomDialog(); }}, "New group room") : null, h("button", {class: "btn", onclick: () => { close(); newAgentDialog(); }}, "New agent"))),

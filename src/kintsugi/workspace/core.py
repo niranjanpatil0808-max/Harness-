@@ -21,7 +21,7 @@ from typing import Callable
 from kintsugi.memory import tokens
 from kintsugi.model import Model, ModelInfraError, ModelRequestError, OpenAIAdapter, QuotaExhausted
 
-from . import compact, origins, perms, personal, providers, tasks, uploads
+from . import compact, explain, origins, perms, personal, providers, tasks, uploads
 from .db import Database
 from .keychain import Keychain
 
@@ -980,7 +980,7 @@ class Workspace:
                     run_agent(self, agent, room, message_id, hops)
                     outcome = "ran"
                 except (ModelInfraError, QuotaExhausted, ModelRequestError, RuntimeError) as err:
-                    self._run_failed(agent, room, hops, f"{agent} could not get an answer from the model: {err}", err)
+                    self._run_failed(agent, room, hops, f"{agent} could not answer: {explain.explain_model_error(err)}", err)
                 except Exception as err:  # a bug must show up in the room, never vanish on a worker thread
                     self._run_failed(agent, room, hops, f"{agent} hit an internal error: {type(err).__name__}: {err}", err)
                 try:

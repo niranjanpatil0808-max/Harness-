@@ -135,6 +135,7 @@ function openSwitcher() {
     for (const [k, label] of settingsTabs()) if (!low || label.toLowerCase().includes(low) || k.includes(low)) out.push({kind: "Settings", title: label, sub: SETTINGS_BLURB[k], run: () => settingsDialog(k)});
     if (S.room && (!low || "save export download chat markdown".includes(low) || low.split(" ").some((w) => w.length > 2 && "save export download markdown".includes(w)))) out.push({kind: "Action", title: "Save this chat as a file", run: () => exportChat(S.room)});
     if (!low || "tasks team board assign".includes(low) || low.split(" ").some((w) => w.length > 2 && "tasks board assign".includes(w))) out.push({kind: "Action", title: "Team tasks", sub: "Give an agent a task, follow progress", run: () => tasksDialog()});
+    if (!low || "help guide how to use tips".includes(low) || low.split(" ").some((w) => w.length > 2 && "help guide tips tour".includes(w))) out.push({kind: "Action", title: "How to use Kintsugi", run: helpDialog});
     if (isAdmin() && (!low || "starter team template".includes(low))) out.push({kind: "Action", title: "Start from a team", run: startersDialog});
     return out.slice(0, 14);
   };
@@ -281,4 +282,22 @@ async function rate(m, good, btn) {
     const row = btn.closest(".msg-actions"); if (row) row.querySelectorAll(".rate").forEach((b) => b.classList.toggle("on", S.rated[m.id] === (b.dataset.good === "1")));
     if (now !== null) toast(now ? "Thanks. Agents will do more of this for you." : "Noted. Agents will adjust to you over time.");
   } catch (e) { toast(e.message, true); }
+}
+
+
+/* ---------- a short guide inside the app ---------- */
+function helpDialog() {
+  const tip = (title, text) => h("div", {class: "tip"}, h("strong", {}, title), h("p", {class: "muted", style: "margin:2px 0 0"}, text));
+  const touch = matchMedia("(hover: none)").matches;
+  dialog("How to use Kintsugi", "A few things worth knowing.", h("div", {class: "tips"},
+    tip("Talk to an agent", "Type your message. In a group room, tap the @name chips above the box to choose who answers, or write @name yourself. @all asks every agent at once."),
+    tip("Give a task to the team", "Tasks in the sidebar: pick a room and an agent and say what to do. Everyone in the room follows it to done."),
+    tip("Approvals", "When an agent wants to run code or do something risky, a card shows exactly what it will do. Read it, then Allow once or Deny."),
+    tip("Share a good answer", "Tap Share under any message to copy it into another room. 👍 and 👎 teach agents how you like answers."),
+    tip("Find anything", touch ? "Tap Search in the sidebar to find chats, agents, settings and old messages." : "Press Ctrl or Cmd + K, or use Search in the sidebar, to find chats, agents, settings and old messages."),
+    tip("Add a file", "The paperclip gives an agent a text file (notes, CSV, code). Only this chat can see it."),
+    tip("Talk instead of type", "The microphone dictates your message, and the speaker reads replies aloud (Settings > General has a hands-free mode)."),
+    tip("Stay in control", "Settings > Models for your AI key, Usage for what it costs, and Internet for what each agent may look up. Agents never go online unless you allow it."),
+    isOwner() ? tip("Bring your team", "Settings > Team > Create invite link. Each link works once; send it privately.") : null),
+    (c) => [h("button", {class: "btn primary", onclick: c}, "Got it")]);
 }

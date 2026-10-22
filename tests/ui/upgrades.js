@@ -14,6 +14,11 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8804';
   if (!/\(evil\.example\.com\)/.test(links)) errs.push('look-alike link does not show its host: ' + links);
   if (/example\.com\/a<\/a><span/.test(links)) errs.push('an honest link got a host label');
   if (/href="(tel|javascript)/.test(links)) errs.push('a non-web link kept its destination');
+  // 0b. the in-app guide opens from the sidebar's ? button and from search
+  await p.click('button[aria-label="How to use"]');
+  await p.waitForSelector('.dialog:has-text("How to use Kintsugi") .tip');
+  if ((await p.locator('.tip').count()) < 6) errs.push('the guide has too few tips');
+  await p.keyboard.press('Escape');
   // 1. settings is a page with grouped sections; the owner sees every section including Usage
   await p.click('button[aria-label="Settings"]');
   await p.waitForSelector('.set-nav .set-item.on');

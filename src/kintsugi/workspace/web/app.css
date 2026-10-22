@@ -265,3 +265,15 @@ kbd{margin-left:auto;font:600 11px var(--sans);color:var(--muted);border:1px sol
 .bubble.shared{white-space:normal}.bubble.shared blockquote{margin:6px 0 0;padding-left:10px;border-left:3px solid var(--accent)}
 .mini.rate.on{background:color-mix(in srgb,var(--accent) 22%,transparent);border-color:var(--accent)}
 .linkhost{font-size:12px;color:var(--muted);white-space:nowrap}
+
+/* phone polish */
+.persona-hint{max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bars{justify-content:flex-start}.bar{flex:0 1 44px;max-width:44px}
+@media(max-width:860px){
+  #topbar .title{min-width:3ch}
+  #topbar .pill-btn.warn .pill-long{display:none}  /* "1 waiting for approval" becomes a compact "1 to approve" badge so the room name keeps its space */
+  #topbar .pill-btn.warn .pill-n::after{content:" to approve"}
+}
+@media(max-width:700px){.set-title,.set-title+p{display:none}}  /* the selected chip already says which section this is */
+@media(hover:none){kbd{display:none}}
+.tips{display:flex;flex-direction:column;gap:10px;max-height:56vh;overflow:auto}.tip strong{display:block}
