@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/img/team-tasks.png" alt="The team task board: give an agent a task in a shared room and everyone follows it to done" width="78%">
-  <img src="docs/img/phone-chat.png" alt="The same workspace on a phone" width="17%">
+  <img src="docs/img/team-tasks.png" alt="The team task board: teammates give agents tasks in a shared room and everyone follows them to done" width="42%">
+  <img src="docs/img/phone-chat.png" alt="The same workspace on a phone" width="22%">
 </p>
 <p align="center"><sub>Screenshots use the built-in scripted demo model, so they show the app, not a real model's answers.</sub></p>
 
