@@ -17,7 +17,7 @@
 
 Kintsugi is a shared workspace where **you, your teammates and AI agents work side by side**. Invite your team with a link, and everyone gets their own login, private chats and shared rooms. Hand an agent a task and the whole room follows it to done. Share a good answer with the team in one tap. Agents remember, work in parallel and on a schedule, and **learn how each person likes to work**.
 
-You stay in control: agents ask before anything risky, run code in a locked box, go online only if you allow it, and show what they cost. You paste your own key (OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Ollama or any OpenAI-style address). Nothing is hosted or sold for you, and your data stays on your server.
+You stay in control: agents ask before anything risky, run code in a locked box, go online only if you allow it, and show what they cost. You paste your own key (OpenAI, Anthropic, Gemini, Meta Llama API, DeepSeek, Groq, OpenRouter, Ollama or any OpenAI-style address). Nothing is hosted or sold for you, and your data stays on your server.
 
 > Built for the Meta Global AI Developer Hackathon (Indie developer track). Python standard library only; two small web libraries are bundled for the interface. "Kintsugi" is a working name.
 
@@ -67,7 +67,7 @@ Open the link on your computer or phone. A short setup asks for your provider an
 | **Web search** with your own key (Tavily or Brave): cited snippets, no page fetching | **Works** against test servers; **not yet tried against the live services** |
 | **Automations:** daily briefing, change watcher that stays silent unless something matters, research report, your own task; your time zone | **Works** (scheduling and time zones tested incl. daylight saving); search-based ones need a search key |
 | **Notifications** that never contain your message, plus unread markers and an app badge | **Works** in tests with a fake push service; **not yet verified against Google's, Apple's or Mozilla's real push services** |
-| **Bring your own key:** any OpenAI-style API (OpenAI, DeepSeek, Groq, Together, OpenRouter, Ollama...), Anthropic or Gemini; set up in the app, per agent if you like | **Works** against fake servers in tests; **not yet tried with real keys** (I have none of those services here) |
+| **Bring your own key:** any OpenAI-style API (OpenAI, Meta Llama API, DeepSeek, Groq, Together, OpenRouter, Ollama...), Anthropic or Gemini; set up in the app, per agent if you like | **Works** against fake servers in tests; **not yet tried with real keys** (I have none of those services here) |
 | **Internet control:** each agent is Off / Ask each time / Allow, plus a master switch; agents can read one public page as text | **Works** in tests (including attempts to reach private addresses); not yet tried on the live internet |
 | **Agents in parallel:** several agents work at once; `@all` gives everyone the same task; you set how many | **Works** (tested for real overlap) |
 | **Plugins:** skills and web-API tools from a folder or GitHub repo, previewed in full before install ([docs/PLUGINS.md](docs/PLUGINS.md)) | **Works** against fake servers; no plugin code runs; Python-code plugins are **not built** |

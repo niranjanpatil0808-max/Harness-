@@ -221,6 +221,10 @@ class TestProviderApi(WithFake):
         conn.request("POST", "/api/providers/save", "{}", {})
         self.assertEqual(conn.getresponse().status, 401)
         self.assertEqual(self.call("GET", "/api/providers")[1]["presets"]["anthropic"]["kind"], "anthropic")
+        meta = self.call("GET", "/api/providers")[1]["presets"]["meta"]  # Meta's Llama API speaks the OpenAI style at /compat/v1
+        self.assertEqual((meta["kind"], meta["base_url"]), ("openai", "https://api.llama.com/compat/v1"))
+        from kintsugi.workspace import providers
+        self.assertEqual(providers.clean_base_url(meta["base_url"]), "https://api.llama.com/compat/v1")
 
 
 if __name__ == "__main__":

@@ -31,6 +31,7 @@ PRESETS = {
     "openai": {"label": "OpenAI", "kind": "openai", "base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini", "signup": "https://platform.openai.com/api-keys"},
     "anthropic": {"label": "Anthropic (Claude)", "kind": "anthropic", "base_url": "https://api.anthropic.com", "model": "claude-haiku-5-5", "signup": "https://console.anthropic.com/settings/keys"},
     "gemini": {"label": "Google Gemini", "kind": "gemini", "base_url": "https://generativelanguage.googleapis.com", "model": "gemini-2.5-flash", "signup": "https://aistudio.google.com/apikey"},
+    "meta": {"label": "Meta Llama API", "kind": "openai", "base_url": "https://api.llama.com/compat/v1", "model": "Llama-4-Maverick-17B-128E-Instruct-FP8", "signup": "https://llama.developer.meta.com"},
     "deepseek": {"label": "DeepSeek", "kind": "openai", "base_url": "https://api.deepseek.com", "model": "deepseek-chat", "signup": "https://platform.deepseek.com/api_keys"},
     "groq": {"label": "Groq (free tier)", "kind": "openai", "base_url": "https://api.groq.com/openai/v1", "model": "llama-3.3-70b-versatile", "signup": "https://console.groq.com/keys"},
     "openrouter": {"label": "OpenRouter (many models)", "kind": "openai", "base_url": "https://openrouter.ai/api/v1", "model": "meta-llama/llama-3.3-70b-instruct", "signup": "https://openrouter.ai/keys"},

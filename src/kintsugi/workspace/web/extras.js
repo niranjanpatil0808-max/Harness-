@@ -68,8 +68,8 @@ async function usagePanel() {
 }
 
 /* ---------- first-run setup ---------- */
-const WIZARD_HINTS = {groq: "Free tier, fast", openai: "GPT models", anthropic: "Claude models", gemini: "Gemini models", deepseek: "Low cost", openrouter: "Many models, one key", together: "Open models", ollama: "On your own computer, no key"};
-const WIZARD_ORDER = ["groq", "openai", "anthropic", "gemini", "deepseek", "openrouter", "together", "ollama"];
+const WIZARD_HINTS = {groq: "Free tier, fast", meta: "Meta Llama models", openai: "GPT models", anthropic: "Claude models", gemini: "Gemini models", deepseek: "Low cost", openrouter: "Many models, one key", together: "Open models", ollama: "On your own computer, no key"};
+const WIZARD_ORDER = ["groq", "meta", "openai", "anthropic", "gemini", "deepseek", "openrouter", "together", "ollama"];
 async function setupWizard() {
   if (S.wizardOpen) return;
   S.wizardOpen = true;
